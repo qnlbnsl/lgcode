@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HarnessSettings } from "@lgcode/contracts";
+import type { HarnessSettings } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 
 import { formatReport, hasRecordingFailures, recordFixtures, runRecording } from "../recorder.ts";
@@ -68,7 +68,7 @@ export const recordLive = async (deps: RecordingDeps): Promise<RecordingOutcome>
   const errorDirectory = join(deps.outputDirectory, "errors");
   const errorSamples = await Promise.all((await readdir(errorDirectory)).filter((name) => name.endsWith(".json")).map(async (name) =>
     JSON.parse(await readFile(join(errorDirectory, name), "utf8"))));
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "lgcode-live-record-"));
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "lgtm-live-record-"));
   try {
     const results = await deps.record({
       harnesses, outputDirectory: deps.outputDirectory, temporaryRoot, homeDirectory, parentEnvironment,

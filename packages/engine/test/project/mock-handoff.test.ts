@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { MockBundle } from "@lgcode/contracts"
+import type { MockBundle } from "@lgtm/contracts"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
@@ -16,7 +16,7 @@ import { eventually, snapshot } from "../support/routingRig.ts"
 import { accountFor, echoFile, harnessFor, makeRunnerRig, readEcho, removeRunnerRig, withEngine, writeFakeAdapter, type RunnerRig } from "../support/acpRunnerRig.ts"
 let rig: RunnerRig
 beforeEach(() => {
-  rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig) })
@@ -35,7 +35,7 @@ it.live("delivers owner approval over the real authenticated engine and ACP chil
     const settled = yield* eventually(snapshot, (state) => state.agents[project.leadAgentId]?.state._tag === "idle")
     expect(settled.agents[project.leadAgentId]?.state._tag).toBe("idle")
     writeFileSync(join(workspace.path, "review.html"), "<h1>Repository-authored screen</h1>")
-    const lead = yield* connect(rig.socket, peer.env.LGCODE_TOKEN!)
+    const lead = yield* connect(rig.socket, peer.env.LGTM_TOKEN!)
     const bundle: typeof MockBundle.Type = {
       sources: [{ sourceId: "screen" as never, worktreeId: workspace.worktreeId, path: "review.html", kind: "screens" }],
       screens: [{ screenId: "home" as never, sourceId: "screen" as never, name: "Home", route: "/home",

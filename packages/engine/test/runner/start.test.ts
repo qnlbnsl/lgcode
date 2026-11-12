@@ -18,9 +18,9 @@ import { eventually, tagged } from "../support/routingRig.ts";
 // Criterion 6.1 (task 6a.1; rows 18, 22, 33, 39, 57, 60; issue 64): starting
 // an agent spawns its adapter from the harness's absolute path, at its stored
 // real folder, in a new process group, with exactly the allow-listed
-// environment plus the account's variables and exactly `LGCODE_SOCKET` and
-// `LGCODE_TOKEN`. Except for Codex (issue 236, lgcode-server.test.ts),
-// `session/new` gets the `lgcode mcp` server with `process.execPath` and
+// environment plus the account's variables and exactly `LGTM_SOCKET` and
+// `LGTM_TOKEN`. Except for Codex (issue 236, lgtm-server.test.ts),
+// `session/new` gets the `lgtm mcp` server with `process.execPath` and
 // an absolute script path. The session id and negotiated version are recorded.
 //
 // The child is the fake agent, which writes what it was started with to its
@@ -31,7 +31,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -47,12 +47,12 @@ const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) =>
 
 registerRebuildCheck({ noLog: true });
 
-live("6.1 environment: the child gets exactly the allow-list, the account's variables with secrets resolved, and the runner's own LGCODE_SOCKET and LGCODE_TOKEN (breaks if the runner extends process.env, passes HERDR_* or a LGCODE_* wildcard, lets an account override the socket, or passes a secret reference unresolved)", () =>
+live("6.1 environment: the child gets exactly the allow-list, the account's variables with secrets resolved, and the runner's own LGTM_SOCKET and LGTM_TOKEN (breaks if the runner extends process.env, passes HERDR_* or a LGTM_* wildcard, lets an account override the socket, or passes a secret reference unresolved)", () =>
   withAcpRunner(rig, { secrets: { "secret:planted-key": plantedSecret } }, ({ runner }) => Effect.gen(function* () {
     const echo = echoFile(rig);
     const harness = harnessFor("first", writeFakeAdapter(rig));
     const account = accountFor("first", { turns: [] }, echo, {
-      PLANTED_API_KEY: "secret:planted-key", PLAIN_SETTING: "plain value", HERDR_ENV: "account-herdr", LGCODE_SOCKET: "/tmp/account-forged.sock",
+      PLANTED_API_KEY: "secret:planted-key", PLAIN_SETTING: "plain value", HERDR_ENV: "account-herdr", LGTM_SOCKET: "/tmp/account-forged.sock",
     });
     const spawn = yield* spawnFor(rig, harness, account);
     yield* runner.start(spawn.input);
@@ -63,7 +63,7 @@ live("6.1 environment: the child gets exactly the allow-list, the account's vari
     Object.assign(expected, {
       FAKE_AGENT_SCRIPT: account.environment!.FAKE_AGENT_SCRIPT, FAKE_AGENT_ECHO: echo,
       PLANTED_API_KEY: plantedSecret, PLAIN_SETTING: "plain value",
-      LGCODE_SOCKET: rig.socket, LGCODE_TOKEN: spawn.token,
+      LGTM_SOCKET: rig.socket, LGTM_TOKEN: spawn.token,
     });
     expect(seen.env).toEqual(expected);
     expect(Object.keys(seen.env).filter((name) => name.startsWith("HERDR_"))).toEqual([]);
@@ -106,7 +106,7 @@ live("6.1 adapter path: a stored adapter path containing /../ is refused at star
     expect(existsSync(echo), "the fake agent wrote its echo file, so the unresolved path was spawned").toBe(false);
   })));
 
-live("6.1 tool server: session/new gets one stdio server that runs process.execPath on the absolute path of packages/cli/src/bin.ts with `mcp`, and no argument carries the token (breaks if the runner sends no mcpServers, uses `node` or `lgcode` from PATH, a relative script, or puts the token in the arguments)", () =>
+live("6.1 tool server: session/new gets one stdio server that runs process.execPath on the absolute path of packages/cli/src/bin.ts with `mcp`, and no argument carries the token (breaks if the runner sends no mcpServers, uses `node` or `lgtm` from PATH, a relative script, or puts the token in the arguments)", () =>
   withAcpRunner(rig, {}, ({ runner }) => Effect.gen(function* () {
     const echo = echoFile(rig);
     const spawn = yield* spawnFor(rig, harnessFor("first", writeFakeAdapter(rig)), accountFor("first", { turns: [] }, echo));
@@ -119,7 +119,7 @@ live("6.1 tool server: session/new gets one stdio server that runs process.execP
     expect(servers[0]!.command).toBe(process.execPath);
     expect(servers[0]!.args).toEqual([mcpScriptPath, "mcp"]);
     expect(JSON.stringify(servers[0]!.args)).not.toContain(spawn.token);
-    for (const variable of servers[0]!.env ?? []) expect(["LGCODE_SOCKET", "LGCODE_TOKEN"]).toContain(variable.name);
+    for (const variable of servers[0]!.env ?? []) expect(["LGTM_SOCKET", "LGTM_TOKEN"]).toContain(variable.name);
   })));
 
 live("6.1 session: start returns the adapter's session id and the negotiated protocol version, for version 2 and for a version 1 adapter that advertises loadSession (breaks if the runner reports the version it offered, or a session id of its own)", () =>

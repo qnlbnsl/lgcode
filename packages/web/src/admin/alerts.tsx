@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { Alert, EventSequence, RequestId } from "@lgcode/contracts"
+import type { Alert, EventSequence, RequestId } from "@lgtm/contracts"
 import { commandOutcome, requestId, useAdminApi } from "./api.ts"
 import { threadHref } from "../thread/links.ts"
 import { visibleText } from "../thread/text.tsx"
@@ -71,7 +71,7 @@ export function Alerts({ onSessionExpired }: { readonly onSessionExpired: () => 
         <td className="admin-record-name"><span title={visibleText(alert.title)}>{visibleText(alert.title)}</span><small>Status: {alert.status} · Kind: {alert.kind}</small></td>
         <td>{Number.isFinite(alert.raisedAt) ? <time dateTime={new Date(alert.raisedAt).toISOString()}>{new Date(alert.raisedAt).toLocaleString()}</time> : "Time unavailable"}</td>
         <td>{alert.agentId !== undefined ? <a href={threadHref(alert.agentId,
-          alert.subject?._tag === "piece" ? `${alert.subject.namespace}:${alert.subject.id}` : undefined)}>Open thread for {visibleText(alert.agentId)}</a> : "LGcode"}</td>
+          alert.subject?._tag === "piece" ? `${alert.subject.namespace}:${alert.subject.id}` : undefined)}>Open thread for {visibleText(alert.agentId)}</a> : "LGTM Studio"}</td>
         <td className={`admin-record-status${alert.delivery?.status === "failed" ? " admin-warning" : ""}`}>
         {alert.delivery !== undefined ? <>
           Delivery: {alert.delivery.status === "delivered" ? "Delivered" : alert.delivery.final ? "Still failing" : "Failed"}

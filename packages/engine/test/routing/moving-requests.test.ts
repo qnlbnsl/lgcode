@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import type { Actor } from "@lgcode/contracts";
+import type { Actor } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -37,7 +37,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

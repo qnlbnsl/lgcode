@@ -13,7 +13,7 @@ import { connect } from "../support/socketClient.ts"
 import { call, freshRequest, makeRig, ownerCredential as owner, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
 
 let rig: Rig
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder) })
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 
 for (const actor of ["owner", "lead"] as const) {

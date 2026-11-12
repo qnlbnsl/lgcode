@@ -22,7 +22,7 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
   expect(existsSync(namespaces), "E1 must define PieceNamespace").toBe(true);
   expect(existsSync(visibility), "E8 must define eventVisibility").toBe(true);
   expect(existsSync(lists), "E22 must expose the default typed lists").toBe(true);
-  const home = mkdtempSync("/tmp/lgcode-piece-types-");
+  const home = mkdtempSync("/tmp/lgtm-piece-types-");
   try {
     const fixture = join(home, "fixture.mts");
     writeFileSync(fixture, `

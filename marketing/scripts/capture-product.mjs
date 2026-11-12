@@ -7,7 +7,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1.5 });
   await page.goto('http://127.0.0.1:4178/workbench.html');
-  await page.waitForFunction(() => window.lgcodeReady);
+  await page.waitForFunction(() => window.lgtmReady);
   await page.locator('[data-project="workspace"]').first().click();
   await page.evaluate(() => setTheme('dark', false));
   await page.evaluate(() => document.fonts.ready);

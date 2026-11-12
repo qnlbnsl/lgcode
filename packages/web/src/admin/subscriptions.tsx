@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import type { Account, AccountId, ClientSnapshot, HarnessId, HarnessSettings, RequestId } from "@lgcode/contracts"
+import type { Account, AccountId, ClientSnapshot, HarnessId, HarnessSettings, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"

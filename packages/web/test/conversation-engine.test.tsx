@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client"
 import { expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { ProjectId } from "@lgcode/contracts"
+import { ProjectId } from "@lgtm/contracts"
 import { CommandHandler } from "../../engine/src/commands/CommandHandler.ts"
 import { dispatchQueued } from "../../engine/src/routing/deliveries.ts"
 import { provideBoard, boardState } from "../../engine/test/board/wakeFixtures.ts"
@@ -19,7 +19,7 @@ import { AgentTools } from "../src/thread/agentTools.tsx"
 import { TeamConversation } from "../src/thread/team.tsx"
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
@@ -27,7 +27,7 @@ vi.mock("@lgcode/client/browser", async () => {
 
 it("mounts real context search, prompt/configuration and owner team peek without consuming member marks", async () => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.spyOn(document, "hidden", "get").mockReturnValue(false)
   const git = (...args: string[]) => execFileSync("/usr/bin/git", ["-C", rig.work, ...args], { stdio: "pipe" })
   const container = document.createElement("div"); document.body.append(container)

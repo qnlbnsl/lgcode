@@ -1,4 +1,4 @@
-import { eventVisibility, type EventEnvelope } from "@lgcode/contracts";
+import { eventVisibility, type EventEnvelope } from "@lgtm/contracts";
 import type { emptyViews } from "../../src/views/apply.ts";
 
 // Independent specification oracle: structural children stay readable, and

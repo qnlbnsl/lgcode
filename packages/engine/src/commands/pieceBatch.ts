@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eventEffect, pieceNamespaces, projectTeamGroup, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgcode/contracts";
+import { eventEffect, pieceNamespaces, projectTeamGroup, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { own, projectView, projectKey } from "../project/view.ts";
@@ -36,7 +36,7 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
       && event.anchorAgentId === project.leadAgentId && event.manager?._tag === "agent" && event.manager.agentId === project.leadAgentId
       && event.opener._tag === "agent" && event.opener.agentId === project.leadAgentId && event.members.length === 0
       && own(projectView(snapshot).teams, projectKey(team.projectId, team.teamId)) === undefined
-      && !Object.hasOwn((snapshot.board as import("@lgcode/contracts").BoardView).channels, event.channelId)
+      && !Object.hasOwn((snapshot.board as import("@lgtm/contracts").BoardView).channels, event.channelId)
       && (caller?._tag === "owner" || caller?._tag === "agent" && caller.agentId === project.leadAgentId);
   };
   if (batch.events.some((event) => !event._tag.startsWith(`${namespace}.`) && event._tag !== "DeliveryWithdrawn" && !teamChannel(event))) return yield* refused();

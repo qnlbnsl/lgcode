@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -23,6 +23,7 @@ import { SecretStore as SecretStoreService } from "./commands/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
+import { adoptLegacyVariables } from "@lgtm/contracts/legacyNames";
 import * as CommandHandler from "./commands/CommandHandler.ts";
 import { isInferredSecretValue } from "./identity/inferredSecret.ts";
 import { redactingLoggerLayer } from "./identity/logger.ts";
@@ -105,7 +106,7 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
   // A detached launcher needs evidence of which child won the lock, rather
   // than inferring it from timing the losing child's exit. This is an
   // inherited parent/child channel, never a second listener.
-  if (process.send !== undefined) process.send({ _tag: "LGcodeLockAcquired" }, () => { if (process.connected) process.disconnect?.(); });
+  if (process.send !== undefined) process.send({ _tag: "LgtmLockAcquired" }, () => { if (process.connected) process.disconnect?.(); });
   const socketPath = join(folder, "engine.sock");
   yield* Effect.try({ try: () => {
     try {
@@ -115,8 +116,8 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
   }, catch: () => new Error("stale socket removal failed") });
   const listener = yield* listen(socketPath);
   const ownerCredential = yield* loadOwnerCredential(folder);
-  const debug = process.env.LGCODE_TEST_DEBUG === "1" && inTemporaryFolder(folder);
-  const protocolLog = process.env.LGCODE_TEST_PROTOCOL_LOG === "1" && inTemporaryFolder(folder);
+  const debug = process.env.LGTM_TEST_DEBUG === "1" && inTemporaryFolder(folder);
+  const protocolLog = process.env.LGTM_TEST_PROTOCOL_LOG === "1" && inTemporaryFolder(folder);
   const databasePath = join(folder, "events.sqlite");
   // Enable WAL before the copied client's reader worker can first open it.
   yield* Effect.try({ try: () => {
@@ -188,10 +189,11 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
 // A graceful signal interrupts the whole scoped program. Finalizers close
 // connections and adapters before releasing the lifetime lock.
 if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const inheritedToken = process.env.LGCODE_TOKEN;
-  const webPassword = process.env.LGCODE_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.LGCODE_WEB_PASSWORD);
-  delete process.env.LGCODE_WEB_PASSWORD;
-  delete process.env.LGCODE_TOKEN;
+  adoptLegacyVariables(process.env);
+  const inheritedToken = process.env.LGTM_TOKEN;
+  const webPassword = process.env.LGTM_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.LGTM_WEB_PASSWORD);
+  delete process.env.LGTM_WEB_PASSWORD;
+  delete process.env.LGTM_TOKEN;
   process.umask(0o077);
   const fiber = Effect.runFork(program(inheritedToken, webPassword));
   const stop = () => fiber.interruptUnsafe();

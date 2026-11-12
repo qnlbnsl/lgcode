@@ -88,7 +88,7 @@ Remove an address from the local table if its owner asks to leave the list.
 ## Reproduce the screenshots and checks
 
 The public images were captured from `design/workbench.html` with its sample data.
-They show the current mockup, which still displays the LGcode name.
+They show the current mockup, which still displays the LGTM Studio name.
 They do not claim that every mockup feature is released.
 The mockup server used for capture is bound to loopback.
 It is never exposed through the marketing server.

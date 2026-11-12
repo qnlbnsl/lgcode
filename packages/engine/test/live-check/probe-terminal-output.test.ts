@@ -5,8 +5,8 @@ import { probeCommands } from "../../scripts/live/liveProbes.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, runProbe, type FakeEngine } from "./probe-fake-engine.ts";
 
-vi.mock("@lgcode/client", async (original) => {
-  const client = await original<typeof import("@lgcode/client")>();
+vi.mock("@lgtm/client", async (original) => {
+  const client = await original<typeof import("@lgtm/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -49,7 +49,7 @@ it("issue 243: an observed socket ownership rejection is not observable and rema
   engine.script = { onPrompt: (e, p) => {
     e.tool(p.agentId, "env", { command: probeCommands(e.state).removedVariables });
     const result = p.agentId === LEAD ? "the engine refused this identity (HTTP 403)"
-      : "lgcode: the folder /tmp above the socket is owned by another user";
+      : "lgtm: the folder /tmp above the socket is owned by another user";
     e.finish(p.agentId, "env", "failed", output("LCP_ENV_BEGIN\nPATH\nLCP_ENV_END\n" + result + "\n", 1));
     e.turnEnded(p.agentId);
   } };

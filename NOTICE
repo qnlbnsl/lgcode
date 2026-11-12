@@ -1,12 +1,12 @@
-LGcode
+LGTM Studio
 
-This file lists the code in LGcode that comes from other open-source
+This file lists the code in LGTM Studio that comes from other open-source
 projects. Each entry names the project, its copyright holder, its licence,
-where the code lives in LGcode, and where the licence text is.
+where the code lives in LGTM Studio, and where the licence text is.
 
 - T3 Code (https://github.com/pingdotgg/t3code)
   Copyright (c) 2026 T3 Tools Inc. MIT License.
-  In LGcode, one folder for each copied package, all under third_party/t3code/:
+  In LGTM Studio, one folder for each copied package, all under third_party/t3code/:
     third_party/t3code/effect-acp (the Agent Client Protocol client and server)
     third_party/t3code/node-sqlite (the SQLite client for Node.js)
     third_party/t3code/provider-instance (provider instance settings and home layouts)
@@ -18,7 +18,7 @@ where the code lives in LGcode, and where the licence text is.
 
 - Inter (https://github.com/rsms/inter)
   Copyright 2016 The Inter Project Authors. SIL Open Font License 1.1.
-  In LGcode: third_party/inter/InterVariable-latin.woff2, the Latin subset of
+  In LGTM Studio: third_party/inter/InterVariable-latin.woff2, the Latin subset of
   Inter 4.001, used by the web mock in design/ and the production shell
   through packages/web/src/tokens.css, and served unchanged by the separate
   marketing page in marketing/.
@@ -26,7 +26,7 @@ where the code lives in LGcode, and where the licence text is.
 
 - JetBrains Mono (https://github.com/JetBrains/JetBrainsMono)
   Copyright 2020 The JetBrains Mono Project Authors. SIL Open Font License 1.1.
-  In LGcode: third_party/jetbrains-mono/JetBrainsMono-latin.woff2, the Latin
+  In LGTM Studio: third_party/jetbrains-mono/JetBrainsMono-latin.woff2, the Latin
   subset of JetBrains Mono 2.211, used by the web mock in design/ and the
   production shell through packages/web/src/tokens.css.
   Licence text: third_party/jetbrains-mono/OFL.txt.
@@ -34,7 +34,7 @@ where the code lives in LGcode, and where the licence text is.
 - Lucide (https://lucide.dev)
   Copyright Lucide Contributors 2022, with portions copyright Cole Bemis
   2013-2022 as part of Feather (MIT). ISC License.
-  In LGcode: icon paths inline in design/workbench.html and design/workbench.js,
+  In LGTM Studio: icon paths inline in design/workbench.html and design/workbench.js,
   and in design/mock/js/icons.js for the rebuilt mock.
   Each icon and where it is used are listed in third_party/lucide/README.md.
   Licence text: third_party/lucide/LICENSE.
@@ -42,7 +42,7 @@ where the code lives in LGcode, and where the licence text is.
 - OpenPencil (https://github.com/open-pencil/open-pencil)
   Copyright (c) 2026 Danila Poyarkov and OpenPencil contributors. MIT License.
   Pinned source: cb717376a6252b0387f95d1e8bf33a0b196eb9bf.
-  In LGcode: the licence and browser-distribution integration attribution in
+  In LGTM Studio: the licence and browser-distribution integration attribution in
   third_party/open-pencil/. The pinned local editor image contains the
   upstream browser distribution, its licence and generated dependency notices.
   The exact successful build and retained raw evidence are in BUILD.md.
@@ -55,7 +55,7 @@ where the code lives in LGcode, and where the licence text is.
   Engine dependency used through its public HTML parser and source locations.
   Its entities 9.0.0 dependency (https://github.com/fb55/entities) is
   Copyright (c) Felix Böhm, BSD 2-Clause licence.
-  No implementation source is copied into LGcode's own source tree.
+  No implementation source is copied into LGTM Studio's own source tree.
   Attribution: third_party/parse5/README.md.
   Licence texts: third_party/parse5/LICENSE and third_party/parse5/entities.LICENSE.
 
@@ -63,15 +63,15 @@ where the code lives in LGcode, and where the licence text is.
   (https://github.com/preactjs/preact) bundled inside its standalone build
   htm is Copyright 2018 Google Inc., Apache License 2.0.
   Preact is Copyright (c) 2015-present Jason Miller, MIT License.
-  In LGcode: third_party/htm-preact/standalone.module.js, unchanged, loaded
+  In LGTM Studio: third_party/htm-preact/standalone.module.js, unchanged, loaded
   only by the web mock in design/mock/. No production code uses it.
   The source and checksum are listed in third_party/htm-preact/README.md.
   Licence texts: third_party/htm-preact/LICENSE and
   third_party/htm-preact/preact.LICENSE.
 
-LGcode is also inspired by Herdr Synapse
+LGTM Studio is also inspired by Herdr Synapse
 (https://github.com/vitalysim/herdr-synapse), Copyright 2026 Vitaly
-Simonovich, Apache License 2.0. No Synapse code has been copied into LGcode.
+Simonovich, Apache License 2.0. No Synapse code has been copied into LGTM Studio.
 If any is, it will be listed here with its licence.
 
 The production shell in packages/web/src/shell/Icon.tsx reuses Lucide

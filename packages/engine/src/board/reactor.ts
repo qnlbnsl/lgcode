@@ -1,6 +1,6 @@
 import { transferName } from "./transferName.ts";
-import type { AgentId, Event, EventEnvelope } from "@lgcode/contracts";
-import type { BoardPostView } from "@lgcode/contracts/board/view";
+import type { AgentId, Event, EventEnvelope } from "@lgtm/contracts";
+import type { BoardPostView } from "@lgtm/contracts/board/view";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";

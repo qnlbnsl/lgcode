@@ -9,6 +9,7 @@ import { type Environment, resolveIdentity, stateFolder } from "./identity.ts"
 import { checkSocket, defaultSocketSecurity, type SocketSecurity } from "./socketCheck.ts"
 
 export { ancestryHeaders, ClientError, resolveIdentity, stateFolder }
+export { adoptLegacyVariables } from "@lgtm/contracts/legacyNames"
 export type { Client, Environment, SocketSecurity }
 export type { ClientEnvelope, UnknownEvent } from "./core.ts"
 export { waitForAgents } from "./waitForAgents.ts"

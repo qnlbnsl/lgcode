@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DeliveryId, describeContext } from "@lgcode/contracts";
+import { DeliveryId, describeContext } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { agentText, envelope, senderOf } from "../routing/envelope.ts";

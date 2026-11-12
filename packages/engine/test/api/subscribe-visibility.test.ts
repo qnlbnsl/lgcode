@@ -7,7 +7,7 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Event, eventVisibility, type EventEnvelope } from "@lgcode/contracts";
+import { Event, eventVisibility, type EventEnvelope } from "@lgtm/contracts";
 import { gitReportSample, gitReviewSample } from "../../../contracts/test/gitReviewFixtures.ts";
 import { rolesSamples } from "../../../contracts/test/roles/fixtures.ts";
 import * as Effect from "effect/Effect";

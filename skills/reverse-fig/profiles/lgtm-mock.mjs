@@ -1,15 +1,15 @@
-// Reverse Fig profile for LGcode's web mock, `design/workbench.html`.
+// Reverse Fig profile for LGTM Studio's web mock, `design/workbench.html`.
 // Serve that folder on port 4178 first:  python3 -m http.server 4178 --bind 127.0.0.1
 const sidebar = '<aside class="sidebar" style="position:static;display:block;width:248px;height:auto;padding:4px 0">{slot}</aside>';
 const statusDot = (cls) => `<span class="dot ${cls}" style="display:block"></span>`;
 const agentRow = (dot, label) => `<button class="agent-link"><span class="dot ${dot}"></span><span class="agent-name">Rowan</span><small>${label}</small></button>`;
 
 export default {
-  name: 'lgcode-mock',
+  name: 'lgtm-mock',
   url: process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html',
-  output: 'design/lgcode.fig',
-  work: '.reverse-fig/lgcode-mock',
-  ready: (page) => page.waitForFunction(() => window.lgcodeReady),
+  output: 'design/lgtm.fig',
+  work: '.reverse-fig/lgtm-mock',
+  ready: (page) => page.waitForFunction(() => window.lgtmReady),
   background: 'var(--color-bg)',
   tokens: {
     prefix: '--color-',

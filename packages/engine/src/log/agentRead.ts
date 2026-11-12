@@ -1,5 +1,5 @@
-import type { Caller, EventEnvelope } from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import type { Caller, EventEnvelope } from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { mayReadAgent, visibleTo } from "../api/visibility.ts";

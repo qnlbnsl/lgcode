@@ -83,11 +83,11 @@ export const mcpAskInput = (input: string | undefined, title: string, marker: st
     const value = JSON.parse(input ?? "null");
     if (value === null || typeof value !== "object") return false;
     if (value.server !== undefined || value.tool !== undefined) {
-      if (value.server !== "lgcode" || value.tool !== "ask") return false;
+      if (value.server !== "lgtm" || value.tool !== "ask") return false;
       const payload = typeof value.arguments === "string" ? JSON.parse(value.arguments) : value.arguments;
       return payload?.text === marker && Object.keys(payload).length === 1;
     }
-    return /lgcode.*ask|ask.*lgcode/i.test(title) && value.text === marker && Object.keys(value).length === 1;
+    return /lgtm.*ask|ask.*lgtm/i.test(title) && value.text === marker && Object.keys(value).length === 1;
   } catch { return false; }
 };
 
@@ -98,7 +98,7 @@ export const mcpAskDiscovery = (tool: { input?: string; title: string; status: s
   if (tool.title !== "ToolSearch" || tool.status !== "completed") return false;
   try {
     const input = JSON.parse(tool.input ?? "null");
-    if (input?.query !== "select:mcp__lgcode__ask" || input.max_results !== 1 || Object.keys(input).length !== 2) return false;
+    if (input?.query !== "select:mcp__lgtm__ask" || input.max_results !== 1 || Object.keys(input).length !== 2) return false;
     // Stored raw results and ACP content wrappers retain their structure.
     // Older logs contain arrays per line, or one formatted reference object.
     // Decode those carriers without accepting prose as discovery evidence.
@@ -117,7 +117,7 @@ export const mcpAskDiscovery = (tool: { input?: string; title: string; status: s
     catch { values = (tool.output ?? "").split("\n").filter(Boolean).map((line) => JSON.parse(line)); }
     const references = values.flatMap(referencesOf) as Json[];
     return references.length > 0 && references.every((reference) => reference?.type === "tool_reference"
-      && reference.tool_name === "mcp__lgcode__ask" && Object.keys(reference).length === 2);
+      && reference.tool_name === "mcp__lgtm__ask" && Object.keys(reference).length === 2);
   } catch { return false; }
 };
 // terminal.ts emits redacted replacement snapshots in the existing serialized
@@ -153,7 +153,7 @@ export const shellIdentityStatus = (output: string): "absent" | "present" | "not
   if (listing === undefined) return "not observed";
   const names = listing.split(/\r?\n/);
   if (names.length === 0 || !names.every((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) return "invalid listing";
-  return names.includes("LGCODE_SOCKET") || names.includes("LGCODE_TOKEN") ? "present" : "absent";
+  return names.includes("LGTM_SOCKET") || names.includes("LGTM_TOKEN") ? "present" : "absent";
 };
 export const shellIdentityAbsent = (output: string): boolean => shellIdentityStatus(output) === "absent";
 

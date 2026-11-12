@@ -5,8 +5,8 @@ import { join } from "node:path";
 import {
   AgentId, Event as EventSchema, RequestId,
   type Actor, type Event, type HarnessSettings, type LifecycleState, type PermissionLevel,
-} from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+} from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import type * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
@@ -53,7 +53,7 @@ export interface Rig {
 let defaultFolder = "/tmp";
 
 export const makeRig = (): Rig => {
-  const root = realpathSync(mkdtempSync("/tmp/lgcode-commands-"));
+  const root = realpathSync(mkdtempSync("/tmp/lgtm-commands-"));
   const rig = {
     root, home: join(root, "home"), stateFolder: join(root, "state"), pluginRoot: join(root, "plugin"),
     work: join(root, "work"), outside: join(root, "outside"), database: join(root, "events.sqlite"),

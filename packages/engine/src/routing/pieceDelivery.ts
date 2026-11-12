@@ -1,4 +1,4 @@
-import type { AgentId, Caller, ContextReference, Event, PieceNamespace } from "@lgcode/contracts";
+import type { AgentId, Caller, ContextReference, Event, PieceNamespace } from "@lgtm/contracts";
 import { agentText } from "./envelope.ts";
 import { freshDelivery } from "./holders.ts";
 export interface DeliveryRequest { readonly target: AgentId; readonly body: string; readonly sourceId: string; readonly context?: ReadonlyArray<ContextReference> }

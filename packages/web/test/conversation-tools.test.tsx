@@ -3,15 +3,15 @@ import { ShellDataProvider, useConversation } from "../src/data/ShellDataProvide
 import { act, type ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
-import type { ClientEnvelope } from "@lgcode/client/browser"
-import type { AgentId, ChannelId, ProjectId, TeamId } from "@lgcode/contracts"
+import type { ClientEnvelope } from "@lgtm/client/browser"
+import type { AgentId, ChannelId, ProjectId, TeamId } from "@lgtm/contracts"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { AgentTools } from "../src/thread/agentTools.tsx"
 import { ReplyControls } from "../src/thread/replyControls.tsx"
 import { TeamConversation } from "../src/thread/team.tsx"
 
 const api = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(api.current) }
 })
@@ -99,7 +99,7 @@ it("paginates owner peek only and retains readable team messages when a later pa
 it("keeps Resume's original key and fresh policy through a generic error, changed reloadability and navigation", async () => {
   const resume = vi.fn().mockReturnValueOnce(Effect.fail({ _tag: "CommandError", reason: "database write failed" })).mockReturnValue(Effect.succeed({}))
   api.current.resume = resume
-  const base = { agentId, state: { _tag: "stopped" }, session: { _tag: "acp", sessionId: "old" }, reloadable: false } as unknown as import("@lgcode/contracts").ClientSnapshot["agents"][number]
+  const base = { agentId, state: { _tag: "stopped" }, session: { _tag: "acp", sessionId: "old" }, reloadable: false } as unknown as import("@lgtm/contracts").ClientSnapshot["agents"][number]
   const { Lifecycle } = await import("../src/thread/lifecycle.tsx")
   await render(<Lifecycle agent={base} signal={new AbortController().signal} />)
   await act(async () => button("Resume agent").click())

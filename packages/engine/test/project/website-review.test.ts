@@ -3,8 +3,8 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
 import { it } from "@effect/vitest"
-import { connectWith } from "@lgcode/client/core"
-import { makeNodeSocket } from "@lgcode/client/nodeSocket"
+import { connectWith } from "@lgtm/client/core"
+import { makeNodeSocket } from "@lgtm/client/nodeSocket"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
@@ -18,7 +18,7 @@ import { approveMockRevision, artifactState, readMockHistory, screenRoute } from
 import { advanceSetup, changeSetupSettings, completeSetup, readSetup } from "../../../web/src/project/setupRead.ts"
 import { RepositoryRegistration } from "../../../web/src/project/registration.ts"
 import type { withClient } from "../../../web/src/thread/client.ts"
-import { ClientError, type Client } from "@lgcode/client/browser"
+import { ClientError, type Client } from "@lgtm/client/browser"
 import { LogWriteFailed } from "../../src/log/EventLog.ts"
 import type { Fakes } from "../support/handlerRig.ts"
 import { freePort, http, login, post, withWeb } from "../support/webRig.ts"
@@ -31,7 +31,7 @@ const live = (name: string, body: () => Effect.Effect<unknown, unknown, any>) =>
 let rig: Rig
 const hash = (text: string) => createHash("sha256").update(text).digest("hex")
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
   execFileSync("git", ["-C", rig.work, "config", "user.name", "Git suggestion"], { stdio: "ignore" })
   execFileSync("git", ["-C", rig.work, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
@@ -336,7 +336,7 @@ it.live("admits exact recorded preview bytes and a dedicated registered design f
     const { displayConfiguration } = yield* Effect.promise(() => import("../../src/client/web/display/policy.ts"))
     const { makeDisplaySessions } = yield* Effect.promise(() => import("../../src/client/web/display/sessions.ts"))
     const { makeMockRenderer } = yield* Effect.promise(() => import("../../src/client/web/display/renderer.ts"))
-    const configuration = displayConfiguration("https://lgcode.example", "https://design.example", 4123)
+    const configuration = displayConfiguration("https://lgtm.example", "https://design.example", 4123)
     const sessions = makeDisplaySessions(configuration, () => {}) // Named test-only frame-secret observer.
     const frame = sessions.issue({ kind: "mock", selection })
     const frameUrl = frame.mockUrl(preview.route)
@@ -416,7 +416,7 @@ for (const addressing of ["root-relative", "relative"] as const) it.live(`serves
       // this is HTTP proof, not browser execution or HTTPS proxy proof.
       let service: Awaited<ReturnType<typeof serveDisplay>> | undefined
       try {
-        service = await serveDisplay({ configuration: displayConfiguration("https://lgcode.example", origin, port),
+        service = await serveDisplay({ configuration: displayConfiguration("https://lgtm.example", origin, port),
           image: "sha256:" + "0".repeat(64), dockerSocket: "/not-used-by-mocks.sock",
           input: () => Effect.runPromise(handler.input({ _tag: "owner" })), registerSecret: () => {},
           onCleanupFailure: () => { cleanupFailures++ } })
@@ -448,9 +448,9 @@ for (const addressing of ["root-relative", "relative"] as const) it.live(`serves
         for (const path of ["../outside.css", "%2e%2e/outside.css", "nested%2foutside.css", "%252e%252e/outside.css", "linked.css", ".env.css"]) {
           expect((await http(endpoint, scoped + "/" + path)).status).toBe(404)
         }
-        expect((await http(endpoint, addresses[0]!, { headers: { Cookie: "lgcode_session=refused" } })).status).toBe(403)
+        expect((await http(endpoint, addresses[0]!, { headers: { Cookie: "lgtm_session=refused" } })).status).toBe(403)
         expect((await http(endpoint, addresses[0]!, { headers: { Authorization: "Bearer refused" } })).status).toBe(403)
-        expect((await http(endpoint, addresses[0]!, { headers: { Host: "lgcode.example" } })).status).toBe(403)
+        expect((await http(endpoint, addresses[0]!, { headers: { Host: "lgtm.example" } })).status).toBe(403)
         expect((await http(endpoint, addresses[0]!, { method: "HEAD" })).body).toBe("")
         const other = await service.open(selection)
         await service.closeSession(frame.id)
@@ -461,7 +461,7 @@ for (const addressing of ["root-relative", "relative"] as const) it.live(`serves
         expect((await http(endpoint, otherUrl.pathname + otherUrl.search)).status).toBe(503)
         // The unscoped document query cannot dispatch an expired mock and
         // reaches the unchanged no-editor fallback. Its scoped assets refuse.
-        const otherScope = "/session/" + otherUrl.searchParams.get("__lgcode_display_session")
+        const otherScope = "/session/" + otherUrl.searchParams.get("__lgtm_display_session")
         expect((await http(endpoint, otherScope + "/" + paths[0]!)).status).toBe(401)
       } finally { try { await service?.close() } finally { clock.mockRestore() } }
       expect(cleanupFailures).toBe(0)

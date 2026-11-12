@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentId, Delivery, EpochMilliseconds, Event, EventSequence, RequestId } from "@lgcode/contracts";
+import type { AgentId, Delivery, EpochMilliseconds, Event, EventSequence, RequestId } from "@lgtm/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import { canRead } from "../board/access.ts";

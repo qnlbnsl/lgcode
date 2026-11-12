@@ -11,8 +11,8 @@ import { createReporter } from "../../scripts/live/reporter.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, WORKER, runProbe, type FakeEngine } from "./probe-fake-engine.ts";
 
-vi.mock("@lgcode/client", async (original) => {
-  const client = await original<typeof import("@lgcode/client")>();
+vi.mock("@lgtm/client", async (original) => {
+  const client = await original<typeof import("@lgtm/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -60,7 +60,7 @@ it("m-8: a token and arguments without that agent's environment names cannot pas
   // and the real process's nonempty arguments remain present for both agents.
   vi.spyOn(Object, "keys").mockImplementation((value) => {
     const environment = value as Record<string, unknown>;
-    return environment.LGCODE_SOCKET === join(e.state, "engine.sock") && environment.LGCODE_TOKEN === e.tokenOf.get(WORKER)
+    return environment.LGTM_SOCKET === join(e.state, "engine.sock") && environment.LGTM_TOKEN === e.tokenOf.get(WORKER)
       ? [] : keys(value);
   });
   const result = await runProbe(e, "token-scan");

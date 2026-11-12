@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
-import type { Discovery, Event } from "@lgcode/contracts"
+import type { Discovery, Event } from "@lgtm/contracts"
 import { type Input, type Payload, type PiecePlanner, readHarnesses, refused } from "../commands/internal.ts"
 import type { ReadHandler } from "../api/reads.ts"
 import { localHarnessDefaults } from "../runner/harnesses.ts"

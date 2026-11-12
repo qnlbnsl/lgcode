@@ -6,10 +6,10 @@
 // is shown as a row with a download, not as text.
 export const TEXT_LIMIT = 1024 * 1024;
 const LISTS = {
-  lgcode: [
+  lgtm: [
     ['.nvmrc', 3], ['README.md', 4180], ['package.json', 1260], ['pnpm-lock.yaml', 1_934_112], ['pnpm-workspace.yaml', 412],
     ['docs/features.md', 48_920], ['docs/issues.md', 61_340], ['docs/specs/agent-console.md', 6_210],
-    ['design/lgcode.fig', 2_516_582], ['design/DESIGN.md', 22_480],
+    ['design/lgtm.fig', 2_516_582], ['design/DESIGN.md', 22_480],
     ['packages/engine/src/projects.ts', 9_840], ['packages/engine/test/projects.test.ts', 7_120],
     ['packages/web/public/icon.svg', 640],
     ['packages/web/src/App.tsx', 3_310], ['packages/web/src/routes.ts', 1_980],
@@ -45,10 +45,10 @@ through an authenticated client API for web, desktop and mobile apps.
 \`\`\`sh
 nvm use
 pnpm install
-./bin/lgcode serve --detach
+./bin/lgtm serve --detach
 \`\`\`
 
-Set \`LGCODE_WEB_PASSWORD\` on the service to enable the web page.
+Set \`LGTM_WEB_PASSWORD\` on the service to enable the web page.
 
 ## How agents are run
 
@@ -60,7 +60,7 @@ Every harness has two run modes, chosen per harness in its settings:
   pane through the optional plugin.
 `,
   'package.json': `{
-  "name": "lgcode",
+  "name": "lgtm",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.2.0",
@@ -107,7 +107,7 @@ export function Bell() {
 // make the storage throw, so every call is guarded and falls back.
 export function readStored<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(\`lgcode:\${key}\`);
+    const raw = localStorage.getItem(\`lgtm:\${key}\`);
     return raw === null ? fallback : (JSON.parse(raw) as T);
   } catch {
     return fallback;
@@ -116,7 +116,7 @@ export function readStored<T>(key: string, fallback: T): T {
 
 export function writeStored(key: string, value: unknown): void {
   try {
-    localStorage.setItem(\`lgcode:\${key}\`, JSON.stringify(value));
+    localStorage.setItem(\`lgtm:\${key}\`, JSON.stringify(value));
   } catch {
     // The value is only a convenience. Losing it is fine.
   }

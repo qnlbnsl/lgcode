@@ -1,5 +1,5 @@
-import { EventSequence as EventSequenceSchema, type EventSequence } from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import { EventSequence as EventSequenceSchema, type EventSequence } from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

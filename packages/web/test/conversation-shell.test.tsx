@@ -7,7 +7,7 @@ import { App } from "../src/app.tsx"
 import { adminShellClient } from "./admin-shell-client.ts"
 
 const api = vi.hoisted(() => ({ client: {} as Record<string, unknown> }))
-vi.mock("@lgcode/client/browser", async () => { const Effect = await import("effect/Effect"); return { connect: () => Effect.succeed(api.client) } })
+vi.mock("@lgtm/client/browser", async () => { const Effect = await import("effect/Effect"); return { connect: () => Effect.succeed(api.client) } })
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const agent = (agentId: string, name: string) => ({ agentId, name, role: "lead", groups: [], parent: { _tag: "owner" }, state: { _tag: "idle" }, displayedState: "Idle", openPermissionRequests: 0, openQuestionsAsked: 0, harness: "codex", account: "default", permission: "ask", folder: "/work", startedAt: 1 })
 const snapshot = { sequence: 7, agents: [agent("lead", "Lead"), agent("worker", "Worker")], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0, project: {
@@ -103,9 +103,9 @@ it("keeps Git closed below the wide threshold, bounds width preferences and show
   await act(async () => button("Conversation with Lead").click()); expect(dock.hidden).toBe(false)
   const resize = container.querySelector<HTMLElement>('[aria-label="Resize the thread panel"]')!
   for (let n = 0; n < 30; n++) await act(async () => resize.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })))
-  expect(localStorage.getItem("lgcode-layout-lead")).toBe("600")
+  expect(localStorage.getItem("lgtm-layout-lead")).toBe("600")
   for (let n = 0; n < 30; n++) await act(async () => resize.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })))
-  expect(localStorage.getItem("lgcode-layout-lead")).toBe("320")
+  expect(localStorage.getItem("lgtm-layout-lead")).toBe("320")
   expect(container.querySelector<HTMLElement>(".app")!.style.getPropertyValue("--lead-width")).toBe("320px")
   await viewport(2560); await navigate("/#/thread/lead")
   await eventually(() => expect(container.querySelector('[aria-label="Task and changes"]')?.textContent).toContain("actual.txt"))

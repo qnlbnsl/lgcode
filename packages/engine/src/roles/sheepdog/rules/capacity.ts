@@ -1,4 +1,4 @@
-import type { Event, EventEnvelope } from "@lgcode/contracts";
+import type { Event, EventEnvelope } from "@lgtm/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import { clientView } from "../../../client/alerts/view.ts";

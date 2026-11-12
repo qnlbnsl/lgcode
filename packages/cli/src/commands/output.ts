@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts"
+import type { EventEnvelope } from "@lgtm/contracts"
 import { sanitize, sanitizeJson } from "./sanitize.ts"
 
 export const out = (text: string): void => { process.stdout.write(text) }

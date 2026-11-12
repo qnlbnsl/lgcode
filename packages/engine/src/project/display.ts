@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises"
 import { dirname, extname, relative } from "node:path"
-import type { ProjectId, RepositoryId, RequestId } from "@lgcode/contracts"
+import type { ProjectId, RepositoryId, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { refused, type Input } from "../commands/internal.ts"
 import { sourceArtifact, fingerprint, validScreenRoute, validArtifactPath } from "./artifacts.ts"

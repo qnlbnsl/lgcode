@@ -40,8 +40,8 @@ const replyGate = (gate: ReplyGate): NonNullable<Fakes["wrapLog"]> => (real) => 
   })).pipe(Effect.tap(() => created && gate.hold ? Effect.promise(() => new Promise<void>((resolve) => { gate.hold = false; gate.release = resolve })) : Effect.void))
 } })
 const fixture = async (page: Page, body: (rig: Rig, gate: ReplyGate, runner: Effect.Success<ReturnType<typeof makeFakeRunner>>) => Effect.Effect<void, unknown, any>, registered = true, isolated = false) => {
-  const rig = makeRig(), previousHome = process.env.HOME, previousState = process.env.LGCODE_HOME
-  process.env.HOME = rig.home; process.env.LGCODE_HOME = rig.stateFolder
+  const rig = makeRig(), previousHome = process.env.HOME, previousState = process.env.LGTM_HOME
+  process.env.HOME = rig.home; process.env.LGTM_HOME = rig.stateFolder
   const gate: ReplyGate = { hold: false }
   const displaySecrets: Array<Redacted.Redacted<string>> = []
   let displayProxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
@@ -87,7 +87,7 @@ const fixture = async (page: Page, body: (rig: Rig, gate: ReplyGate, runner: Eff
         yield* Effect.promise(async () => {
           await page.goto(`http://127.0.0.1:${port}/#/`)
           await gate.login!()
-          await expect(registered ? page.getByRole("button", { name: "New project", exact: true }).first() : page.getByRole("main", { name: "Set up LGcode", exact: true })).toBeVisible()
+          await expect(registered ? page.getByRole("button", { name: "New project", exact: true }).first() : page.getByRole("main", { name: "Set up LGTM Studio", exact: true })).toBeVisible()
         })
         yield* body(rig, gate, runner)
       }))
@@ -97,7 +97,7 @@ const fixture = async (page: Page, body: (rig: Rig, gate: ReplyGate, runner: Eff
     gate.release?.()
     await displayProxy?.close()
     if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome
-    if (previousState === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previousState
+    if (previousState === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousState
     removeRig(rig)
   }
 }
@@ -371,7 +371,7 @@ test("first-run Welcome, discovery, Back, Machines detour and actual first creat
   await fixture(page, (rig, _gate, runner) => Effect.gen(function* () {
     const initial = yield* readLog
     yield* Effect.promise(async () => {
-      const setup = page.getByRole("main", { name: "Set up LGcode", exact: true })
+      const setup = page.getByRole("main", { name: "Set up LGTM Studio", exact: true })
       for (const width of [390, 768, 1440, 2560]) for (const colorScheme of ["light", "dark"] as const) {
         await page.setViewportSize({ width, height: 1000 }); await page.emulateMedia({ colorScheme, reducedMotion: "reduce" })
         await expect(setup.getByRole("button", { name: "Get started", exact: true })).toBeVisible()
@@ -382,7 +382,7 @@ test("first-run Welcome, discovery, Back, Machines detour and actual first creat
     expect(yield* readLog).toEqual(initial)
     expect(runner.callsOf("start")).toHaveLength(0)
     yield* Effect.promise(async () => {
-      const setup = page.getByRole("main", { name: "Set up LGcode", exact: true })
+      const setup = page.getByRole("main", { name: "Set up LGTM Studio", exact: true })
       await setup.getByRole("button", { name: "Get started", exact: true }).click()
       await expect(setup).toContainText("Remote authentication not checked")
       const form = setup.locator(".new-project")
@@ -648,7 +648,7 @@ for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal
       await form.getByRole("button", { name: "Create project", exact: true }).click()
       await expect(page.getByText("Setup completion is unconfirmed.", { exact: false })).toBeVisible()
       await page.reload()
-      await expect(page.getByRole("main", { name: "Set up LGcode", exact: true })).toBeVisible()
+      await expect(page.getByRole("main", { name: "Set up LGTM Studio", exact: true })).toBeVisible()
       await expect(page.getByRole("button", { name: "Create project", exact: true })).toHaveCount(0)
       await expect(page.getByRole("button", { name: "Retry completion", exact: true })).toBeVisible()
       await expect(page.locator(".new-project form")).toHaveCount(0)
@@ -677,7 +677,7 @@ for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal
       await expect(page.getByRole("status", { name: "Agent activity", exact: true })).toHaveText("Idle")
       await page.getByRole("button", { name: "Return to first project", exact: true }).click()
       await page.getByRole("button", { name: "Retry completion", exact: true }).click()
-      await expect(page.getByRole("main", { name: "Set up LGcode", exact: true })).toHaveCount(0)
+      await expect(page.getByRole("main", { name: "Set up LGTM Studio", exact: true })).toHaveCount(0)
       await expect(page).toHaveURL(new RegExp(`#\\/thread\\/${project.leadAgentId}$`))
     })
     const after = projectView(yield* snapshot), events = yield* readLog

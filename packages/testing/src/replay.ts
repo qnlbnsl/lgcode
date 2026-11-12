@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises"
 import { isDeepStrictEqual } from "node:util"
 import { createInterface } from "node:readline"
 import { pathToFileURL } from "node:url"
-import { decodeProviderReplayNdjson } from "@lgcode/t3-provider-testing/replayTranscript"
+import { decodeProviderReplayNdjson } from "@lgtm/t3-provider-testing/replayTranscript"
 import * as Effect from "effect/Effect"
 
 export class ReplayParseError extends Error {
@@ -29,7 +29,7 @@ const writeFrame = (frame: unknown) =>
   new Promise<void>((resolve, reject) => process.stdout.write(JSON.stringify(frame) + "\n", (error) => error ? reject(error) : resolve()))
 
 // Unit 6a: `--match method` stands in for an adapter that a different client drives, such as
-// LGcode's runner, whose own frames differ from the recorder's. Each client request or
+// LGTM Studio's runner, whose own frames differ from the recorder's. Each client request or
 // notification is matched with the next recorded outbound frame of the same method, and the
 // recorded inbound frames after that entry are written, with a recorded reply's id changed to
 // the client's id. A request no remaining entry has gets "method not found". Replies to the

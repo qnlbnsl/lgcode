@@ -1,5 +1,5 @@
-import type { ClientEnvelope } from "@lgcode/client/browser"
-import { contentOnlyEventTags, type AgentId, type ClientSnapshot, type EventSequence, type Oversized } from "@lgcode/contracts"
+import type { ClientEnvelope } from "@lgtm/client/browser"
+import { contentOnlyEventTags, type AgentId, type ClientSnapshot, type EventSequence, type Oversized } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { connectBrowser, requestId } from "./client.ts"

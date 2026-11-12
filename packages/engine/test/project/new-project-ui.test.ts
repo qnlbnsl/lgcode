@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync } from "node:fs"
 import { join } from "node:path"
-import { connect, type Client } from "@lgcode/client"
+import { connect, type Client } from "@lgtm/client"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
@@ -29,7 +29,7 @@ const disk = (root: string): unknown => readdirSync(root).sort().map((name) => {
 })
 beforeEach(() => {
   rig = makeRig(); chmodSync(rig.stateFolder, 0o700)
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   git(rig.work, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initial")
 })
@@ -45,7 +45,7 @@ const connected = () => Effect.gen(function* () {
   yield* registerRebuildCheck()
   const bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "engine.sock")
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
-  return yield* connect({ environment: { LGCODE_SOCKET: socket, LGCODE_TOKEN: bearer } })
+  return yield* connect({ environment: { LGTM_SOCKET: socket, LGTM_TOKEN: bearer } })
 })
 const runFor = (client: Client): typeof withClient => (action, signal) => Effect.runPromise(action(client), { signal })
 const flush = async (session: NewProjectSession) => {

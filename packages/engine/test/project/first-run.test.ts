@@ -21,7 +21,7 @@ const files = (root: string): unknown => readdirSync(root).sort().map((name) => 
   return [name, stat.mode, stat.isSymbolicLink() ? readlinkSync(path) : stat.isDirectory() ? files(path) : createHash("sha256").update(readFileSync(path)).digest("hex")]
 })
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main"); git(rig.work, "config", "user.name", "Actual Git Owner")
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })

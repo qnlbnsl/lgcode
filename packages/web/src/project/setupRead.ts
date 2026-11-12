@@ -1,7 +1,7 @@
-import type { Client } from "@lgcode/client/browser"
-import { EventEnvelope, type EventSequence } from "@lgcode/contracts"
+import type { Client } from "@lgtm/client/browser"
+import { EventEnvelope, type EventSequence } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
-import type { Project, ProjectId, ProjectSettings, RequestId, SetupState } from "@lgcode/contracts"
+import type { Project, ProjectId, ProjectSettings, RequestId, SetupState } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId } from "../thread/client.ts"
 

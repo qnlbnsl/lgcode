@@ -4,9 +4,9 @@ import { dirname } from "node:path"
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
-import { makeNodeSocket } from "@lgcode/client/nodeSocket"
+import { makeNodeSocket } from "@lgtm/client/nodeSocket"
 import { connectWith, type Client } from "../../../client/src/core.ts"
-import { CommandsRpcGroup, Event, ProjectId, projectEventTags } from "@lgcode/contracts"
+import { CommandsRpcGroup, Event, ProjectId, projectEventTags } from "@lgtm/contracts"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
@@ -52,7 +52,7 @@ const knownGitReceipt = (requestId: string, reason: string) => Effect.gen(functi
 const save = (folder: string, path: string, content: string) => writeFileSync(join(folder, path), content)
 const commit = (folder: string, message: string) => { git(folder, "add", "--all"); git(folder, "commit", "-m", message); return git(folder, "rev-parse", "HEAD") }
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   git(rig.work, "config", "user.name", "Test Author")
   git(rig.work, "config", "user.email", "test@example.test")

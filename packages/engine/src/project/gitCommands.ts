@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect"
-import { type Event } from "@lgcode/contracts"
+import { type Event } from "@lgtm/contracts"
 import { type ReadHandler } from "../api/reads.ts"
 import { type PiecePlanner, type Input, refused, CommandUncertain } from "../commands/internal.ts"
 import { withGit, gitCall, gitReply, workspacePath, repositoryPath, selection } from "./gitApi.ts"

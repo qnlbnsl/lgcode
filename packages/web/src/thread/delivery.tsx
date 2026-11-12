@@ -1,5 +1,5 @@
-import type { ClientEnvelope } from "@lgcode/client/browser"
-import type { Event } from "@lgcode/contracts"
+import type { ClientEnvelope } from "@lgtm/client/browser"
+import type { Event } from "@lgtm/contracts"
 import { DataText, visibleText } from "./text.tsx"
 import { BoundedText } from "./boundedText.tsx"
 

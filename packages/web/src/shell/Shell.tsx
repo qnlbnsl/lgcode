@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react"
-import type { AgentId, Project } from "@lgcode/contracts"
+import type { AgentId, Project } from "@lgtm/contracts"
 import { Alerts } from "../admin/alerts.tsx"
 import { NotificationPrompt } from "../admin/notification-prompt.tsx"
 import { Settings } from "../admin/settings.tsx"
@@ -84,14 +84,14 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   const route = parseShellRoute(href)
   const scope = selectedScope(route, data.navigation, data.snapshot)
   const routeIdentity = shellHref(route)
-  const [collapsed, setCollapsed] = useState(() => readPreference("lgcode-sidebar") === "rail")
+  const [collapsed, setCollapsed] = useState(() => readPreference("lgtm-sidebar") === "rail")
   const [width, setWidth] = useState(savedPanelWidth)
   const [phone, setPhone] = useState(() => window.matchMedia?.("(max-width:700px)").matches ?? false)
   const [dockWide, setDockWide] = useState(() => window.matchMedia?.("(min-width:1801px)").matches ?? false)
   const [dockCompact, setDockCompact] = useState(() => window.matchMedia?.("(max-width:1100px)").matches ?? false)
   const [dockOpen, setDockOpen] = useState(() => !(window.matchMedia?.("(max-width:1100px)").matches ?? false))
   const [gitDockOpen, setGitDockOpen] = useState(false)
-  const [dockWidth, setDockWidth] = useState(() => Math.max(320, Math.min(600, Number(readPreference("lgcode-layout-lead")) || 360)))
+  const [dockWidth, setDockWidth] = useState(() => Math.max(320, Math.min(600, Number(readPreference("lgtm-layout-lead")) || 360)))
   const dock = useRef<HTMLElement>(null)
   const dockTrigger = useRef<HTMLButtonElement>(null)
   const dockResize = useRef<{ pointer: number; x: number; width: number } | undefined>(undefined)
@@ -132,8 +132,8 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     // Never write an inline style attribute or accept arbitrary CSS strings.
     app.current?.style.setProperty("--sidebar-width", `${panelWidth(width)}px`)
   }, [width])
-  const resize = (value: number) => { const next = panelWidth(value); setWidth(next); writePreference("lgcode-layout-sidebar", String(next)) }
-  const toggleRail = useCallback(() => setCollapsed((previous) => { writePreference("lgcode-sidebar", previous ? "full" : "rail"); return !previous }), [])
+  const resize = (value: number) => { const next = panelWidth(value); setWidth(next); writePreference("lgtm-layout-sidebar", String(next)) }
+  const toggleRail = useCallback(() => setCollapsed((previous) => { writePreference("lgtm-sidebar", previous ? "full" : "rail"); return !previous }), [])
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || shortcutInField(event.target) || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
@@ -211,7 +211,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     event.preventDefault(); navigate(target, `${link.pathname}${link.search}${link.hash}`, link.getAttribute("role") !== "tab")
   }
   useEffect(() => {
-    if (route.page === "project") writePreference(`lgcode-tab:${scopeKey(route.projectId, route.teamId)}`, route.tab)
+    if (route.page === "project") writePreference(`lgtm-tab:${scopeKey(route.projectId, route.teamId)}`, route.tab)
     setDrawer(false); setBell(false); setWorkspaces(false)
     // After a drawer selection, move into the newly selected view. Escape
     // without navigation is handled by the focus scope and returns to Menu.
@@ -274,7 +274,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   useEffect(() => { app.current?.style.setProperty("--lead-width", `${dockWidth}px`) }, [dockWidth])
   const resizeDock = (value: number) => {
     const width = Math.round(Math.max(320, Math.min(600, Math.max(320, innerWidth - 650), value)))
-    setDockWidth(width); writePreference("lgcode-layout-lead", String(width))
+    setDockWidth(width); writePreference("lgtm-layout-lead", String(width))
   }
   const previousAgent = projectId === undefined ? undefined : lastAgent.current.get(projectId)
   const remembered = data.snapshot?.agents.find((row) => row.agentId === previousAgent && (row.agentId === scope.project?.leadAgentId || row.folder === scope.assignedWorkspace?.path))
@@ -300,7 +300,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     {drawer && phone && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
     <aside ref={sidebar} id="sidebar" className={`sidebar${drawer ? " open" : ""}`} aria-label="Repositories, projects and teams"
       {...(phone && !drawer || quick || bell || workspaces || dockModal ? { inert: true } : {})} {...(drawer && phone ? { role: "dialog", "aria-modal": true } : {})}>
-      <div className="brand-row"><span className="brand">LGcode</span><button className="icon-button" id="collapse-sidebar" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} aria-controls="sidebar" onClick={toggleRail}><Icon name="panel" /></button>
+      <div className="brand-row"><span className="brand">LGTM Studio</span><button className="icon-button" id="collapse-sidebar" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} aria-controls="sidebar" onClick={toggleRail}><Icon name="panel" /></button>
         <button className="icon-button close-navigation" aria-label="Close navigation" onClick={closeDrawer}><Icon name="x" /></button></div>
       {phone && attention.length > 0 && <section className="drawer-attention" aria-label="Needs attention"><h2>Needs attention <small>{attention.length}</small></h2>{[...new Set(attention.map((item) => item.agentId))].map((id) => {
         const item = attention.find((row) => row.agentId === id)!

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { AgentId, Alert, AlertKind, EventSequence } from "@lgcode/contracts"
+import type { AgentId, Alert, AlertKind, EventSequence } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../client.ts"
 import { SubjectPanel } from "./index.tsx"

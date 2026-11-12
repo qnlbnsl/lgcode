@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import type { Discovery, Project, ProjectId, ProjectSettings, RequestId, SetupState } from "@lgcode/contracts"
+import type { Discovery, Project, ProjectId, ProjectSettings, RequestId, SetupState } from "@lgtm/contracts"
 import { requestId, useAdminApi } from "../admin/api.ts"
 import { visibleText } from "../thread/text.tsx"
 import { setupHarnessGuidance } from "../setup-guidance.ts"
@@ -81,14 +81,14 @@ export function Setup({ renderProject, onOpenLead, onCompleted, onLogout, onSess
   const existing = read?.projects ?? []
   const recovered = existing.find((project) => project.projectId === createdProject) ?? (existing.length === 1 ? existing[0] : undefined)
   const completionId = createdProject ?? recovered?.projectId
-  return <main className="review-page setup-page" aria-label="Set up LGcode"><header><p>Step {page === "welcome" ? 1 : page === "found" ? 2 : 3} of 3</p><button onClick={onLogout}>Log out</button></header>
-    <h1 tabIndex={-1} ref={heading}>{page === "welcome" ? "LGcode" : page === "found" ? "Found on this computer" : "First project"}</h1>
+  return <main className="review-page setup-page" aria-label="Set up LGTM Studio"><header><p>Step {page === "welcome" ? 1 : page === "found" ? 2 : 3} of 3</p><button onClick={onLogout}>Log out</button></header>
+    <h1 tabIndex={-1} ref={heading}>{page === "welcome" ? "LGTM Studio" : page === "found" ? "Found on this computer" : "First project"}</h1>
     {api.message && <p role="alert">{api.message}</p>}{notice && <p role="status">{notice}</p>}
     {read === undefined && <><p role="status">Looking at this computer…</p><button disabled={api.busy} onClick={() => void refresh()}>Try again</button></>}
-    {page === "welcome" && <><p>Runs teams of coding agents on your machines, and shows you where to look.</p><dl className="setup-pairs"><div><dt>You set the outcome.</dt><dd>The lead plans the sprints and brings in teams.</dd></div><div><dt>You answer what only you can.</dt><dd>LGcode shows you where you are needed.</dd></div><div><dt>You approve what users would notice.</dt><dd>Teams commit and merge inside their own branches.</dd></div></dl><button disabled={api.busy || read === undefined} onClick={() => void go("found")}>Get started</button></>}
+    {page === "welcome" && <><p>Runs teams of coding agents on your machines, and shows you where to look.</p><dl className="setup-pairs"><div><dt>You set the outcome.</dt><dd>The lead plans the sprints and brings in teams.</dd></div><div><dt>You answer what only you can.</dt><dd>LGTM Studio shows you where you are needed.</dd></div><div><dt>You approve what users would notice.</dt><dd>Teams commit and merge inside their own branches.</dd></div></dl><button disabled={api.busy || read === undefined} onClick={() => void go("found")}>Get started</button></>}
     {page === "found" && discovery && <>
       {api.busy && <p role="status">Checking current discovery evidence…</p>}
-      <p>LGcode only looked. Nothing here has changed.</p><h2>Harnesses</h2>
+      <p>LGTM Studio only looked. Nothing here has changed.</p><h2>Harnesses</h2>
       <button disabled={api.busy} onClick={() => void refresh()}>Check again</button>
       <ul>{discovery.harnesses.map((row) => {
         const guidance = row.harness === "claude" || row.harness === "codex" || row.harness === "gemini" || row.harness === "cursor" ? setupHarnessGuidance[row.harness] : undefined

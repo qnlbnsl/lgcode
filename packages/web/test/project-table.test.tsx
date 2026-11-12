@@ -1,6 +1,6 @@
 import { act } from "react"
 import * as Schema from "effect/Schema"
-import { Project } from "@lgcode/contracts"
+import { Project } from "@lgtm/contracts"
 import { beforeEach, expect, it } from "vitest"
 import { environment, mount, request, resetData } from "./page-fixtures.tsx"
 import { HomePage, ProjectTable } from "../src/pages/HomePage.tsx"

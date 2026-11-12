@@ -1,4 +1,4 @@
-import type { ClientRequest } from "@lgcode/contracts";
+import type { ClientRequest } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";

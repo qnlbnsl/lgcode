@@ -1,5 +1,5 @@
-import type { Client } from "@lgcode/client/browser"
-import { EventEnvelope, type EventSequence, type MockApproval, type MockRevision, type ProjectId, type RequestId } from "@lgcode/contracts"
+import type { Client } from "@lgtm/client/browser"
+import { EventEnvelope, type EventSequence, type MockApproval, type MockRevision, type ProjectId, type RequestId } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import { requestId } from "../thread/client.ts"

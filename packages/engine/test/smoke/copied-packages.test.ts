@@ -7,11 +7,11 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const packages = [
-  ["effect-acp", "@lgcode/t3-effect-acp"],
-  ["node-sqlite", "@lgcode/t3-node-sqlite"],
-  ["provider-instance", "@lgcode/t3-provider-instance"],
-  ["provider-testing", "@lgcode/t3-provider-testing"],
-  ["source-control", "@lgcode/t3-source-control"],
+  ["effect-acp", "@lgtm/t3-effect-acp"],
+  ["node-sqlite", "@lgtm/t3-node-sqlite"],
+  ["provider-instance", "@lgtm/t3-provider-instance"],
+  ["provider-testing", "@lgtm/t3-provider-testing"],
+  ["source-control", "@lgtm/t3-source-control"],
 ] as const;
 interface Manifest {
   name?: string;
@@ -31,8 +31,8 @@ const dependencyNames = (value: Manifest): string[] => Object.keys({
   ...value.dependencies, ...value.devDependencies, ...value.peerDependencies, ...value.optionalDependencies,
 });
 const firstPartyNames = [
-  "@lgcode/contracts", "@lgcode/client", "@lgcode/engine",
-  "@lgcode/cli", "@lgcode/mcp", "@lgcode/testing",
+  "@lgtm/contracts", "@lgtm/client", "@lgtm/engine",
+  "@lgtm/cli", "@lgtm/mcp", "@lgtm/testing",
 ];
 
 // The root catalog uses a block mapping, as in the frozen workspace tests.
@@ -55,7 +55,7 @@ describe("copied package workspace contracts", () => {
     expect(value.type).toBe("module");
   });
 
-  it.each(packages)("makes %s inherit LGcode's root compiler settings (breaks if a copied tsconfig still points at T3's workspace)", (directory) => {
+  it.each(packages)("makes %s inherit LGTM Studio's root compiler settings (breaks if a copied tsconfig still points at T3's workspace)", (directory) => {
     const root = packageRoot(directory);
     const path = join(root, "tsconfig.json");
     expect(existsSync(path), `${path} must exist`).toBe(true);

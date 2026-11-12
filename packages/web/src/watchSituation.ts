@@ -1,5 +1,5 @@
-import { connect, type ClientEnvelope } from "@lgcode/client/browser"
-import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@lgcode/contracts"
+import { connect, type ClientEnvelope } from "@lgtm/client/browser"
+import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 

@@ -23,7 +23,7 @@ The 2026-11-09 section below supersedes the earlier golden-mock and implementati
 - One master runs the work, and other computers join it as workers, "basically
   spread the load of a project accross machines. and they get their commands
   through the main."
-- A new computer joins by running `lgcode connect` and entering the master's address.
+- A new computer joins by running `lgtm connect` and entering the master's address.
 - The link is "a secure WebSocket with self-signed certificates that both the host
   ... and the client Sheprd trust".
 - A pairing code is fine for machines, and the website generates it. Web login stays
@@ -166,7 +166,7 @@ engine next reads that login.
 
 1. The owner clicks Connect machine on the Machines page and names the machine. The master
    shows a code of about 20 characters that works once and expires after 10 minutes.
-2. The owner runs `lgcode connect <address>` on the other computer, which asks for the code.
+2. The owner runs `lgtm connect <address>` on the other computer, which asks for the code.
 3. The two sides exchange public keys over a secure WebSocket. Each side proves that it
    knows the code by signing both public keys with it.
 4. The machine appears on the page as awaiting confirmation, and the owner confirms it.
@@ -236,7 +236,7 @@ work together. This is the order of building and not a smaller scope.
    team chat read.
 2. **The page.** Rewritten against step 1, and replacing the current page.
 3. **Terminal and subscriptions.** Terminal first, because sign-in uses it.
-4. **Installer and `.lgcode` config.** This was already next, and a worker needs it to get Sheprd
+4. **Installer and `.lgtm` config.** This was already next, and a worker needs it to get Sheprd
    onto another computer. The workspace folder setting moves here from the page's first run.
 5. **Machines.** Pairing, the worker mode and the remote runner.
 
@@ -327,8 +327,8 @@ The run folder also holds a copy in `.scratch/foundry-runs/website-1/plan.md`.
 The mock files remain owned by the mock session.
 
 The earlier descriptions above are historical where this section replaces them.
-The product and command are LGcode and `lgcode`.
-Configuration lives under `.lgcode`.
+The product and command are LGTM Studio and `lgtm`.
+Configuration lives under `.lgtm`.
 
 ### Project discovery, setup, and lifecycle
 

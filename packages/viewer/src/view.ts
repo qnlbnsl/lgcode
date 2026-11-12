@@ -10,9 +10,9 @@ export interface ViewerProps {
 
 // This data-only view can also be rendered without a live terminal or socket.
 export function Viewer({ agents, selectedAgentId, thread = [] }: ViewerProps = {}) {
-  if (agents === undefined) return h(Text, null, "LGcode viewer");
+  if (agents === undefined) return h(Text, null, "LGTM Studio viewer");
   return h(Box, { flexDirection: "column" },
-    h(Text, { bold: true }, "LGcode viewer — Agents"),
+    h(Text, { bold: true }, "LGTM Studio viewer — Agents"),
     ...agents.map((agent) => h(Text, { key: agent.agentId },
       `${selectedAgentId === agent.agentId ? ">" : " "} ${oneLine(agent.name)} (${oneLine(agent.status)})`)),
     h(Text, { bold: true }, "Thread — agent data"),

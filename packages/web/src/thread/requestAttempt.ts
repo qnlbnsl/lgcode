@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react"
-import type { RequestId } from "@lgcode/contracts"
+import type { RequestId } from "@lgtm/contracts"
 
 interface AnswerAttempt {
   readonly status: "ready" | "sending" | "sent" | "failed" | "checked"

@@ -9,9 +9,9 @@ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const here=dirname(fileURLToPath(import.meta.url)),url=process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html';
 const browser=await chromium.launch(),errors=[],passed=[],failures=[];
 const check=(ok,label)=>{(ok?passed:failures).push(label)};
-const temp=mkdtempSync(join(tmpdir(),'lgcode-data-'));
+const temp=mkdtempSync(join(tmpdir(),'lgtm-data-'));
 const load=name=>JSON.parse(readFileSync(join(here,'data',name),'utf8'));
-const open=async(path='',prepare=null)=>{const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(5000);page.on('pageerror',e=>errors.push(e.message));if(prepare)await prepare(page);await page.goto(url+path);await page.waitForFunction(()=>window.lgcodeReady);return page};
+const open=async(path='',prepare=null)=>{const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(5000);page.on('pageerror',e=>errors.push(e.message));if(prepare)await prepare(page);await page.goto(url+path);await page.waitForFunction(()=>window.lgtmReady);return page};
 const serveProd=(page,files)=>page.route('**/data/prod/*',route=>{const name=route.request().url().split('/').at(-1).replace('.json','');return files[name]?route.fulfill({json:files[name]}):route.fulfill({status:404})});
 const eventsOf=page=>page.evaluate(()=>api.debug.events());
 const added=async(page,before)=>(await eventsOf(page)).slice(before).map(row=>row.event_type);
@@ -64,7 +64,7 @@ const added=async(page,before)=>(await eventsOf(page)).slice(before).map(row=>ro
  await page.evaluate(async()=>{
   const sage=projects[0].lead.id;
   await api.permissions.answer('perm-finch','deny');
-  await api.project.create({name:'Audit',repoId:'lgcode',plan:{machineId:'studio',base:workspaces.find(w=>w.id==='main'),branch:'audit',path:'~/projects/lgcode/.worktrees/audit'},useWorktree:true});
+  await api.project.create({name:'Audit',repoId:'lgtm',plan:{machineId:'studio',base:workspaces.find(w=>w.id==='main'),branch:'audit',path:'~/projects/lgtm-studio/.worktrees/audit'},useWorktree:true});
   await api.project.create({name:'Fresh',repoId:'__new',plan:{fresh:true,machineId:'buildbox',slug:'fresh-repo',branch:'main',path:'~/work/fresh-repo'},useWorktree:false});
   await api.project.addTask('workspace',{title:'Audit task',owner:'iris',teamId:'app-shell',sprintId:'sp-02'});
   await api.accounts.add({harness:'cursor',name:'Audit',machineId:'studio'});
@@ -72,7 +72,7 @@ const added=async(page,before)=>(await eventsOf(page)).slice(before).map(row=>ro
   await api.settings.setPush('board.post',false);
   await api.settings.saveCarrier({server:'https://push.example',topic:'audit-topic'});
   await api.settings.setToken('never-stored-token');await api.settings.clearToken();await api.settings.clearCarrier();
-  await api.settings.saveWeb({enabled:true,port:9000,heartbeat:30,proxy:true,publicAddress:'https://lgcode.example'});
+  await api.settings.saveWeb({enabled:true,port:9000,heartbeat:30,proxy:true,publicAddress:'https://lgtm.example'});
   await api.machines.setRole('laptop','Worker');await api.machines.confirm('laptop');await api.machines.place('docs','studio');await api.machines.join('https://studio.example');
   await api.project.savePreferences('workspace',{shell:'zsh'});
   await api.client.prompt({channelId:'ch-workspace-app-shell'},'Team note',{context:['SH-15']});await api.client.stopReply({channelId:'ch-workspace-app-shell'});

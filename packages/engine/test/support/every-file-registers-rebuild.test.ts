@@ -47,8 +47,8 @@ const missingRegistrations = (root: string): string[] => {
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/lgcode-rebuild-guard-");
-  vi.stubEnv("LGCODE_HOME", home);
+  home = mkdtempSync("/tmp/lgtm-rebuild-guard-");
+  vi.stubEnv("LGTM_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

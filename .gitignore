@@ -9,8 +9,8 @@ playwright-report/
 test-results/
 **/test/.state/
 **/tests/.state/
-**/test/**/lgcode-state/
-**/tests/**/lgcode-state/
+**/test/**/lgtm-state/
+**/tests/**/lgtm-state/
 **/test/**/*.sqlite*
 **/tests/**/*.sqlite*
 .foundry/

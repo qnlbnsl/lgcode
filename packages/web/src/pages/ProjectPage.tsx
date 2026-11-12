@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { projectStages, sprintStatus, type Sprint, type Project } from "@lgcode/contracts"
+import { projectStages, sprintStatus, type Sprint, type Project } from "@lgtm/contracts"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref, type ShellRoute } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"

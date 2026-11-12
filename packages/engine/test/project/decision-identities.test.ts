@@ -10,7 +10,7 @@ import { requestPermission, snapshot } from "../support/routingRig.ts"
 import { appendSetup, call, eventOf, freshRequest, makeRig, ownerCredential as owner, readLog, removeRig, seedAccount, seedHarness, success, type Rig } from "../support/handlerRig.ts"
 
 let rig: Rig
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder) })
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 
 it.live("real writer preserves colliding decision joins and question activity identities, redacts prose, and replays original history times", () => Effect.gen(function* () {

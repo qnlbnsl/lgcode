@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type AgentChoice, type AgentChoices, type AgentConfiguration, type AgentId } from "@lgcode/contracts";
+import { type AgentChoice, type AgentChoices, type AgentConfiguration, type AgentId } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { EventLog, LogWriteFailed } from "../log/EventLog.ts";

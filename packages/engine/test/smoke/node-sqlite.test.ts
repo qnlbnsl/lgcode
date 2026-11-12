@@ -18,12 +18,12 @@ import * as Layer from "effect/Layer";
 // A scoped temporary folder under the system temporary directory (`/tmp` on
 // Linux), removed when the scope closes (decisions row 54).
 const tempDirectory = Effect.acquireRelease(
-  Effect.promise(() => mkdtemp(join(tmpdir(), "lgcode-sqlite-"))),
+  Effect.promise(() => mkdtemp(join(tmpdir(), "lgtm-sqlite-"))),
   (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
 );
 
 class Sqlite extends Context.Service<Sqlite, { readonly database: DatabaseSync }>()(
-  "lgcode/test/smoke/Sqlite",
+  "lgtm/test/smoke/Sqlite",
 ) {}
 
 // The layer opens the file when it is built and closes it when its scope ends.
@@ -69,12 +69,12 @@ it.effect(
           const { database } = yield* Sqlite;
           database.exec("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL)");
           const insert = database.prepare("INSERT INTO notes (body) VALUES (?)");
-          insert.run("the lgcode keeps the flock");
+          insert.run("the lgtm keeps the flock");
           return readNotes(database);
         }).pipe(Effect.provide(sqliteLayer(filename)));
 
         assert.strictEqual(rows.length, 1);
-        assert.strictEqual(rows[0]?.body, "the lgcode keeps the flock");
+        assert.strictEqual(rows[0]?.body, "the lgtm keeps the flock");
         assert.strictEqual(rows[0]?.id, 1);
         assert.strictEqual(directory.startsWith(tmpdir()), true);
         assert.strictEqual(existsSync(filename), true);

@@ -52,7 +52,7 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     else if (command === "subscribe" && flag === "--after") after = value()
     else if (command === "thread.export" && flag === "--out") out = value()
     else if ((isWait || command === "thread.export") && !arg.startsWith("-")) members.push(arg)
-    else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see lgcode ${command} --help`)
+    else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see lgtm ${command} --help`)
   }
   if (help) return { help, payload: undefined, block }
   if (command === "thread.export") {
@@ -76,5 +76,5 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     return { help, block, payload: { requestId: randomUUID(), after: sequence } }
   }
   if (["project.setup", "project.setup.discover", "client.alerts.carrier.clear-token", "client.alerts.test", "client.alerts.prompt.dismiss"].includes(command)) return { help, block, payload: { requestId: randomUUID() } }
-  throw new UsageError(`${command} needs --input '<JSON payload>'; see lgcode ${command} --help`)
+  throw new UsageError(`${command} needs --input '<JSON payload>'; see lgtm ${command} --help`)
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { boardAlertTitles, Caller, type BoardAuthor, type BoardPost, type PostId } from "@lgcode/contracts"
+import { boardAlertTitles, Caller, type BoardAuthor, type BoardPost, type PostId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { requestId, withClient } from "../client.ts"

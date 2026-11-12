@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Semaphore from "effect/Semaphore"
 import { type Runtime, type Input, refused, CommandUncertain } from "../commands/internal.ts"
-import type { Workspace } from "@lgcode/contracts"
+import type { Workspace } from "@lgtm/contracts"
 import { agentReadReply } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectView } from "./view.ts"

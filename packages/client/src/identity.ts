@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { legacyStateFolderName, stateFolderName } from "@lgtm/contracts/legacyNames"
 import { ClientError } from "./errors.ts"
 
 export type Environment = Readonly<Record<string, string | undefined>>
@@ -14,12 +15,20 @@ export interface Identity {
 
 const present = (value: string | undefined): value is string => value !== undefined && value !== ""
 
+// An installation from before the rename keeps its folder: the old name is
+// used while it exists and the new one does not.
+const preferCurrent = (parent: string): string => {
+  const current = resolve(parent, stateFolderName)
+  const legacy = resolve(parent, legacyStateFolderName)
+  return !existsSync(current) && existsSync(legacy) ? legacy : current
+}
+
 // The state folder, resolved as the engine resolves it (engine/api/stateFolder.ts).
 export const stateFolder = (environment: Environment): string => {
-  if (present(environment.LGCODE_HOME)) return resolve(environment.LGCODE_HOME)
-  if (present(environment.XDG_STATE_HOME)) return resolve(environment.XDG_STATE_HOME, "lgcode")
-  if (!present(environment.HOME)) throw new ClientError({ message: "the home folder is unavailable; set LGCODE_HOME" })
-  return resolve(environment.HOME, ".local/state/lgcode")
+  if (present(environment.LGTM_HOME)) return resolve(environment.LGTM_HOME)
+  if (present(environment.XDG_STATE_HOME)) return preferCurrent(environment.XDG_STATE_HOME)
+  if (!present(environment.HOME)) throw new ClientError({ message: "the home folder is unavailable; set LGTM_HOME" })
+  return preferCurrent(resolve(environment.HOME, ".local/state"))
 }
 
 // Both variables name an agent. Neither names the owner's terminal. One alone
@@ -27,17 +36,17 @@ export const stateFolder = (environment: Environment): string => {
 // A variable that is set but empty counts as set (rows 54 and 64): the owner
 // fallback applies only when both are unset.
 export const resolveIdentity = (environment: Environment): Identity => {
-  const socket = environment.LGCODE_SOCKET
-  const token = environment.LGCODE_TOKEN
+  const socket = environment.LGTM_SOCKET
+  const token = environment.LGTM_TOKEN
   if (socket !== undefined && token !== undefined) {
     if (socket === "" || token === "") {
-      throw new ClientError({ message: "LGCODE_SOCKET and LGCODE_TOKEN must both hold a value, or both be left unset" })
+      throw new ClientError({ message: "LGTM_SOCKET and LGTM_TOKEN must both hold a value, or both be left unset" })
     }
-    if (!socket.startsWith("/")) throw new ClientError({ message: "LGCODE_SOCKET must be an absolute path" })
+    if (!socket.startsWith("/")) throw new ClientError({ message: "LGTM_SOCKET must be an absolute path" })
     return { kind: "agent", socketPath: socket, bearer: () => token }
   }
   if (socket !== undefined || token !== undefined) {
-    throw new ClientError({ message: "LGCODE_SOCKET and LGCODE_TOKEN must be set together, or both left unset" })
+    throw new ClientError({ message: "LGTM_SOCKET and LGTM_TOKEN must be set together, or both left unset" })
   }
   const folder = stateFolder(environment)
   return {

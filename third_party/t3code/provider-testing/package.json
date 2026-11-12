@@ -1,5 +1,5 @@
 {
-  "name": "@lgcode/t3-provider-testing",
+  "name": "@lgtm/t3-provider-testing",
   "version": "0.0.1",
   "private": true,
   "type": "module",

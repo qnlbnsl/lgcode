@@ -332,4 +332,4 @@ act.applyPrefs();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
 act.startSimulation();
 render(html`<${App} />`, document.getElementById('app'));
-window.lgcode = { store, act }; // for poking at the mock from the console
+window.lgtm = { store, act }; // for poking at the mock from the console

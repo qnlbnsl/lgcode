@@ -1,9 +1,9 @@
 import { act } from "react"
 import { createRoot } from "react-dom/client"
 import * as Schema from "effect/Schema"
-import { Event } from "@lgcode/contracts"
+import { Event } from "@lgtm/contracts"
 import { expect, it } from "vitest"
-import type { ClientEnvelope } from "@lgcode/client/browser"
+import type { ClientEnvelope } from "@lgtm/client/browser"
 import { DeliveryHistory } from "../src/thread/delivery.tsx"
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true

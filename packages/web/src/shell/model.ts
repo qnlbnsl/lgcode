@@ -1,5 +1,5 @@
-import type { AgentId, ClientRequest, ClientSnapshot, Project, Team } from "@lgcode/contracts"
-import { projectTeamGroup } from "@lgcode/contracts"
+import type { AgentId, ClientRequest, ClientSnapshot, Project, Team } from "@lgtm/contracts"
+import { projectTeamGroup } from "@lgtm/contracts"
 import type { NavigationData } from "../data/projectReads.ts"
 import type { ShellRoute } from "../routes.ts"
 

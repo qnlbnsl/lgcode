@@ -2,7 +2,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { it } from "@effect/vitest";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -28,7 +28,7 @@ let root: ServiceRoot;
 beforeEach(() => {
   root = makeServiceRoot("/tmp/sh-b1-");
   for (const [name, value] of Object.entries({
-    HOME: root.home, LGCODE_HOME: root.state, XDG_STATE_HOME: join(root.root, "xdg"),
+    HOME: root.home, LGTM_HOME: root.state, XDG_STATE_HOME: join(root.root, "xdg"),
     CODEX_HOME: join(root.home, ".codex"), CLAUDE_CONFIG_DIR: join(root.root, "claude-config"),
   })) vi.stubEnv(name, value);
 });
@@ -36,7 +36,7 @@ afterEach(async () => { await stopAllServices(); vi.unstubAllEnvs(); });
 
 const serviceOptions = () => ({ env: {
   CODEX_HOME: undefined, CLAUDE_CONFIG_DIR: join(root.root, "claude-config"),
-  LGCODE_TEST_DEBUG: "1", LGCODE_TEST_PROTOCOL_LOG: "1",
+  LGTM_TEST_DEBUG: "1", LGTM_TEST_PROTOCOL_LOG: "1",
 } });
 
 const noLeaks = (boundaries: Record<string, string>, tokens: ReadonlyArray<string>) => {

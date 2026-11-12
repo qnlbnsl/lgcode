@@ -11,10 +11,10 @@ LICENSE file is copied here, with its original copyright line.
 The currently copied repository file is LICENSE, from upstream LICENSE.
 Its bytes are unchanged. Its SHA-256 is
 38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b.
-No OpenPencil application source file is copied into LGcode's own source tree.
-LGcode's isolated-service launcher and folder/session checks are original
-LGcode code. The browser application they will serve is OpenPencil's code,
-not LGcode-authored application code.
+No OpenPencil application source file is copied into LGTM Studio's own source tree.
+LGTM Studio's isolated-service launcher and folder/session checks are original
+LGTM Studio code. The browser application they will serve is OpenPencil's code,
+not LGTM Studio-authored application code.
 
 The build preparation retains the full official pinned archive and its
 source-file-manifest.json in the ignored owned preparation directory.
@@ -49,7 +49,7 @@ image's licence/provenance directory. The licences of dependency-provided
 WebAssembly and other runtime assets must remain with their generated
 notices. The Caddy runtime and BuildKit tooling retain their own licences.
 
-The successful recipe populated /usr/share/lgcode-editor-provenance with source
+The successful recipe populated /usr/share/lgtm-editor-provenance with source
 identity, input checksums, exact source-file manifest, distribution hashes,
 bootstrap/tool versions and operating-system package inventory. The direct
 host build output, exit and final image identity must be retained alongside any
@@ -57,5 +57,5 @@ distribution of that image. A source label alone is insufficient.
 Any future copied or adapted upstream application source must be placed
 under third_party/open-pencil, list each original file and change here,
 preserve its copyright lines, and receive the required commit-message
-credit before integration. Dockerfile.editor is LGcode's original frozen recipe, not copied upstream application code. No commit,
+credit before integration. Dockerfile.editor is LGTM Studio's original frozen recipe, not copied upstream application code. No commit,
 service acceptance or distribution is claimed now.

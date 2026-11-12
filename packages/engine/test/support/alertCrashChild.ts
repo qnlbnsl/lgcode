@@ -1,8 +1,8 @@
 // Disposable real followers. The parent kills this process while it is parked
 // at an observed source-read or inside an uncommitted baseline transaction.
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";

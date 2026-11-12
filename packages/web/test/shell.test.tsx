@@ -4,14 +4,14 @@ import * as Effect from "effect/Effect"
 import * as Deferred from "effect/Deferred"
 import * as Stream from "effect/Stream"
 import * as Schema from "effect/Schema"
-import { ClientRequest, EventEnvelope } from "@lgcode/contracts"
+import { ClientRequest, EventEnvelope } from "@lgtm/contracts"
 import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/app.tsx"
 import { controlledStream } from "./controlled-stream.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown }))
 // Effect-valued connect is synchronous, just like the real browser client.
-vi.mock("@lgcode/client/browser", async () => { const Effect = await import("effect/Effect"); return { connect: () => Effect.succeed(browser.client) } })
+vi.mock("@lgtm/client/browser", async () => { const Effect = await import("effect/Effect"); return { connect: () => Effect.succeed(browser.client) } })
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const roots: Array<{ root: Root; container: HTMLDivElement }> = []
 const agent = { agentId: "lead", name: "Lead <script>", role: "lead", groups: [], parent: { _tag: "owner" }, state: { _tag: "idle" }, displayedState: "Idle", openPermissionRequests: 0, openQuestionsAsked: 0, harness: "codex", account: "default", permission: "ask", folder: "/work", startedAt: 1 }
@@ -94,11 +94,11 @@ it("remembers bounded navigation widths and folds to its remembered rail", async
   const handle = container.querySelector<HTMLElement>('[role="separator"]')!
   await act(async () => handle.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true })))
   expect(handle.getAttribute("aria-valuenow")).toBe("360")
-  expect(localStorage.getItem("lgcode-layout-sidebar")).toBe("360")
+  expect(localStorage.getItem("lgtm-layout-sidebar")).toBe("360")
   expect(container.querySelector<HTMLElement>('.app')?.style.getPropertyValue('--sidebar-width')).toBe("360px")
   await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "b", ctrlKey: true, bubbles: true })))
   expect(container.querySelector('.sidebar-collapsed')).not.toBeNull()
-  expect(localStorage.getItem('lgcode-sidebar')).toBe('rail')
+  expect(localStorage.getItem('lgtm-sidebar')).toBe('rail')
 })
 it("refreshes a coherent project snapshot for namespace changes and retains the last tree on a failed paged recovery", async () => {
   const live = await controlledStream()

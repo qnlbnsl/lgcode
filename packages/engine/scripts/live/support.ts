@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Client } from "@lgcode/client";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { Client } from "@lgtm/client";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";

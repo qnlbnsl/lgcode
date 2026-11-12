@@ -1,4 +1,4 @@
-import type { Caller, Project } from "@lgcode/contracts"
+import type { Caller, Project } from "@lgtm/contracts"
 import type { Snapshot } from "../commands/internal.ts"
 import { own, projectView } from "./view.ts"
 export const canReadProject = (snapshot: Snapshot, actor: Caller, projectId: string): boolean =>

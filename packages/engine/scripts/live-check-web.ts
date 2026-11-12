@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, expect, type Browser, type Page } from "@playwright/test";
 import { build } from "vite";
-import { connect, type Client } from "@lgcode/client";
-import type { AgentId, RequestId, AccountId, HarnessId } from "@lgcode/contracts";
+import { connect, type Client } from "@lgtm/client";
+import type { AgentId, RequestId, AccountId, HarnessId } from "@lgtm/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -67,7 +67,7 @@ const main = async () => {
     scope = await run(Scope.make());
     for (let attempt = 0; ; attempt++) {
       try {
-        owner = await run(connect({ environment: { LGCODE_HOME: service.state }, attempts: 1 }).pipe(Scope.provide(scope)));
+        owner = await run(connect({ environment: { LGTM_HOME: service.state }, attempts: 1 }).pipe(Scope.provide(scope)));
         return;
       } catch {
         if (attempt >= 299 || service.exited()) throw new Error("Private engine did not become ready");
@@ -129,7 +129,7 @@ const main = async () => {
       await page.goto(origin);
       await page.getByLabel("Password", { exact: true }).fill(password);
       await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await expect(page.getByRole("main", { name: "Set up LGcode", exact: true })).toBeVisible();
+      await expect(page.getByRole("main", { name: "Set up LGTM Studio", exact: true })).toBeVisible();
     });
     const projectJourney = await webProject(page, owner!, origin, step, (agent) => agents.push(agent));
     const workerLink = () => page.getByRole("navigation", { name: "Projects", exact: true }).locator(".agent-link").filter({ hasText: "Web live worker" });

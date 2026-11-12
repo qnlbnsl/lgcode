@@ -1,6 +1,6 @@
 // Task 8a.3, decision rows 33 and 57, issue 14: the base environment of a child process.
 //
-//   `buildBaseEnvironment({ parent, accountVariables?, lgcodeSocket?, lgcodeToken? })`
+//   `buildBaseEnvironment({ parent, accountVariables?, lgtmSocket?, lgtmToken? })`
 //   (module `packages/engine/src/runner/baseEnvironment.ts`) returns a new
 //   `Record<string, string>` that is the whole environment of the child. It takes `parent` as an
 //   argument and never reads `process.env`. Names are matched exactly and case-sensitively.
@@ -8,8 +8,8 @@
 //   Allow-list (row 33): PATH, HOME, USER, LOGNAME, SHELL, LANG, LC_* (the prefix `LC_`), TERM,
 //   TMPDIR and TZ, copied from `parent` when set. Then the account's variables, which win over the
 //   parent's values. Never HERDR_* (parent or account). Never a provider key the account did not
-//   set. The only LGCODE_* names are LGCODE_SOCKET and LGCODE_TOKEN (row 57), and they come
-//   only from the `lgcodeSocket` and `lgcodeToken` arguments, never from `parent` or from the
+//   set. The only LGTM_* names are LGTM_SOCKET and LGTM_TOKEN (row 57), and they come
+//   only from the `lgtmSocket` and `lgtmToken` arguments, never from `parent` or from the
 //   account's variables.
 import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
@@ -25,12 +25,12 @@ registerRebuildCheck({ noLog: true })
 it("5.17/E34 drops the web password from the parent and from account variables before a child is started", () => {
   const password = randomBytes(32).toString("base64url")
   const environment = buildBaseEnvironment({
-    parent: { PATH: process.env.PATH ?? "/usr/bin", LGCODE_WEB_PASSWORD: password },
-    accountVariables: { LGCODE_WEB_PASSWORD: password },
+    parent: { PATH: process.env.PATH ?? "/usr/bin", LGTM_WEB_PASSWORD: password },
+    accountVariables: { LGTM_WEB_PASSWORD: password },
   })
-  assert.isFalse(Object.hasOwn(environment, "LGCODE_WEB_PASSWORD"), "the web password variable reached the child environment")
+  assert.isFalse(Object.hasOwn(environment, "LGTM_WEB_PASSWORD"), "the web password variable reached the child environment")
   assert.isFalse(Object.values(environment).some((value) => value.includes(password)), "the web password value reached the child environment")
-  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(Object.hasOwn(process.env, 'LGCODE_WEB_PASSWORD')))"], { env: environment, encoding: "utf8" })
+  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(Object.hasOwn(process.env, 'LGTM_WEB_PASSWORD')))"], { env: environment, encoding: "utf8" })
   assert.equal(child.status, 0)
   assert.equal(child.stdout, "false")
 })
@@ -62,9 +62,9 @@ const secrets = {
   SSH_AUTH_SOCK: "/tmp/ssh-planted/agent.1",
   HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
   HERDR_PANE_ID: "p_1",
-  LGCODE_SOCKET: "/tmp/parent-planted.sock",
-  LGCODE_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
-  LGCODE_HOME: "/tmp/parent-planted-home",
+  LGTM_SOCKET: "/tmp/parent-planted.sock",
+  LGTM_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
+  LGTM_HOME: "/tmp/parent-planted-home",
   LCX_FOO: "looks-like-lc-but-is-not",
   XLC_ALL: "also-not",
   NODE_OPTIONS: "--require=/tmp/planted.js"
@@ -106,35 +106,35 @@ it("adds the account's variables, including a provider key the account set, and 
   })
 })
 
-it("drops account variables named HERDR_*, LGCODE_SOCKET or LGCODE_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
+it("drops account variables named HERDR_*, LGTM_SOCKET or LGTM_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
   const environment = buildBaseEnvironment({
     parent: { PATH: "/usr/bin" },
     accountVariables: {
       HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
       HERDR_ENV: "1",
-      LGCODE_SOCKET: "/tmp/account-planted.sock",
-      LGCODE_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
+      LGTM_SOCKET: "/tmp/account-planted.sock",
+      LGTM_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
       KEEP_ME: "yes"
     }
   })
   assert.deepEqual(environment, { PATH: "/usr/bin", KEEP_ME: "yes" })
 })
 
-it("sets LGCODE_SOCKET and LGCODE_TOKEN from the arguments, and no other LGCODE_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
+it("sets LGTM_SOCKET and LGTM_TOKEN from the arguments, and no other LGTM_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
   const environment = buildBaseEnvironment({
-    parent: { PATH: "/usr/bin", LGCODE_SOCKET: "/tmp/parent.sock", LGCODE_HOME: "/tmp/home" },
-    lgcodeSocket: "/tmp/run/engine.sock",
-    lgcodeToken: "shp_a_GIVENTOKEN0123456789"
+    parent: { PATH: "/usr/bin", LGTM_SOCKET: "/tmp/parent.sock", LGTM_HOME: "/tmp/home" },
+    lgtmSocket: "/tmp/run/engine.sock",
+    lgtmToken: "shp_a_GIVENTOKEN0123456789"
   })
   assert.deepEqual(environment, {
     PATH: "/usr/bin",
-    LGCODE_SOCKET: "/tmp/run/engine.sock",
-    LGCODE_TOKEN: "shp_a_GIVENTOKEN0123456789"
+    LGTM_SOCKET: "/tmp/run/engine.sock",
+    LGTM_TOKEN: "shp_a_GIVENTOKEN0123456789"
   })
 })
 
-it("adds no LGCODE_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
-  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", LGCODE_SOCKET: "/tmp/p.sock", LGCODE_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
+it("adds no LGTM_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
+  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", LGTM_SOCKET: "/tmp/p.sock", LGTM_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
   assert.deepEqual(environment, { PATH: "/usr/bin" })
 })
 
@@ -162,8 +162,8 @@ it("a real child started with the built environment sees exactly those names and
   const environment = buildBaseEnvironment({
     parent: { ...allowListed, ...secrets, PATH: `${process.env.PATH ?? "/usr/bin"}` },
     accountVariables: { ACCOUNT_VAR: "from-account" },
-    lgcodeSocket: "/tmp/run/engine.sock",
-    lgcodeToken: "shp_a_GIVENTOKEN0123456789"
+    lgtmSocket: "/tmp/run/engine.sock",
+    lgtmToken: "shp_a_GIVENTOKEN0123456789"
   })
   const child = spawnSync(process.execPath, ["-e", "console.log(JSON.stringify(Object.keys(process.env).sort()))"], {
     env: environment,
@@ -171,7 +171,7 @@ it("a real child started with the built environment sees exactly those names and
   })
   assert.equal(child.status, 0)
   const seen = JSON.parse(child.stdout) as string[]
-  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "LGCODE_SOCKET", "LGCODE_TOKEN"].sort())
+  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "LGTM_SOCKET", "LGTM_TOKEN"].sort())
   assert.notInclude(child.stdout, "planted")
 })
 

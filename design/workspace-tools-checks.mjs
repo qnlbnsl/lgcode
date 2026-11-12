@@ -7,7 +7,7 @@ const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)};
 const click=s=>page.locator(s).click(),text=s=>page.locator(s).textContent();
 const command=async value=>{await page.locator('#terminal-command').fill(value);await page.locator('#terminal-command').press('Enter')};
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgtmReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#workspace-tabs [data-main-view="terminal"]').count()===1,'Project workspace offers a Terminal view');
  await click('[data-main-view="terminal"]');check(await page.locator('#terminal-form').isVisible()&&!await page.locator('#composer-wrap').isVisible(),'Terminal replaces the main conversation with command input');
@@ -52,7 +52,7 @@ try{
  await click('#project-submit');await click('[data-main-view="workspace-settings"]');
  check(await text('#workspace-location').then(t=>t.includes('Main checkout')&&!t.includes('.worktrees')),'Opting out uses the repository’s main checkout');
  await click('[data-system-page="machines"]');check(await text('#view-title').then(t=>t==='Machines'),'Machines is a global page');
- await click('#connect-machine');await page.locator('#machine-name').fill('Office worker');await click('#pair-machine');check((await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('lgcode connect '),'The master shows the pairing code and the command');await page.waitForFunction(()=>document.querySelector('#pair-status').textContent.includes('connected'));await click('#pair-code [data-close="machine-dialog"]');
+ await click('#connect-machine');await page.locator('#machine-name').fill('Office worker');await click('#pair-machine');check((await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('lgtm connect '),'The master shows the pairing code and the command');await page.waitForFunction(()=>document.querySelector('#pair-status').textContent.includes('connected'));await click('#pair-code [data-close="machine-dialog"]');
  check(await text('#view-body').then(t=>t.includes('Office worker')&&t.includes('Awaiting confirmation')),'Pairing requires confirmation before a worker becomes available');
  await click('[data-confirm-machine]');const newWorker=page.locator('[data-project-machine="workspace"] option').last();check(await newWorker.textContent().then(t=>t.includes('Office worker'))&&await newWorker.isDisabled(),'Confirmed worker remains unavailable for placement until its repository is connected');
  await page.locator('[data-project-machine="workspace"]').selectOption('buildbox');

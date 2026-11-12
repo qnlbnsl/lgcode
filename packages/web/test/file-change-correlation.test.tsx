@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { ThreadContent } from "@lgcode/contracts"
+import { ThreadContent } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { expect, it } from "vitest"
 import { translate } from "../../engine/src/runner/translate.ts"

@@ -62,7 +62,7 @@ commands accept paths. Subsequent commands use registered identities.
 `project.branches` and `project.checkouts` enumerate actual Git branches and
 checkouts by repository identity. A record outside a changed workspace folder
 is preserved, but Git operations on it refuse. The owner can restore the
-workspace setting. A branch changed outside LGcode requires restoring the
+workspace setting. A branch changed outside LGTM Studio requires restoring the
 recorded branch before that workspace's Git operations can proceed.
 
 The workspace commands take `worktreeId`. They are `project.changes`,

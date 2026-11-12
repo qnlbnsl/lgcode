@@ -1,5 +1,5 @@
 import { extname } from "node:path"
-import { DesignRegistration, DesignTokens, type RepositoryDesign, type RepositoryDesignResult } from "@lgcode/contracts"
+import { DesignRegistration, DesignTokens, type RepositoryDesign, type RepositoryDesignResult } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"

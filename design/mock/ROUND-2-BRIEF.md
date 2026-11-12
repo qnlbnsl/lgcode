@@ -1,4 +1,4 @@
-# Brief for the second round of the LGcode mock
+# Brief for the second round of the LGTM Studio mock
 
 This brief hands the mock in `design/mock/` to the agent that builds its second round.
 The owner asked for the brief on 2026-11-10, after a 40 minute walkthrough of the first
@@ -123,7 +123,7 @@ File: `js/dialogs.js`.
   words of the query against each project's goal, description and agent names. Keep the
   scoring in one small function, so the website team can see what is being imitated.
 
-Done means: "lgcode" puts the repository first, "lgcode lead" puts a project lead first,
+Done means: "lgtm" puts the repository first, "lgtm lead" puts a project lead first,
 and the loose question above finds the right project.
 
 ### The sidebar is headed "Repositories" (feedback section 4)
@@ -142,7 +142,7 @@ Files: `js/app.js`, `js/screens/project.js`.
 Files: `js/dialogs.js`, `js/actions.js`.
 
 - Replace the name field with one "Goal" field. The goal is the first message to the
-  project lead. The placeholder is an example, such as "Make a mock for the LGcode phone
+  project lead. The placeholder is an example, such as "Make a mock for the LGTM Studio phone
   app".
 - The project appears in the sidebar as "Naming…". The simulated lead then names it in
   its first turn, and the sidebar shows the new name.

@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { AgentChoices } from "@lgcode/contracts";
+import { AgentChoices } from "@lgtm/contracts";
 import { expect } from "vitest";
 import { configuredChoices, negotiatedChoices, reportedChoice } from "../../src/runner/choices.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

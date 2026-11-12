@@ -10,7 +10,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { deliveryRow, eventually, snapshot, tagged } from "../support/routingRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 for (const race of [false, true]) {

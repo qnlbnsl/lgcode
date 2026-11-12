@@ -10,14 +10,14 @@ const preview=async action=>{await click('#design-notes');await click(`[data-pre
 const text=s=>page.locator(s).textContent();
 const authLook=()=>page.evaluate(()=>{const m=document.querySelector('#auth-message'),f=document.querySelector('#login-password'),s=document.querySelector('#login-submit'),token=v=>{const d=document.createElement('i');d.style.color=`var(${v})`;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c};return {color:getComputedStyle(m).color,error:token('--color-error'),muted:token('--color-muted'),gap:m.getBoundingClientRect().top-f.getBoundingClientRect().bottom,beforeSubmit:m.getBoundingClientRect().bottom<=s.getBoundingClientRect().top}});
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgtmReady);
  check(await page.locator('.push-prompt').count()===0&&!await page.evaluate(()=>pushPromptDue()),'A service with a notification service set does not offer phone notifications');
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#logout').count()===1,'Owner view has a Log out action');
  check(await text('#connection-status').then(t=>t.trim()==='Live'),'Connection state is visible without a sample badge');
  await click('#logout');check(await page.locator('#login-form').isVisible()&&!await page.locator('.app').isVisible(),'Logout hides the owner workspace and shows login');
  check(await page.locator('#login-password').getAttribute('autocomplete')==='current-password','The password field lets a password manager fill it');
- check(await text('#auth-title')==='Sign in to LGcode'&&await page.locator('.auth-mark').isVisible()&&(await page.locator('.auth-mark').boundingBox()).y<(await page.locator('#auth-title').boundingBox()).y,'Login says Sign in to LGcode under the logo mark');
+ check(await text('#auth-title')==='Sign in to LGTM Studio'&&await page.locator('.auth-mark').isVisible()&&(await page.locator('.auth-mark').boundingBox()).y<(await page.locator('#auth-title').boundingBox()).y,'Login says Sign in to LGTM Studio under the logo mark');
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
  check(await page.locator('#login-password').inputValue()==='','Password input clears on submission');
  check(await page.locator('.app').isVisible(),'Sample login returns to the workspace');
@@ -42,7 +42,7 @@ try{
  check(await page.locator('#retry-connection').isHidden()&&!await page.locator('#new-project').isDisabled()&&!(await page.locator('#new-project').getAttribute('title'))&&!await page.locator('#attention-toggle').evaluate(b=>b.classList.contains('stale')),'Going live re-enables actions and clears their reasons');
  await click('#lead-panel [data-open-permission="perm-iris"]');await preview('offline');
  check(await text('#connection-state')==='Offline'&&await text('#connection-updated')==='Last updated 2 minutes ago','The Offline preview shows the indicator with the last update time');
- check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').getAttribute('title')).startsWith('LGcode is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm')),'Offline keeps the request readable and disables Allow with the reason');
+ check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').getAttribute('title')).startsWith('LGTM Studio is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm')),'Offline keeps the request readable and disables Allow with the reason');
  check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').evaluate(b=>{const c=document.querySelector('#composer-wrap').getBoundingClientRect(),r=b.getBoundingClientRect();return r.bottom<=c.top}),'Allow stays above the composer while offline');
  await click('#retry-connection');await click('#tab-board');
  await click('#lead-agent-controls [data-agent-command="stop"]');check(await text('#lead-agent-controls').then(t=>t.includes('Sage is stopped'))&&await page.locator('#send-message').isDisabled()&&await page.locator('#message-input').isHidden(),'Stop agent changes lifecycle, and Resume replaces the input');
@@ -51,7 +51,7 @@ try{
  check(await text('#view-title').then(t=>t==='Iris'),'Lead surfaces permission requests from its team');
  const permission=page.locator('#permission-perm-iris');
  check(await permission.evaluate(el=>el===document.activeElement),'Permission link focuses the exact request');
- check(await permission.textContent().then(t=>t.includes('pnpm --filter @lgcode/web test')&&t.includes('perm-iris')),'Permission request shows identity and actual tool input');
+ check(await permission.textContent().then(t=>t.includes('pnpm --filter @lgtm/web test')&&t.includes('perm-iris')),'Permission request shows identity and actual tool input');
  check(await permission.evaluate(el=>el.querySelector('.request-fields').compareDocumentPosition(el.querySelector('[data-permission-answer]'))&Node.DOCUMENT_POSITION_FOLLOWING),'Action input is visible before permission answer buttons');
  await click('[data-permission-answer="allow"][data-permission-id="perm-iris"]');
  check(await permission.textContent().then(t=>t.includes('Allow once'))&&await permission.locator('[data-permission-answer]').count()===0,'Permission answer is recorded and cannot be sent twice');
@@ -106,7 +106,7 @@ try{
  check(await text('[data-push-kind="roles.rule-first-use"]~*, .push-setting:has([data-push-kind="roles.rule-first-use"]) .op-caption').then(t=>/permission rule/.test(t)),'SET-2: one sentence explains the permission rule');
  check(await page.locator('#send-test').isDisabled()&&await text('#send-test-reason')==='Set the token first.','Send test notification says what it needs');
  await page.locator('[data-push-kind="approval"]').uncheck();check(await text('[data-saved-for="push-approval"]').then(t=>t.includes('Saved')),'A notification choice saves at once with a Saved mark');
- await page.locator('#carrier-server').fill('https://push.example/path');await page.locator('#carrier-topic').fill('lgcode');await page.locator('#carrier-topic').blur();
+ await page.locator('#carrier-server').fill('https://push.example/path');await page.locator('#carrier-topic').fill('lgtm');await page.locator('#carrier-topic').blur();
  check(await text('[data-saved-for="carrier-topic"]').then(t=>t.includes('Saved'))&&await page.locator('#carrier-server').inputValue()==='https://push.example','The service saves on change, keeping only the server origin');
  await page.locator('#carrier-token').fill('sample-only-token');await page.locator('#carrier-token').blur();
  check(await page.locator('#carrier-token').inputValue()===''&&await text('#token-state').then(t=>t.includes('A token is set')),'Token control clears the input and exposes only whether a token is set');
@@ -117,9 +117,9 @@ try{
  check(await text('#token-state').then(t=>t.includes('No token')),'Changing token destination clears the old token state');
  await click('#clear-carrier');check(await page.locator('#carrier-token').isDisabled(),'Clearing carrier disables token entry');
  check(await page.evaluate(()=>{findPushPrompt();return pushPromptDue()&&pushPromptFor.length>0}),'With no notification service, the oldest waiting request offers phone notifications');
- await page.locator('#web-public').fill('https://lgcode.example/path');await page.locator('#web-public').blur();
+ await page.locator('#web-public').fill('https://lgtm.example/path');await page.locator('#web-public').blur();
  check(await text('#web-public-error').then(t=>t.includes('canonical HTTPS origin')),'Settings rejects a public address with a path');
- await page.locator('#web-public').fill('https://lgcode.example');await page.locator('#web-public').blur();await page.locator('#web-proxy').check();
+ await page.locator('#web-public').fill('https://lgtm.example');await page.locator('#web-public').blur();await page.locator('#web-proxy').check();
  await page.locator('#web-port').fill('8899');await page.locator('#web-port').blur();
  check(await text('[data-saved-for="web-port"]').then(t=>t.includes('Saved'))&&await text('#view-body').then(t=>t.includes('next service start')),'Web settings save on change and keep the restart consequence');
  await click('#web-enabled');check(await page.locator('#confirm-dialog').isVisible()&&await page.locator('#web-enabled').isChecked(),'Turning off the web server asks first');await click('#confirm-dialog footer [data-close]');
@@ -140,7 +140,7 @@ try{
  await page.screenshot({path:new URL('./previews/operations-settings-dark-1440.png',import.meta.url).pathname});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:new URL('./previews/operations-settings-dark-390.png',import.meta.url).pathname});
  await page.setViewportSize({width:1440,height:900});
- await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await page.locator('#carrier-topic').blur();
+ await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgtm');await page.locator('#carrier-topic').blur();
  await page.locator('#carrier-token').fill('unsaved-secret-must-clear');await click('#logout');
  check(await page.locator('#carrier-token').inputValue()==='','Logout wipes an unsaved token from hidden controls');
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
@@ -157,7 +157,7 @@ try{
  check(await text('#permission-perm-finch').then(t=>t.includes('Held by Sage, the project lead'))&&await page.locator('#permission-perm-finch [data-permission-answer]').count()===0,'Permissions held elsewhere offer no owner answer controls');
  // CONN-4: after 30 seconds of failed reconnects the indicator says Offline, and the last update time keeps counting.
  {const ctx=await browser.newContext({viewport:{width:1440,height:900}}),o=await ctx.newPage();o.on('pageerror',e=>errors.push(e.message));await o.clock.install();
-  await o.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await o.waitForFunction(()=>window.lgcodeReady);
+  await o.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await o.waitForFunction(()=>window.lgtmReady);
   await o.click('.project-select[data-project="workspace"]');await o.click('#design-notes');await o.click('[data-preview="reconnect"]');
   await o.clock.runFor(29000);check(await o.locator('#connection-state').textContent()==='Reconnecting','Reconnecting holds for the first 30 seconds');
   await o.clock.runFor(2000);check(await o.locator('#connection-state').textContent()==='Offline'&&await o.locator('#connection-updated').textContent()==='Last updated 30 seconds ago','After 30 seconds of failed reconnects the indicator says Offline');

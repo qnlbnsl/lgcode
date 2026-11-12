@@ -4,7 +4,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { EventSequence, RequestId } from "@lgcode/contracts";
+import { EventSequence, RequestId } from "@lgtm/contracts";
 import * as Server from "../../src/api/server.ts";
 import { connect, ancestryHeaders, authorization, upgradeStatus } from "../support/socketClient.ts";
 import * as Fiber from "effect/Fiber";
@@ -42,7 +42,7 @@ it("a genuine test waits for carrier acceptance, stores nothing, and discloses n
       expect(yield* Deferred.isDone(completed)).toBe(false);
       const request = posts(server)[0]!;
       expect(request.headers.authorization === `Bearer ${token}`).toBe(true);
-      expect(request.headers.title).toBe("LGcode test notification");
+      expect(request.headers.title).toBe("LGTM Studio test notification");
       expect(request.headers["x-sequence-id"]).toMatch(/^test-/);
       request.response.writeHead(200); request.response.end(`provider-private-${token}`);
       const reply = success(yield* Fiber.join(task));

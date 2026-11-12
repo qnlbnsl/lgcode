@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
-import { connect } from "@lgcode/client"
+import { connect } from "@lgtm/client"
 import { UsageError } from "./parse.ts"
 import { describeFailure, err, out } from "./output.ts"
 

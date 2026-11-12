@@ -8,7 +8,7 @@ import { accountFor, alive, echoFile, harnessFor, makeRunnerRig, readEcho, remov
   startPayloadFor, withEngine, writeFakeAdapter, type RunnerRig } from "../support/acpRunnerRig.ts";
 
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 
 for (const protocolVersion of [1, 2]) for (const permission of [false, true]) {

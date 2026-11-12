@@ -7,7 +7,7 @@ import { App } from "../src/index.ts"
 import { adminShellClient } from "./admin-shell-client.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(browser.client) }
 })
@@ -158,14 +158,14 @@ it("sends all web settings, including proxy and enable controls", async () => {
   input("port").value = "8899"
   input("heartbeatSeconds").value = "40"
   input("proxyMode").checked = true
-  input("publicAddress").value = "https://lgcode.example"
+  input("publicAddress").value = "https://lgtm.example"
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true,
     value: function (this: HTMLDialogElement) { this.setAttribute("open", "") } })
   await submit(container, "Web server settings")
   expect(set).not.toHaveBeenCalled()
   await act(async () => { Array.from(container.querySelectorAll<HTMLButtonElement>("dialog button")).find((button) => button.textContent === "Turn off")!.click() })
   expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: {
-    enabled: false, port: 8899, heartbeatSeconds: 40, proxyMode: true, publicAddress: "https://lgcode.example"
+    enabled: false, port: 8899, heartbeatSeconds: 40, proxyMode: true, publicAddress: "https://lgtm.example"
   } }))
   Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
 })

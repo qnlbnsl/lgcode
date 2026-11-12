@@ -53,7 +53,7 @@ export function App() {
       if (response.ok) setSession("owner")
       else setMessage(response.status === 401 ? "The password was not accepted." : "Log in is unavailable. Try again.")
     }).catch(() => {
-      if (!controller.signal.aborted) setMessage("Could not reach LGcode. Try again.")
+      if (!controller.signal.aborted) setMessage("Could not reach LGTM Studio. Try again.")
     }).finally(() => {
       if (!controller.signal.aborted) {
         action.current = undefined
@@ -88,7 +88,7 @@ export function App() {
     <Shell onSessionExpired={sessionExpired} onLogout={logOut} logoutBusy={busy} message={message} />
   </ShellDataProvider>
   return <main className="auth-page">
-    <h1>LGcode</h1>
+    <h1>LGTM Studio</h1>
     {message && <p role="alert">{message}</p>}
     {session === "checking" && <p role="status">Checking your session…</p>}
     {session === "unavailable" && <section aria-label="Connection unavailable">

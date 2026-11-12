@@ -4,10 +4,10 @@ import { projectView } from "../project/view.ts";
 import { collectSecrets } from "../accounts/collectSecrets.ts";
 // Pattern: T3 Code packages/effect-acp/src/client.ts (`loadSession`, line 91;
 // MIT licence; the copy here is third_party/t3code/effect-acp/src/client.ts)
-// for the reload itself, through reload.ts. The recovery order is LGcode's
+// for the reload itself, through reload.ts. The recovery order is LGTM Studio's
 // own (decision rows 31, 52 and 66).
 import { randomUUID } from "node:crypto";
-import { BootId, Event as EventSchema, PermissionRequestId, WaitId, type AgentId, type Event } from "@lgcode/contracts";
+import { BootId, Event as EventSchema, PermissionRequestId, WaitId, type AgentId, type Event } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

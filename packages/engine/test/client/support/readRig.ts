@@ -1,4 +1,4 @@
-import type { Caller, Event, EventEnvelope } from "@lgcode/contracts";
+import type { Caller, Event, EventEnvelope } from "@lgtm/contracts";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import * as Effect from "effect/Effect";

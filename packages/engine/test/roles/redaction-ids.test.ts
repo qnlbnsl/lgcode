@@ -1,5 +1,5 @@
-import { RequestId } from "@lgcode/contracts";
-import type { BoardView } from "@lgcode/contracts/board/view";
+import { RequestId } from "@lgtm/contracts";
+import type { BoardView } from "@lgtm/contracts/board/view";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";

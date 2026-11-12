@@ -4,12 +4,12 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
-import type { AgentId, ContextReference, ProjectId, TeamId, ChannelId, WorkspaceId, TaskId } from "@lgcode/contracts"
+import type { AgentId, ContextReference, ProjectId, TeamId, ChannelId, WorkspaceId, TaskId } from "@lgtm/contracts"
 import { Composer } from "../src/thread/composer.tsx"
 import { conversationKey, type ConversationIdentity, type ConversationSession } from "../src/thread/conversationState.tsx"
 
 const api = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(api.current) }
 })

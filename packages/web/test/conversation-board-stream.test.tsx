@@ -7,7 +7,7 @@ import { expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Stream from "effect/Stream"
-import type { ClientStreamItem } from "@lgcode/contracts"
+import type { ClientStreamItem } from "@lgtm/contracts"
 import { App } from "../src/app.tsx"
 import { serve } from "../../engine/src/api/server.ts"
 import { EventLog } from "../../engine/src/log/EventLog.ts"
@@ -18,7 +18,7 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { connect } from "../../engine/test/support/socketClient.ts"
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
@@ -26,7 +26,7 @@ vi.mock("@lgcode/client/browser", async () => {
 
 it("refreshes a real team post through the authenticated shell stream without polling or consuming member marks", async () => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   // Only the HTTP session probe is a double. Every RPC below, including the
   // owner's subscription, traverses the real authenticated Unix socket API.
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })))

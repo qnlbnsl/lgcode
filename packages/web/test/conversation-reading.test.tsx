@@ -3,14 +3,14 @@ import { adminShellClient } from "./admin-shell-client.ts"
 import { ShellDataProvider, useConversation } from "../src/data/ShellDataProvider.tsx"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import type { AgentId } from "@lgcode/contracts"
+import type { AgentId } from "@lgtm/contracts"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 
 import { useConversationReading } from "../src/thread/reading.tsx"
 import { BoundedText } from "../src/thread/boundedText.tsx"
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-vi.mock("@lgcode/client/browser", () => ({ connect: () => Effect.succeed(adminShellClient()) }))
+vi.mock("@lgtm/client/browser", () => ({ connect: () => Effect.succeed(adminShellClient()) }))
 let container: HTMLDivElement, root: Root
 const identity = { _tag: "agent" as const, agentId: "reader" as AgentId }
 function Reader({ count, id }: { count: number; id: string }) {

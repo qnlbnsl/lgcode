@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import {
   acpPermissionOptionKinds, comparePermission, permissionForOptionKind,
   type Actor, type PermissionLevel,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 
@@ -317,7 +317,7 @@ export const canUseMode = (caller: Actor, parentMode: PermissionLevel, requested
 const isHarnessSettings = (path: string): boolean => {
   const segments = path.split(sep).map((segment) => segment.toLowerCase());
   return segments.some((segment, index) =>
-    segment === ".claude" || segment === ".codex" || segment === ".gemini" || segment === ".cursor" || segment === ".lgcode"
+    segment === ".claude" || segment === ".codex" || segment === ".gemini" || segment === ".cursor" || segment === ".lgtm" || segment === ".lgcode"
     || (segment === ".mcp.json" && index === segments.length - 1));
 };
 

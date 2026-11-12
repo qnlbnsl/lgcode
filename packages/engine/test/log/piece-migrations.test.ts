@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";
@@ -12,7 +12,7 @@ registerRebuildCheck({ noLog: true });
 type MigratePieces = (migrations: EngineLists["migrations"]) => Effect.Effect<void, unknown, SqlClient.SqlClient>;
 const loadMigrate = async () => (await productionModule<{ migratePieces: MigratePieces }>("log/migrations.ts")).migratePieces;
 const withDatabase = async (body: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) => {
-  const home = mkdtempSync("/tmp/lgcode-piece-migration-");
+  const home = mkdtempSync("/tmp/lgtm-piece-migration-");
   try { await Effect.runPromise(body.pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "events.sqlite") })), Effect.scoped)); }
   finally { rmSync(home, { recursive: true, force: true }); }
 };

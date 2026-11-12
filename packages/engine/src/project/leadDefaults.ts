@@ -1,9 +1,9 @@
 import { constants } from "node:fs"
 import { access, stat } from "node:fs/promises"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { ProjectName, type Account, type HarnessSettings, type ProjectLeadDefaults } from "@lgcode/contracts"
-import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess"
-import { mergeProviderInstanceEnvironment } from "@lgcode/t3-provider-instance/instanceEnvironment"
+import { isServiceVariable, ProjectName, type Account, type HarnessSettings, type ProjectLeadDefaults } from "@lgtm/contracts"
+import { HomeDirectory } from "@lgtm/t3-provider-instance/HostProcess"
+import { mergeProviderInstanceEnvironment } from "@lgtm/t3-provider-instance/instanceEnvironment"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
@@ -29,7 +29,7 @@ export const accountReadiness = (input: Input, harness: HarnessSettings, account
   if (!(yield* adapterInstalled(harness))) return "missing-executable" as const
   let variables: Record<string, string> = {}
   for (const [name, raw] of Object.entries(account.environment ?? {})) {
-    if (name.startsWith("LGCODE_") || name.startsWith("HERDR_")) continue
+    if (isServiceVariable(name) || name.startsWith("HERDR_")) continue
     if (raw.startsWith("secret:")) {
       if (raw.startsWith("secret:client.")) return "unavailable" as const
       const value = yield* input.runtime.secrets.resolve(raw)
@@ -48,7 +48,7 @@ export const accountReadiness = (input: Input, harness: HarnessSettings, account
   }
   if (harness.id === "codex") variables = yield* resolveCodexHome({ stateFolder: input.runtime.stateFolder, home: input.runtime.home,
     accountId: account.id, variables, ...(account.home === undefined ? {} : { homePath: account.home }) }).pipe(Effect.provide(NodeServices.layer))
-  const base = buildBaseEnvironment({ parent: process.env, accountVariables: variables, lgcodeSocket: "", lgcodeToken: "" })
+  const base = buildBaseEnvironment({ parent: process.env, accountVariables: variables, lgtmSocket: "", lgtmToken: "" })
   const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: false })), base)
     .pipe(Effect.provideService(HomeDirectory, process.env.HOME ?? input.runtime.home))
   const effective = Object.fromEntries(Object.entries(environment).filter((pair): pair is [string, string] => pair[1] !== undefined))

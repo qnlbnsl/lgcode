@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { Workspace } from "@lgcode/contracts"
+import type { Workspace } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../thread/client.ts"
 import { DataText } from "../thread/text.tsx"

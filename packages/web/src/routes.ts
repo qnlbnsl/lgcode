@@ -1,4 +1,4 @@
-import type { AgentId, ProjectId, RepositoryId, SprintId, TaskId, TeamId, WorkspaceId } from "@lgcode/contracts"
+import type { AgentId, ProjectId, RepositoryId, SprintId, TaskId, TeamId, WorkspaceId } from "@lgtm/contracts"
 
 export const workspaceTabs = ["board", "mocks", "chat", "terminal", "git", "settings", "tasks"] as const
 export type WorkspaceTab = typeof workspaceTabs[number]

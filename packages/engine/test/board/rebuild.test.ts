@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 
-import type { BoardView } from "@lgcode/contracts/board/view";
+import type { BoardView } from "@lgtm/contracts/board/view";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -14,8 +14,8 @@ import { accept, agent, close, event, position, post, queue, read, resolve, retu
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/lgcode-board-view-");
-  vi.stubEnv("LGCODE_HOME", home);
+  home = mkdtempSync("/tmp/lgtm-board-view-");
+  vi.stubEnv("LGTM_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

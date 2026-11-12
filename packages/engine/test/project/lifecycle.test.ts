@@ -20,7 +20,7 @@ import { accountFor, alive, echoFile, effortOption, harnessFor, makeRunnerRig, m
 let rig: RunnerRig
 const git = (path: string, ...args: string[]) => execFileSync("git", ["-C", path, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
 beforeEach(() => {
-  rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   git(rig.work, "-c", "commit.gpgsign=false", "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--allow-empty", "-m", "Initial")
 })
@@ -63,7 +63,7 @@ it.live("creates through the authenticated API, launches saved defaults, inherit
     expect(yield* api["project.create"](payload)).toEqual(created)
     expect((yield* readLog).filter(({ event }) => event._tag === "AgentStarted")).toHaveLength(1)
     expect((yield* api["project.create"]({ ...payload, name: "Different" }).pipe(Effect.result))._tag).toBe("Failure")
-    const leadApi = yield* connect(rig.socket, peer.env.LGCODE_TOKEN!)
+    const leadApi = yield* connect(rig.socket, peer.env.LGTM_TOKEN!)
     const childPayload = { requestId: freshRequest(), name: "Worker", role: "worker", harness: harness.id,
       account: { _tag: "named" as const, accountId: childAccount.id }, permission: "ask" as const, folder: workspace.path }
     expect((yield* leadApi.start({ ...childPayload, permission: "full" }).pipe(Effect.result))._tag).toBe("Failure")

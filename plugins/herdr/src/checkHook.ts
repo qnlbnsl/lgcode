@@ -28,19 +28,19 @@ export const checkPluginHook = async (environment: Environment, signal?: AbortSi
   const entry = /\[\[startup\]\]([\s\S]*?)(?=\n\[|$)/.exec(manifest)?.[1];
   const text = entry === undefined ? undefined : /^command\s*=\s*(\[[^\n]+\])/m.exec(entry)?.[1];
   const command: unknown = text === undefined ? undefined : JSON.parse(text);
-  if (!Array.isArray(command) || command.length !== 3 || command[0] !== "lgcode" || command[1] !== "serve" || command[2] !== "--detach") {
-    throw new Error("the Herdr plugin startup command must be lgcode serve --detach");
+  if (!Array.isArray(command) || command.length !== 3 || command[0] !== "lgtm" || command[1] !== "serve" || command[2] !== "--detach") {
+    throw new Error("the Herdr plugin startup command must be lgtm serve --detach");
   }
-  const root = mkdtempSync("/tmp/lgcode-herdr-hook-");
+  const root = mkdtempSync("/tmp/lgtm-herdr-hook-");
   const state = join(root, "state");
   const home = join(root, "home");
   mkdirSync(home, { mode: 0o700 });
   const bin = fileURLToPath(new URL("../../../bin", import.meta.url));
-  const env = { HOME: home, PATH: `${bin}${delimiter}${environment.PATH ?? ""}`, LGCODE_HOME: state, LGCODE_NODE: process.execPath };
+  const env = { HOME: home, PATH: `${bin}${delimiter}${environment.PATH ?? ""}`, LGTM_HOME: state, LGTM_NODE: process.execPath };
   const owned = new Map<number, string>();
   const remember = () => {
     for (const service of listServicesFromProc()) {
-      if (service.environment.LGCODE_HOME !== state) continue;
+      if (service.environment.LGTM_HOME !== state) continue;
       const start = processStart(service.pid);
       if (start !== undefined) owned.set(service.pid, start);
     }

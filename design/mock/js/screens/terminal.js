@@ -22,17 +22,17 @@ function files(root, project, branch) {
   const f = {};
   const put = (path, text) => { f[root + '/' + path] = text; };
   put('README.md', `# ${base(root)}\n\nWorktree for ${project.name}, on branch ${branch}.\n\nRun \`pnpm test\` for the unit tests.\nRun \`pnpm check\` for the full run that a merge needs.\n`);
-  put('package.json', `{\n  "name": "lgcode",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "test": "vitest run",\n    "typecheck": "tsc --noEmit",\n    "check": "pnpm typecheck && vitest run --project full"\n  },\n  "engines": { "node": ">=26" }\n}\n`);
+  put('package.json', `{\n  "name": "lgtm",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "test": "vitest run",\n    "typecheck": "tsc --noEmit",\n    "check": "pnpm typecheck && vitest run --project full"\n  },\n  "engines": { "node": ">=26" }\n}\n`);
   put('pnpm-workspace.yaml', 'packages:\n  - packages/*\n');
   put('tsconfig.json', '{\n  "compilerOptions": {\n    "strict": true,\n    "module": "nodenext",\n    "target": "es2024",\n    "noEmit": true\n  },\n  "include": ["packages/*/src", "packages/*/test"]\n}\n');
   put('.nvmrc', '26\n');
   put('docs/features.md', '# Feature list\n\n- Fold the sidebar into a 48 pixel rail.\n- Open an agent thread from the board.\n- Count open requests the same way everywhere.\n');
-  put('packages/web/package.json', '{\n  "name": "@lgcode/web",\n  "private": true,\n  "scripts": { "test": "vitest run" }\n}\n');
+  put('packages/web/package.json', '{\n  "name": "@lgtm/web",\n  "private": true,\n  "scripts": { "test": "vitest run" }\n}\n');
   put('packages/web/src/shell/Sidebar.tsx', `import { Rail } from './Rail';\nimport { openCount } from './attention';\n\nexport function Sidebar({ folded, projects }: SidebarProps) {\n  if (folded) return <Rail count={openCount(projects)} />;\n  return (\n    <aside className="sidebar" aria-label="Navigation">\n      <ProjectTree projects={projects} />\n    </aside>\n  );\n}\n`);
   put('packages/web/src/shell/Rail.tsx', `export function Rail({ count }: { count: number }) {\n  return (\n    <nav className="rail" aria-label="Navigation">\n      <RailLink to="/home" icon="house" pip={count > 0} />\n    </nav>\n  );\n}\n`);
-  put('packages/web/src/shell/attention.ts', `import type { Project, Request } from '@lgcode/client';\n\n// A request held by a lead does not count for the owner.\nexport function openCount(projects: Project[]): number {\n  return projects.flatMap((p) => p.requests).filter(needsOwner).length;\n}\n\nconst needsOwner = (r: Request) => r.status === 'open' && r.heldBy === null;\n`);
+  put('packages/web/src/shell/attention.ts', `import type { Project, Request } from '@lgtm/client';\n\n// A request held by a lead does not count for the owner.\nexport function openCount(projects: Project[]): number {\n  return projects.flatMap((p) => p.requests).filter(needsOwner).length;\n}\n\nconst needsOwner = (r: Request) => r.status === 'open' && r.heldBy === null;\n`);
   put('packages/web/src/shell/attention.test.ts', `import { expect, test } from 'vitest';\nimport { openCount } from './attention';\n\ntest('a request held by a lead is not counted', () => {\n  expect(openCount([projectWith({ heldBy: 'lead' })])).toBe(0);\n});\n`);
-  put('packages/client/package.json', '{\n  "name": "@lgcode/client",\n  "private": true\n}\n');
+  put('packages/client/package.json', '{\n  "name": "@lgtm/client",\n  "private": true\n}\n');
   put('packages/client/src/socket.ts', `export function reconnect(socket: Socket, wait = 250): Promise<void> {\n  return closed(socket).then(() => open(socket, wait));\n}\n`);
   put('packages/client/test/reconnect.test.ts', `import { expect, test } from 'vitest';\nimport { reconnect } from '../src/socket';\n\ntest('reconnect waits for the socket to close', async () => {\n  const socket = fakeSocket();\n  await reconnect(socket);\n  expect(socket.opened).toBe(2);\n});\n`);
   return f;
@@ -93,7 +93,7 @@ const TEST_FILES = [
 const stamp = () => new Date().toTimeString().slice(0, 8);
 function testSteps(sess, { pace = 260, fail = false, total = 412 } = {}) {
   const steps = [
-    [120, ''], [40, [[`> lgcode@0.4.0 ${fail ? 'check' : 'test'} ${sess.root}`, 'tc-m']]], [40, [[`> ${fail ? 'pnpm typecheck && vitest run --project full' : 'vitest run'}`, 'tc-m']]], [pace * 2, ''],
+    [120, ''], [40, [[`> lgtm@0.4.0 ${fail ? 'check' : 'test'} ${sess.root}`, 'tc-m']]], [40, [[`> ${fail ? 'pnpm typecheck && vitest run --project full' : 'vitest run'}`, 'tc-m']]], [pace * 2, ''],
     [60, [[' RUN ', 'tc-inv tc-bl'], [' ' + sess.root, 'tc-m']]], [pace, ''],
   ];
   for (const [file, n, ms] of TEST_FILES) {
@@ -170,7 +170,7 @@ function exec(sess, raw, { onExit } = {}) {
   let exit = 0;
   if (cmd === 'clear') { sess.lines = []; }
   else if (cmd === 'pwd') out(sess, sess.cwd);
-  else if (cmd === 'whoami') out(sess, 'lgcode');
+  else if (cmd === 'whoami') out(sess, 'lgtm');
   else if (cmd === 'date') out(sess, new Date().toString());
   else if (cmd === 'echo') out(sess, args.join(' ').replace(/^["']|["']$/g, ''));
   else if (cmd === 'history') sess.history.forEach((h, i) => out(sess, [[String(i + 1).padStart(5) + '  ', 'tc-m'], [h]]));
@@ -188,7 +188,7 @@ function exec(sess, raw, { onExit } = {}) {
       const items = list(sess, to).filter((x) => all || !x.name.startsWith('.'));
       if (long) {
         out(sess, [[`total ${items.length * 8}`, 'tc-m']]);
-        for (const x of items) out(sess, [[(x.dir ? 'drwxr-xr-x' : '-rw-r--r--') + '  1 lgcode lgcode ', 'tc-m'], [String(x.size).padStart(5) + ' Nov 10 20:37 ', 'tc-m'], [x.name + (x.dir ? '/' : ''), x.dir ? 'tc-bl tc-b' : '']]);
+        for (const x of items) out(sess, [[(x.dir ? 'drwxr-xr-x' : '-rw-r--r--') + '  1 lgtm lgtm ', 'tc-m'], [String(x.size).padStart(5) + ' Nov 10 20:37 ', 'tc-m'], [x.name + (x.dir ? '/' : ''), x.dir ? 'tc-bl tc-b' : '']]);
       } else if (items.length) {
         out(sess, items.flatMap((x, i) => [[x.name + (x.dir ? '/' : ''), x.dir ? 'tc-bl tc-b' : ''], ...(i < items.length - 1 ? [['   ']] : [])]));
       }
@@ -217,7 +217,7 @@ function exec(sess, raw, { onExit } = {}) {
     if (!inRepo(sess)) { out(sess, [[' ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND ', 'tc-inv tc-r'], [' No package.json was found in "' + sess.cwd + '".', 'tc-r']]); exit = 1; }
     else if (script === 'test') { stream(sess, 'pnpm test', testSteps(sess), 0); return; }
     else if (script === 'check') { stream(sess, 'pnpm check', testSteps(sess, { pace: 200, fail: true }), 1); return; }
-    else if (script === 'typecheck') { stream(sess, 'pnpm typecheck', [[120, ''], [40, [[`> lgcode@0.4.0 typecheck ${sess.root}`, 'tc-m']]], [40, [['> tsc --noEmit', 'tc-m']]], [1700, '']], 0); return; }
+    else if (script === 'typecheck') { stream(sess, 'pnpm typecheck', [[120, ''], [40, [[`> lgtm@0.4.0 typecheck ${sess.root}`, 'tc-m']]], [40, [['> tsc --noEmit', 'tc-m']]], [1700, '']], 0); return; }
     else if (script === 'install' || script === 'i') { stream(sess, 'pnpm install', [[300, 'Lockfile is up to date, resolution step is skipped'], [500, 'Already up to date'], [200, [['Done in 1.1s', 'tc-m']]]], 0); return; }
     else { out(sess, [[' ERR_PNPM_NO_SCRIPT ', 'tc-inv tc-r'], [` Missing script: ${script || ''}`, 'tc-r']], '', 'Scripts in this package: test, typecheck, check'); exit = 1; }
   }

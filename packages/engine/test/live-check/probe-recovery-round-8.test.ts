@@ -7,8 +7,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, WORKER, ONCE, REJECT, type FakeEngine } from "./probe-fake-engine.ts";
 import { scriptedApi } from "./scripted-api.ts";
 
-vi.mock("@lgcode/client", async (original) => {
-  const client = await original<typeof import("@lgcode/client")>();
+vi.mock("@lgtm/client", async (original) => {
+  const client = await original<typeof import("@lgtm/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });

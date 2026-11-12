@@ -4,8 +4,8 @@ import { PROBE_MCP_PROMPT, RESTART_ACTIVE_PROMPT, RESTART_PREPARE_PROMPT } from 
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, markerIn, runProbe, type FakeEngine } from "./probe-fake-engine.ts";
 
-vi.mock("@lgcode/client", async (original) => {
-  const client = await original<typeof import("@lgcode/client")>();
+vi.mock("@lgtm/client", async (original) => {
+  const client = await original<typeof import("@lgtm/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -15,7 +15,7 @@ const make = () => { const e = fakeEngine(); engines.push(e); return e; };
 afterEach(() => { for (const e of engines.splice(0)) e.cleanup(); });
 
 const ask = (e: FakeEngine, agentId: string, text: string) => {
-  e.tool(agentId, "ask-" + agentId, { text: markerIn(text) }, "mcp__lgcode__ask");
+  e.tool(agentId, "ask-" + agentId, { text: markerIn(text) }, "mcp__lgtm__ask");
   e.emit(agentId, { _tag: "QuestionAsked", text: markerIn(text) }, { caller: { _tag: "agent", agentId } });
   e.finish(agentId, "ask-" + agentId, "completed", "question recorded");
 };
@@ -25,8 +25,8 @@ it("issue 244: exact ask discovery followed by each authenticated ask passes, in
   e.script = { onPrompt: (engine, p) => {
     if (p.agentId === LEAD) {
       engine.tool(p.agentId, "lookup", {}, "ToolSearch");
-      engine.tool(p.agentId, "lookup", { query: "select:mcp__lgcode__ask", max_results: 1 }, "");
-      engine.finish(p.agentId, "lookup", "completed", '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]');
+      engine.tool(p.agentId, "lookup", { query: "select:mcp__lgtm__ask", max_results: 1 }, "");
+      engine.finish(p.agentId, "lookup", "completed", '[{"type":"tool_reference","tool_name":"mcp__lgtm__ask"}]');
     }
     ask(engine, p.agentId, p.text);
     engine.turnEnded(p.agentId);
@@ -38,10 +38,10 @@ it("issue 244: exact ask discovery followed by each authenticated ask passes, in
 });
 
 it.each([
-  { query: "lgcode", reference: "mcp__lgcode__ask", status: "completed", title: "ToolSearch" },
-  { query: "select:mcp__lgcode__ask", reference: "mcp__lgcode__start", status: "completed", title: "ToolSearch" },
-  { query: "select:mcp__lgcode__ask", reference: "mcp__lgcode__ask", status: "failed", title: "ToolSearch" },
-  { query: "select:mcp__lgcode__ask", reference: "mcp__lgcode__ask", status: "completed", title: "Bash" },
+  { query: "lgtm", reference: "mcp__lgtm__ask", status: "completed", title: "ToolSearch" },
+  { query: "select:mcp__lgtm__ask", reference: "mcp__lgtm__start", status: "completed", title: "ToolSearch" },
+  { query: "select:mcp__lgtm__ask", reference: "mcp__lgtm__ask", status: "failed", title: "ToolSearch" },
+  { query: "select:mcp__lgtm__ask", reference: "mcp__lgtm__ask", status: "completed", title: "Bash" },
 ])("issue 244: a different discovery or failure still fails ($query, $reference, $status, $title)", async (lookup) => {
   const e = make();
   e.script = { onPrompt: (engine, p) => {
@@ -57,8 +57,8 @@ it("issue 244: discovery alone cannot prove PB-A3", async () => {
   const e = make();
   e.script = { onPrompt: (engine, p) => {
     if (p.agentId === LEAD) {
-      engine.tool(p.agentId, "lookup", { query: "select:mcp__lgcode__ask", max_results: 1 }, "ToolSearch");
-      engine.finish(p.agentId, "lookup", "completed", '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]');
+      engine.tool(p.agentId, "lookup", { query: "select:mcp__lgtm__ask", max_results: 1 }, "ToolSearch");
+      engine.finish(p.agentId, "lookup", "completed", '[{"type":"tool_reference","tool_name":"mcp__lgtm__ask"}]');
     }
     engine.turnEnded(p.agentId);
   } };
@@ -91,7 +91,7 @@ it("issue 245: an ended hold turn without its exact shell tool reports the missi
 
 it.each([
   { listing: "", status: "not observed", passes: false },
-  { listing: "LCP_ENV_BEGIN\nPATH\nLGCODE_TOKEN\nLCP_ENV_END\n", status: "present", passes: false },
+  { listing: "LCP_ENV_BEGIN\nPATH\nLGTM_TOKEN\nLCP_ENV_END\n", status: "present", passes: false },
   { listing: "LCP_ENV_BEGIN\nPATH\nLCP_ENV_END\n", status: "absent", passes: true },
 ])("identity listing reports $status separately from missing output", async ({ listing, status, passes }) => {
   const e = fakeEngine({ shellListing: false }); engines.push(e);
@@ -106,7 +106,7 @@ it.each([
 });
 
 it("the printed prompts allow exact discovery and distinguish a shell hold from a clock sleep", () => {
-  expect(PROBE_MCP_PROMPT).toContain('select:mcp__lgcode__ask');
+  expect(PROBE_MCP_PROMPT).toContain('select:mcp__lgtm__ask');
   expect(RESTART_PREPARE_PROMPT).toContain("Follow later test prompts exactly");
   expect(RESTART_ACTIVE_PROMPT).toContain("Do not substitute a clock or timer tool");
 });

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Caller, Sender } from "@lgcode/contracts";
+import type { Caller, Sender } from "@lgtm/contracts";
 
 // Decision rows 38 and 58. A prompt an agent sends to another agent must not
 // start with a slash command, after any leading whitespace: every Unicode

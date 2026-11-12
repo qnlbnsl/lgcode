@@ -1,6 +1,6 @@
 import { environment, mount, resetData } from "./page-fixtures.tsx"
 import * as Effect from "effect/Effect"
-import type { Client } from "@lgcode/client/browser"
+import type { Client } from "@lgtm/client/browser"
 import { beforeEach, expect, it, vi } from "vitest"
 import { readBoard, useProjectBoard } from "../src/pages/projectData.ts"
 

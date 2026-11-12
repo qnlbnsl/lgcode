@@ -1,6 +1,6 @@
 import { act, useEffect, useState } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import type { MockRevision, ProjectId, RequestId } from "@lgcode/contracts"
+import type { MockRevision, ProjectId, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { afterEach, expect, it, vi } from "vitest"
 import { Mocks as MockPage } from "../src/project/mocks.tsx"
@@ -15,7 +15,7 @@ import { setupHarnessGuidance } from "../src/setup-guidance.ts"
 // This is a controlled presentation transport, not authenticated engine proof.
 // website-review.test.ts exercises these helpers against real RPC/persistence.
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", () => ({ connect: () => Effect.succeed(transport.client) }))
+vi.mock("@lgtm/client/browser", () => ({ connect: () => Effect.succeed(transport.client) }))
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const roots: Array<{ root: Root; container: HTMLDivElement }> = []
 function Mocks(props: Omit<React.ComponentProps<typeof MockPage>, "approvals">) {

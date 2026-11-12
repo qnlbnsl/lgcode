@@ -3,7 +3,7 @@
 The file in this folder is the JetBrains Mono typeface by JetBrains and the
 JetBrains Mono Project Authors. It is released under the SIL Open Font License,
 version 1.1 (OFL). The licence text is in [OFL.txt](OFL.txt) next to this file,
-and it must stay there for as long as the font is in LGcode.
+and it must stay there for as long as the font is in LGTM Studio.
 
 ## Which file, and from where
 
@@ -18,7 +18,7 @@ and it must stay there for as long as the font is in LGcode.
 - The file is unchanged. It is 31,432 bytes. The web mock turns its ligatures
   off in code, diffs, and the terminal, so `=>` stays two characters.
 
-## Where LGcode uses it
+## Where LGTM Studio uses it
 
 The web mock in `design/` loads it through `design/fonts/jetbrains-mono`, a
 symbolic link to this folder, so the preview server can serve it.

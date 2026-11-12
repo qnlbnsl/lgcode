@@ -1,4 +1,4 @@
-import * as Contracts from "@lgcode/contracts";
+import * as Contracts from "@lgtm/contracts";
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { rolesEvents } from "../../../contracts/test/roles/fixtures.ts";

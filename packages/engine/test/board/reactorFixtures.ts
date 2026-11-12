@@ -1,11 +1,11 @@
 import { it } from "@effect/vitest";
-import { DeliveryId, type Event } from "@lgcode/contracts";
+import { DeliveryId, type Event } from "@lgtm/contracts";
 import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
 import { engineLists } from "../../src/pieces/lists.ts";
@@ -25,7 +25,7 @@ export { it, eventually, pause };
 export const reactorRig = (register: () => ReturnType<typeof registerRebuildCheck>) => {
   let rig: Rig;
   let credentials: Record<string, Credential> = {};
-  beforeEach(() => { rig = makeRig(); credentials = {}; vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+  beforeEach(() => { rig = makeRig(); credentials = {}; vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig); });
   return {
     ownerClient: () => boardOwnerClient(rig),

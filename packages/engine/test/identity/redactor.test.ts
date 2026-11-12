@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { AgentId, DeliveryId, PermissionRequestId, RequestId, type Event } from "@lgcode/contracts";
-import * as AcpClient from "@lgcode/t3-effect-acp/client";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import { AgentId, DeliveryId, PermissionRequestId, RequestId, type Event } from "@lgtm/contracts";
+import * as AcpClient from "@lgtm/t3-effect-acp/client";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -30,9 +30,9 @@ import { Redactor } from "../../src/log/Redactor.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/lgcode-redactor-");
+  home = mkdtempSync("/tmp/lgtm-redactor-");
   vi.stubEnv("HOME", home);
-  vi.stubEnv("LGCODE_HOME", home);
+  vi.stubEnv("LGTM_HOME", home);
 });
 afterEach(() => { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }); });
 
@@ -233,11 +233,11 @@ it.live("5.11 fake agent: catches a printed token or account key reaching event,
       secrets: () => [Redacted.make(secret)], tokenHashes: () => new Set([minted.tokenHash]),
     });
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const child = yield* spawner.spawn(ChildProcess.make(process.execPath, [fileURLToPath(import.meta.resolve("@lgcode/testing/fakeAgent"))], {
+    const child = yield* spawner.spawn(ChildProcess.make(process.execPath, [fileURLToPath(import.meta.resolve("@lgtm/testing/fakeAgent"))], {
       cwd: home,
       env: {
-        HOME: home, LGCODE_HOME: home, TMPDIR: home, PATH: "/usr/bin:/bin",
-        LGCODE_TOKEN: raw, ACCOUNT_KEY: secret,
+        HOME: home, LGTM_HOME: home, TMPDIR: home, PATH: "/usr/bin:/bin",
+        LGTM_TOKEN: raw, ACCOUNT_KEY: secret,
         FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [[{ step: "print_env" }]] }),
       },
     }));

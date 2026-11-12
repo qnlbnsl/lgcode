@@ -42,7 +42,7 @@ scenario("1 crash: the crash is written with the exit code and the error output'
     name: "Crasher", permission: "ask", prompt: "Go.",
     script: { turns: [[
       { step: "stderr", text: "first line of trouble" },
-      { step: "stderr", text: "kaboom-from-stderr, token=${env:LGCODE_TOKEN}" },
+      { step: "stderr", text: "kaboom-from-stderr, token=${env:LGTM_TOKEN}" },
       openRequest("call-crash"),
       { step: "slow", ms: 400 },
       { step: "crash", exitCode: 3 },

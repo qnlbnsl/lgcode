@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { EventEnvelope, type EventSequence } from "@lgcode/contracts"
+import { EventEnvelope, type EventSequence } from "@lgtm/contracts"
 import { createRequestSources } from "../src/data/requestSources.ts"
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
