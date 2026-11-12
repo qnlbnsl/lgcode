@@ -147,7 +147,7 @@ deliveries, its crash-and-resume policy, and the board's own read cursor.
   Row 26 says the owner's reply closes an `any` post; for `all` it says only
   "every live addressee" (`decisions.md:36`; `plan.md:307-309`).
 - **Evidence:** The plan accepts that "a question to a live agent that
-  never answers keeps its author unsettled forever", with the sheepdog as
+  never answers keeps its author unsettled forever", with the stall watch as
   the remedy (`plan.md:360`). But a service may only post, read status and
   flush (`contract.md:180-189`), and a service's reply closes nothing
   (only an addressee or the owner can close, `plan.md:307-309`). So the
@@ -374,7 +374,7 @@ No finding meets the severity floor (none has severity 9 or 10).
    view rebuilt from the log equals the live view. Evidence: the rebuild
    check plus a count of `board.Read` events. Area: 2a and 3b.
 6. **L-PB6, `board.flush` with a wake already queued.** Scenario: the
-   sheepdog flushes an agent whose board wake is queued. Expected: no
+   stall watch flushes an agent whose board wake is queued. Expected: no
    second wake; the plan should state whether flush is a no-op or a merge.
    Evidence: a wakes test. Area: 3a.
 

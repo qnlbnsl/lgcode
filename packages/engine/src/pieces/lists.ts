@@ -22,7 +22,7 @@ import { openMatters as boardOpenMatters, alertSource as boardAlertSource } from
 import { pieceViews, type PieceView } from "./viewTables.ts";
 import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 import { openMatters as rolesOpenMatters, alertSource as rolesAlertSource } from "../roles/openMatters.ts";
-import { sheepdogLoop } from "../roles/sheepdog/loop.ts";
+import { stallWatchLoop } from "../roles/stall-watch/loop.ts";
 
 import { clientView } from "../client/alerts/view.ts";
 import { alertDelivery } from "../client/alerts/delivery.ts";
@@ -67,7 +67,7 @@ export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [], project: () => [] },
   services: {
-    "roles.sheepdog": ["subscribe", "client.event", "prompt", "compact", "resume", "release", "roles.record", "board.post", "board.flush", "board.status"],
+    "roles.stallWatch": ["subscribe", "client.event", "prompt", "compact", "resume", "release", "roles.record", "board.post", "board.flush", "board.status"],
     "roles.standing-rules": [],
   }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
@@ -84,6 +84,6 @@ export const engineLists: EngineLists = {
   alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
   openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
   get reactors() { return reactors ??= {
-    client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor, roles: sheepdogLoop,
+    client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor, roles: stallWatchLoop,
   }; },
 } satisfies EngineLists;

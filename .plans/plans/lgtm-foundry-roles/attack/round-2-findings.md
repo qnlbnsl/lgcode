@@ -28,17 +28,17 @@ Lead rulings applied: L25 (board #127) for TM-3, the shell's identity
 | C-R2-C5 The crash exception suppresses the board-off owner escalation | minor | With the board off, `GaveUp` is raised to the owner under the `engineAlertOpen` test, not a blanket crash exception | Board switched off, 3.6, 4.9; rows 58, 59 |
 | C-R2-C6 The engine verify command runs no test script | minor | Verify lines use `pnpm vitest run <paths>` at the repository root | Conventions, every Verify line; row 66; result file issue |
 | Lo-R2-L1 "Waiting on others" hides every deadlock | major | Waiting counts only while an awaited party is busy, is the owner, or holds the agent's request or question; cycle tests; team idle counts only busy members | WS-4 intro, 4.3, 4a, 4b; row 56 |
-| Lo-R2-L2 A failed reload after the sheepdog's resume tells the owner nothing | major | `GaveUp` records its cause and `engineAlertOpen`, and raises `roles.stall` unless the engine's alert is open | Events, 4.6, 4.9, 4e; row 58 |
+| Lo-R2-L2 A failed reload after the stall watch's resume tells the owner nothing | major | `GaveUp` records its cause and `engineAlertOpen`, and raises `roles.stall` unless the engine's alert is open | Events, 4.6, 4.9, 4e; row 58 |
 | Lo-R2-L3 A held delivery re-sends a prompt the agent already took | major | Only an unaccepted delivery is held and re-sent; an accepted one gets a held carry-on | 7.3, 7b; post-build check 6; row 57 |
-| Lo-R2-L4 With the sheepdog off, a hold is permanent | major | The hold needs a registered condition that says yes only while the sheepdog is on and retries remain; switching off releases each held delivery once | 3.10, 3f, 7.3; row 57 |
+| Lo-R2-L4 With the stall watch off, a hold is permanent | major | The hold needs a registered condition that says yes only while the stall watch is on and retries remain; switching off releases each held delivery once | 3.10, 3f, 7.3; row 57 |
 | Lo-R2-L5 The rule size and the snapshot cap contradict | major | Rule fields bounded to fit 2 KiB; the snapshot carries no rule words | 2a, 1.3a; row 61 |
 | Lo-R2-L6 Capacity exhaustion has no action kind or alert | minor | `GaveUp { cause: capacity }`, flushed to the holder, raising `roles.stall` for the owner | 4.5, Events, flush list; rows 57, 58 |
 | Lo-R2-L7 With the board off, every addressee walks to "replace" | minor | The stall, team-idle and flush rules are suspended with counts kept and clocks restarted | Board switched off, 3.6; row 59 |
-| Lo-R2-L8 "Nudge" and "sheepdog turn" are undefined | minor | Both defined: a nudge is a direct `reply: none` post plus `board.flush`; a sheepdog turn is a wake listing only sheepdog posts, or its carry-on prompt | Notices paragraph, 3.11; row 60 |
+| Lo-R2-L8 "Nudge" and "stall watch turn" are undefined | minor | Both defined: a nudge is a direct `reply: none` post plus `board.flush`; a stall watch turn is a wake listing only stall watch posts, or its carry-on prompt | Notices paragraph, 3.11; row 60 |
 | Lo-R2-L9 The hand-off's two 24 KiB sections pass the token limit | minor | Sections of 20 KiB each, measured encoded, inside 48,000 bytes and 64 KiB | WS-6, 6.2; row 62 |
 | Lo-R2-L10 A cache read is treated as five minutes | minor | A read-only request takes the lifetime of the latest write in view, else nothing is scheduled | WS-5, 5.5; row 64 |
 | Lo-R2-L11 The plan cites board v3, not v4 | minor | Cites board v5 `e84fd65` (L24), noting round 2 reviewed v4 `bcc33e1` | Sources, traceability; row 55; known gap 3 |
-| Ls-R2-L1 Switching off the sheepdog leaves holds with no owner | major | As Lo-R2-L4 | row 57 |
+| Ls-R2-L1 Switching off the stall watch leaves holds with no owner | major | As Lo-R2-L4 | row 57 |
 | Ls-R2-L2 The snapshot cannot contain its rules | major | As A-R2-A3 | row 61 |
 | Ls-R2-L3 A shortened hand-off points to an unreadable thread | major | As A-R2-A2 | row 62 |
 | Ls-R2-L4 The blanket crash-alert exception defeats the board-off escalation | major | As C-R2-C5 | rows 58, 59 |

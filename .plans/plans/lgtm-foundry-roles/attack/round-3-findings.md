@@ -60,7 +60,7 @@ written so that either answer leaves the rest of it unchanged.
 
 ### A-R3-A1: the unread-notice re-send needs a read state that `board.status` does not give
 
-- **Issue:** The sheepdog re-sends an unread notice when its recipient
+- **Issue:** The stall watch re-sends an unread notice when its recipient
   crashes. The board's status gives only counts, so it cannot say whether
   one particular notice was read.
 - **Fix:** The roles view tracks each notice itself. The action record
@@ -94,12 +94,12 @@ written so that either answer leaves the rest of it unchanged.
   nothing sent, and it would stay stuck.
 - **Fix:** A held queue counts as neither "requeued" nor "carried" when
   the engine reloads, so the agent is reloaded idle and still held. At
-  start-up with the sheepdog off, every open hold is released once.
+  start-up with the stall watch off, every open hold is released once.
 - **Decision row:** 75.
 
 ### Lo-R3-L3: the capacity count lagged behind its own release
 
-- **Issue:** The count that ends a hold lived in the sheepdog's records,
+- **Issue:** The count that ends a hold lived in the stall watch's records,
   which are written after each release. A release by the owner or a lead
   was not counted at all. The count's key was also undefined.
 - **Fix:** The engine counts holds itself, from its own hold and release
@@ -130,9 +130,9 @@ written so that either answer leaves the rest of it unchanged.
 ### Ls-R3-L2: one event cannot tell the alert when a stall has ended
 
 - **Issue:** A stall alert must end on an ordinary turn but not on a
-  sheepdog turn. An alert source sees one event, and that event cannot
+  stall watch turn. An alert source sees one event, and that event cannot
   tell the two kinds of turn apart.
-- **Fix:** The sheepdog writes `roles.StallEnded` when an ordinary turn
+- **Fix:** The stall watch writes `roles.StallEnded` when an ordinary turn
   starts or the agent is stopped, and the alert ends on that event.
 - **Decision row:** 76.
 
@@ -146,8 +146,8 @@ written so that either answer leaves the rest of it unchanged.
 | C-R3-C4 The board-off give-up alert conflicts with the recipient rule | A `board-off` `GaveUp` raises its alert whatever its recorded recipient | Alert sources, Board switched off, 3.6; row 72 |
 | C-R3-C5 Crash retries accept undefined values | The setting is 0 or 1; 0 gives up at once | 3b, 4.6; row 73 |
 | Lo-R3-L5 Runaway counts a blocking `wait` | Time in an open blocking `wait` is left out | 4.4, 4c; row 77 |
-| Lo-R3-L6 The sheepdog's compaction ends a stall alert | A compaction the sheepdog requested is a sheepdog turn | Notices, 3.11; row 76 |
-| Lo-R3-L7 Any post resets the stall count | Only a file change, a reply to P, or a post outside a sheepdog turn | WS-4 intro, 4.2; row 78 |
+| Lo-R3-L6 The stall watch's compaction ends a stall alert | A compaction the stall watch requested is a stall watch turn | Notices, 3.11; row 76 |
+| Lo-R3-L7 Any post resets the stall count | Only a file change, a reply to P, or a post outside a stall watch turn | WS-4 intro, 4.2; row 78 |
 | Lo-R3-L8 The maxima do not fit their caps | Rule checked as a whole; snapshot filled in order by encoded size | Snapshot and sizes, 1.3a; row 70 |
 | Lo-R3-L9 Two matcher guards fail open | `ModeRefused` blocks matching; names compared without case | WS-2 list, 2.6, 2.8; row 79 |
 | Ls-R3-L3 Field maxima exceed 2 KiB | As C-R3-C1 | row 70 |

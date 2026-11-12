@@ -25,7 +25,7 @@ import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
-import { settingsRefusal } from "../roles/sheepdog/settings.ts";
+import { settingsRefusal } from "../roles/stall-watch/settings.ts";
 import { holderAbove } from "../routing/holders.ts";
 import { preempt, withLane } from "../routing/lanes.ts";
 import { permissionRequested } from "../routing/permissions.ts";

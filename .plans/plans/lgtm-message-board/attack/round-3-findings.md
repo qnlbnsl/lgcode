@@ -152,7 +152,7 @@ agent would then wait forever.
 the agent: no wake carrying it has been accepted, and none is waiting. An
 agent that received its question and ended its turn counts as finished, as
 the engine would say. Its asker still waits on its own open question, and
-the sheepdog or the owner deals with the silence.
+the stall watch or the owner deals with the silence.
 
 **Decision:** row 90. **Proved by:** criterion 4.6.
 

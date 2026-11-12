@@ -105,7 +105,7 @@ post of its own that needs a reply count as not settled?
 unsettled until the post closes. The board already closes a post whose
 addressees all stopped or crashed (row 21), so this cannot hang forever on
 a dead addressee; it can hang on a live addressee that never replies,
-which is the sheepdog's case to catch.
+which is the stall watch's case to catch.
 
 ## Q3 (decision row 61): may the round-1 fold change the frozen board contract, and who is a board wake's sender?
 

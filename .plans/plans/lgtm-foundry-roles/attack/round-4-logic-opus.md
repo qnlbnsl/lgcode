@@ -197,7 +197,7 @@ failure policies and edge rules.
   hand), fallout 3, probability 2 (a defect plus a capacity error) = **36,
   record.**
 
-### R4-L5. The waiting test counts the sheepdog's own nudges as "busy", so in the plan's deadlock the worker is advised replaced before the lead that owes the answer is nudged once (MINOR)
+### R4-L5. The waiting test counts the stall watch's own nudges as "busy", so in the plan's deadlock the worker is advised replaced before the lead that owes the answer is nudged once (MINOR)
 
 - **Category:** Bug (timing). Interacting rules: stall clock × waiting
   test × nudge.
@@ -206,7 +206,7 @@ failure policies and edge rules.
   and turn. A clock "restarts from zero the next time it runs" after any
   stop, and after a turn ends (PLAN:738-740). Limits are 10 minutes for a
   worker and 20 for a lead (PLAN:741-742). Team idleness already ignores
-  sheepdog turns (PLAN:768); the waiting test does not.
+  stall watch turns (PLAN:768); the waiting test does not.
 - **Timeline (4.3's own case, PLAN:770):** lead L posts hand-off H to
   worker W; W posts question Q back; both are idle.
   - t=0: neither reaches a busy agent, so both clocks run.
@@ -217,14 +217,14 @@ failure policies and edge rules.
     10 minutes, restarts again.
   - t≈32: W's episode 3 sends `ReplaceAdvised` to L.
   - L, who owes the answer to Q, is first nudged at about t=53, after the
-    sheepdog has told it to replace a worker whose only fault was waiting
+    stall watch has told it to replace a worker whose only fault was waiting
     for L.
 - **Truth table** (A owes a reply to P; B is reachable from A):
 
   | B is | Plan v5: A's clock | Should be |
   |---|---|---|
   | in ordinary work, or has an ordinary delivery queued | stopped | stopped |
-  | in a sheepdog turn, or has only a sheepdog wake queued | **stopped, and restarted from zero** | runs, as for team idleness |
+  | in a stall watch turn, or has only a stall watch wake queued | **stopped, and restarted from zero** | runs, as for team idleness |
   | held for capacity, or paused with a known reset | stopped | stopped |
   | idle, and reaches nothing busy | runs | runs |
 
@@ -234,7 +234,7 @@ failure policies and edge rules.
   limit, and team idleness cannot fire because W2 is busy). Row 74 accepts
   this; it is not re-filed, but the fix below can cover it.
 - **Suggested fix:** For the waiting test, count an agent as busy only for
-  work the sheepdog did not cause, as team idleness does. Optionally, let
+  work the stall watch did not cause, as team idleness does. Optionally, let
   the clock for (P, A) also run when P's author reaches nothing busy except
   through A. Add an ST test for the timeline above: L is nudged about Q
   before W's `ReplaceAdvised`.
@@ -282,7 +282,7 @@ failure policies and edge rules.
   same way.
 - **Scenario B, the trigger:** "as today" writes `DeliveryReturned` whose
   reason is the provider's redacted error text (`deliveries.ts:171`,
-  `:46`). Nothing marks it as a capacity return, so the sheepdog must guess
+  `:46`). Nothing marks it as a capacity return, so the stall watch must guess
   from a later return of any kind, or read error text, which the plan
   otherwise keeps out of its rules.
 - **Also unclear:** whether the count is the holds alone or holds plus
@@ -355,12 +355,12 @@ failure policies and edge rules.
   (`packages/engine/src/recovery/reload.ts:84-98`), and the live-process
   return path, `returnAgents`, already leaves an idle held agent idle
   (`packages/engine/src/accounts/available.ts:40-55`); start-up with the
-  sheepdog off releases every hold (3.10). R3-L3: the engine counts its own
+  stall watch off releases every hold (3.10). R3-L3: the engine counts its own
   `DeliveryHeld` and `DeliveryReleased` in the same transaction, per agent
   and outage, with every release counted (7.3); R4-L7 covers its end. R3-L4:
   a limit pause with a known reset is busy (row 74); R4-L6 covers the case
   without a reset. R3-L5: a blocking wait is left out of the turn limit
-  (4.4). R3-L6: a sheepdog compaction is a sheepdog turn (3.11). R3-L7: a
+  (4.4). R3-L6: a stall watch compaction is a stall watch turn (3.11). R3-L7: a
   post in a nudge's turn is not progress (4.2, row 78). R3-L8: a rule is
   checked as a whole and the snapshot is filled by encoded size (1.3a,
   row 70). R3-L9: any `ModeRefused` blocks matching, and protected names
@@ -393,7 +393,7 @@ failure policies and edge rules.
 | R4-L1 | The cache guard skips every lead with a working worker | 4: uncached large wakes, context growth | 3: one run | 8: every lead, every run | 96 | Schedule | Confirmed (PLAN:721-730, :820-825, :833; `context-keeper.sh:3`, `:23`) | roles planner, unit 9 |
 | R4-L2 | Worktrees under `.claude/worktrees/` are protected settings paths | 4: owner answers routine edits; rules never match | 3: undone by moving worktrees | 8: the skill's example layout | 96 | Schedule | Confirmed (`ceiling.ts:317-322`, `:396-400`; `runner/permissions.ts:25-31`; `routing/permissions.ts:21`; `SKILL.md:66`; probe) | roles planner (recipe, 8a) and engine owner; lead files the issue |
 | R4-L3 | The first write cancels the holder's blocking wait for a rule-answered request | 4: wasted lead step per match | 3 | 6: each match while the lead waits | 72 | Schedule | Confirmed by reading (`CommandHandler.ts:147-149`; `waits.ts:83`, `:110-119`; PLAN:966) | roles planner, unit 11a |
-| R4-L5 | Sheepdog nudges count as busy, so the deadlock blames the worker | 4: healthy worker advised replaced | 3 | 4 | 48 | Record | Confirmed (PLAN:717-742, :768, :770) | roles planner, unit 7 |
+| R4-L5 | Stall watch nudges count as busy, so the deadlock blames the worker | 4: healthy worker advised replaced | 3 | 4 | 48 | Record | Confirmed (PLAN:717-742, :768, :770) | roles planner, unit 7 |
 | R4-L6 | A limit pause without a reset makes its team idle | 4: hourly flushed wakes | 3 | 4 | 48 | Record | Confirmed (`deliveries.ts:152-155`, `:193-196`; PLAN:717-721, :768, :774) | roles planner, units 6 and 7 |
 | R4-L7 | The outage ends only at a clean turn end; give-up trigger undefined | 4: no retries in a later outage; holder not told | 3 | 4 | 48 | Record | Confirmed (`deliveries.ts:46`, `:94`, `:130-134`, `:171`; PLAN:772, :785, :967) | roles planner, units 8 and 11b |
 | R4-L9 | Compaction's context basis is undefined | 4: needless compaction | 3 | 4: unresolved | 48 | Record | Unresolved (`claude.ndjson:17-20`; PLAN:823-825, :969) | roles planner, units 9 and 11c |
@@ -421,8 +421,8 @@ No row reaches the severity floor (no severity 9 or 10).
   an owner-held asker. Expected: the lead's wait stays open, no
   `WaitCancelled` is written, and no owner alert is raised. Evidence: PC
   test over the real runner-event transaction. Area: unit 11a.
-- **PB-R4-4. The sheepdog's reactor dies alone.** Scenario: kill the
-  sheepdog's reactor fiber with the switch on, then cause a capacity
+- **PB-R4-4. The stall watch's reactor dies alone.** Scenario: kill the
+  stall watch's reactor fiber with the switch on, then cause a capacity
   error. Expected: CAPI §1's reactor supervision restarts it and the hold
   is released on time, or the hold condition says no while the reactor is
   down. Evidence: a K test that interrupts only the reactor. Area: units 5
@@ -443,11 +443,11 @@ No row reaches the severity floor (no severity 9 or 10).
 - A notice to a lead whose own queue is held for capacity waits behind the
   hold, and if the lead's outage ends in a give-up, the board resolves the
   notice's post as `undeliverable` after two returns (BOARD, "Returned
-  wakes"). The sheepdog re-routes a notice only when its recipient crashes
+  wakes"). The stall watch re-routes a notice only when its recipient crashes
   or stops (3.7). Leads and workers usually run on different vendors, so
   this needs two correlated outages.
-- A turn started by the engine's carry-on after the sheepdog's `release`
-  is not a sheepdog turn under 3.11, so it ends a `roles.stall` alert. A
+- A turn started by the engine's carry-on after the stall watch's `release`
+  is not a stall watch turn under 3.11, so it ends a `roles.stall` alert. A
   stall alert cannot normally be open on a held agent, because the stall
   clock does not run while a delivery is queued.
 - Round 3's notes still stand: the release timer of a hold ended by a

@@ -33,10 +33,10 @@ const openRequest = (toolCallId: string) => ({
 });
 
 scenario("1 crash: the crash is written with the exit code and the error output's last lines without the agent's token, its open permission request is cancelled, the owner is told once, its token stops working, and nothing starts the agent again (breaks if the code or output is lost, the output carries a secret, the request stays open, the owner is not told, or the engine restarts the agent)", (w) => Effect.gen(function* () {
-  // This rule is the engine's own. The roles sheepdog resumes a crashed agent
+  // This rule is the engine's own. The roles stall watch resumes a crashed agent
   // by design, and on a fast computer it does so before the checks below, so it
   // is turned off here (issue 562).
-  yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { sheepdog: false } } as never);
+  yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { stallWatch: false } } as never);
   const mark = yield* w.watermark();
   const agent = yield* w.start(w.owner, {
     name: "Crasher", permission: "ask", prompt: "Go.",

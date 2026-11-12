@@ -17,7 +17,7 @@ it.each(["any", "all"])("1.6 %s owner question raises one alert carrying ids and
 it.each([
   ["no reply needed", { ...post, reply: "none" }],
   ["only agent addressees", { ...post, to: [agent("target")] }],
-  ["service author", { ...post, author: { _tag: "service", service: "roles.sheepdog" } }],
+  ["service author", { ...post, author: { _tag: "service", service: "roles.stallWatch" } }],
   ["owner author", { ...post, author: owner, to: [agent("target")] }],
   ["acknowledgement", { _tag: "board.PostAcknowledged", postId: "post-1", addressee: owner }],
   ["unrelated engine event", { _tag: "TurnEnded", agentId: "asker", compact: false }],

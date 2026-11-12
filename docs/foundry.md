@@ -60,14 +60,14 @@ authority.
 Read `roles.settings.get` before changing settings. Use `roles.settings.set`
 with the intended complete `settings` object, preserving existing limits
 and switches that the owner wants to keep. The settings are replaced, not
-patched. The sheepdog is the engine service that watches the run.
+patched. The stall watch is the engine service that watches the run.
 
 No harness qualifies for standing permission rules in this build. The
 owner deferred their parser, commands and permission pre-check until the
 recordings are available. Keep `standingRules: false` and route permission
 requests through the normal holder path. Do not try to add a standing rule
 or count an automatically answered test permission as part of this run.
-The deferred path is separate from the sheepdog's working switches and
+The deferred path is separate from the stall watch's working switches and
 capacity handling.
 
 ## Step 3: Open an area
@@ -106,7 +106,7 @@ capacity handling.
    channel with `board.members` for an explicit cross-area membership, or
    a shared group and a channel anchored at their common manager. Dependency notes, ordering
    agreements and the rule for when to copy the manager stay in the skill.
-8. Enable the sheepdog through the owner's settings when the run is ready.
+8. Enable the stall watch through the owner's settings when the run is ready.
    Do not start separate monitoring processes. Use `roles.actions.list`
    to inspect its paged records and `client.snapshot` for current state.
 
@@ -136,11 +136,11 @@ remain in the external skill.
 | Start a shared test runner and send heavy suites to it. | `start` creates `worker:tester`. A shared channel carries `test-run:` requests and replies. The skill keeps load limits, allowed commands, replacement requests and the rule that the runner edits nothing. |
 | Create a team, enroll a wave before kickoff, set its briefs, link teams and track the human authority behind creation. | `start` establishes parentage and initial groups before the first prompt. `group` changes groups later. `board.open` and shared channels replace links. The skill keeps the charter, scope and audit policy. There is no enrollment race or separate human-only team registry to impersonate. |
 | Assign the manager, leads, workers, relayer and steward to the right team. | Roles and groups identify them. Management rights still follow parentage and the current holder. Membership alone grants no management rights. |
-| Watch team idleness and snooze a team rightly waiting elsewhere. | The sheepdog's team-idle rule reports to the lead's holder. The owner uses `roles.snooze` with `group` and an absolute `until` time in epoch milliseconds. Log the reason in the run record. |
-| Watch capacity failures and move a seat to an alternate after retries run out. | The engine holds eligible deliveries and the sheepdog releases them after the backoff. Its give-up notice asks the holder to act. Selecting the model-sheet alternate stays in the skill. |
+| Watch team idleness and snooze a team rightly waiting elsewhere. | The stall watch's team-idle rule reports to the lead's holder. The owner uses `roles.snooze` with `group` and an absolute `until` time in epoch milliseconds. Log the reason in the run record. |
+| Watch capacity failures and move a seat to an alternate after retries run out. | The engine holds eligible deliveries and the stall watch releases them after the backoff. Its give-up notice asks the holder to act. Selecting the model-sheet alternate stays in the skill. |
 | Collect a whole wave with one wake and report missing work. | Use one board request in `all` reply mode, as below, or an engine `wait`. File result conventions and deadline policy stay in the skill. |
 | Mute leads, batch routine arrivals and avoid acknowledgment chatter. | Board reply modes and normal wake batching replace muting. Use `board.acknowledge` when starting a response. The skill keeps its rule against unnecessary posts. |
-| Keep context bounded, flush pending messages and enforce the worker age cap. | The sheepdog schedules compaction and cache flushes when supported usage is available. Age and runaway notices ask the holder to decide. The skill keeps its two-hour worker cap and advisor audits. |
+| Keep context bounded, flush pending messages and enforce the worker age cap. | The stall watch schedules compaction and cache flushes when supported usage is available. Age and runaway notices ask the holder to decide. The skill keeps its two-hour worker cap and advisor audits. |
 | Start a permissions steward only when the owner requests it. | The owner can answer directly through the client. If retained, the steward is a helper created only on request, with the external permanent folder and approval log described below. |
 
 ## Step 4: Start workers and collect a wave
@@ -256,11 +256,11 @@ The remaining supervision actions map as follows:
 | Hold design discussions with a separate design partner and keep other work moving. | `start` creates a helper; board channels carry the request and result. Discussion format, rare escalation policy and owner acceptance stay in the skill. |
 | Answer an owner present in an agent's session, then use the relayer after 30 minutes of absence. | Team workflow keeps its presence and wording policy where a supported session exposes that interaction. An authenticated client can also send `prompt` and answer questions directly. |
 | Check another team's decision before asking again and verify worker claims. | Read a shared channel and the team's recorded evidence. Board membership and API read rights still apply. |
-| Wake an idle agent with held unread posts and protect an unfinished input draft. | The board queues deliveries through the engine. It does not type into a pane. The sheepdog nudges a genuine stall through `board.post` and `board.flush`. |
+| Wake an idle agent with held unread posts and protect an unfinished input draft. | The board queues deliveries through the engine. It does not type into a pane. The stall watch nudges a genuine stall through `board.post` and `board.flush`. |
 | Recover stuck suggested input or a background native session. | Team workflow handles interactive harness recovery only when needed. Use the roster and `resume` for engine lifecycle recovery. Do not use terminal input tricks as board delivery. |
-| Log approvals, denials, holds and releases, and recover the newest ruling after context loss. | Engine events preserve decisions and `roles.actions.list` preserves sheepdog actions. The skill retains the coordination log, attribution and evidence labels. |
+| Log approvals, denials, holds and releases, and recover the newest ruling after context loss. | Engine events preserve decisions and `roles.actions.list` preserves stall watch actions. The skill retains the coordination log, attribution and evidence labels. |
 
-The sheepdog's defaults include a five-minute capacity backoff, twelve
+The stall watch's defaults include a five-minute capacity backoff, twelve
 capacity retries, one crash retry and a one-hour team-idle threshold.
 A held capacity error does not settle a blocking wait. `release` lets the
 owner or current holder release it early. Exhaustion is reported to the
@@ -274,7 +274,7 @@ clock. The owed-reply exception still lets the clock run for a post whose
 eligible agent author reaches nothing busy except through that lead
 (roles decision 88). An owner-authored post does not qualify for that
 exception. A circular dependency that ends at idle agents can stall. The
-sheepdog nudges and reports; it does not decide the project's next assignment.
+stall watch nudges and reports; it does not decide the project's next assignment.
 Runaway, age and role-advice notices likewise leave the decision to the
 holder. Compaction and cache flushes depend on supported usage information.
 They do not invent a context estimate when the adapter supplies none.
@@ -377,8 +377,8 @@ Have the replacement call `roles.orient` for its own current assignment.
    delivering into a run now driven by LGTM Studio.
 8. Stop the roles through their switches, never by downgrading the engine.
    The owner reads `roles.settings.get`, preserves wanted limits and sends
-   `roles.settings.set` with `sheepdog: false` and `standingRules: false`.
-   Turning the sheepdog off releases its open capacity holds and cancels
+   `roles.settings.set` with `stallWatch: false` and `standingRules: false`.
+   Turning the stall watch off releases its open capacity holds and cancels
    its timers. Check the roster and action records afterward. Once roles
    events exist, never load the record with an engine version that cannot
    read them.
@@ -395,10 +395,10 @@ not commands to run alongside LGTM Studio delivery.
 | `herdr agent send-keys` for approvals or recovery nudges | `answer`, `pass-up` and board deliveries handle requests and wakes without terminal typing. Native terminal repair remains an interactive workflow. |
 | `synapse-owner.sh`, enrollment waits, team links and dissolution | Parentage, roles, groups, channels and `stop` provide engine membership and lifecycle. Charters and dependency agreements remain team workflow. |
 | `collect.sh` | A board request in `all` mode gives one completion for a wave. Engine `wait` is the settlement alternative. Results still need to be read. |
-| `board-waker.sh`, lead muting and turn-end board polling | Board delivery, reply obligations and the sheepdog's stall rule provide wakes. |
+| `board-waker.sh`, lead muting and turn-end board polling | Board delivery, reply obligations and the stall watch's stall rule provide wakes. |
 | `team-idle-watch.sh` and its snooze command | The team-idle rule and owner `roles.snooze` cover idle teams. |
-| `capacity-retry.sh` | Engine holds, sheepdog backoff, `release` and give-up notices handle supported capacity errors. |
-| `context-keeper.sh` and manual compaction trigger files | Usage-based sheepdog scheduling and `compact` provide context management. The worker age rule reports to the holder. Advisor auditing stays team workflow. |
+| `capacity-retry.sh` | Engine holds, stall watch backoff, `release` and give-up notices handle supported capacity errors. |
+| `context-keeper.sh` and manual compaction trigger files | Usage-based stall watch scheduling and `compact` provide context management. The worker age rule reports to the holder. Advisor auditing stays team workflow. |
 
 ## Check the migration before switching the skill
 

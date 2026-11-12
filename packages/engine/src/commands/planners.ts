@@ -19,8 +19,8 @@ import { stop } from "./stop.ts";
 import { refused, type Payload, type Planner, type PlannerTable } from "./internal.ts";
 import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
-import { setSettings, snooze } from "../roles/sheepdog/settings.ts";
-import { record } from "../roles/sheepdog/record.ts";
+import { setSettings, snooze } from "../roles/stall-watch/settings.ts";
+import { record } from "../roles/stall-watch/record.ts";
 import { archiveProject, createProject } from "../project/lifecycle.ts";
 
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {

@@ -144,7 +144,7 @@ the state on without a person.
   that received its question and ended its turn is settled. Reading it
   through `board.read` is receiving it.
 - **Why the plan cannot rely on a person:** `board.flush` repairs this, but
-  only the owner or a service may call it. The sheepdog does not exist yet.
+  only the owner or a service may call it. The stall watch does not exist yet.
 - **Evidence:** `plan.md:521-527`, `:598-609`, `:625-631`;
   `contract.md:289-297`, `:355-360`; `decisions.md` rows 80 and 90.
 - **Suggested fix:** Make clause 3 repair itself with one level rule in the

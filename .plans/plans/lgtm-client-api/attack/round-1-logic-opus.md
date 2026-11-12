@@ -203,7 +203,7 @@ small changes to the contract text would close everything below.
   - Section 1 gives a resume rule and no initial rule (`contract.md:199-200`).
   - A grep of `contract.md` and `plan.md` for "baseline", "first start" and
     "existing log" finds nothing.
-  - The roles plan's sheepdog stream position has the same gap
+  - The roles plan's stall watch stream position has the same gap
     (`inputs/roles-plan.md:534`, l.726).
 - **Suggested fix:** A piece reactor with a position records its first position
   as the log's head at its first start, by one event. Open matters that already
@@ -241,7 +241,7 @@ small changes to the contract text would close everything below.
   silently. A grep of both files for `LogWriteFailed` finds nothing. Criterion
   6.11 covers only a failed send.
 - **Who else this touches:** A refused raise is also a lost alert, with nothing
-  told to the owner. The roles sheepdog keeps a position by the same rule.
+  told to the owner. The roles stall watch keeps a position by the same rule.
 - **Suggested fix:**
   - Add an optional source sequence to the refusal record, and define the
     position as the highest source sequence recorded, on raises, clears and
@@ -474,9 +474,9 @@ small changes to the contract text would close everything below.
 - **Risk:** 36 = S2 × F3 × P6.
   - S2: found at compile time, or as a wrong label in the log.
   - F3: one person.
-  - P6: every sheepdog use.
+  - P6: every stall watch use.
 - **Scenario and evidence:**
-  - The sheepdog's list includes `subscribe` (`inputs/roles-plan.md`, criterion
+  - The stall watch's list includes `subscribe` (`inputs/roles-plan.md`, criterion
     3.4). `subscribe` is not a handler command: it is written inline at
     `packages/engine/src/api/server.ts:154`, and E13's entry point "runs a command"
     (`contract.md:1035`). The in-process read path has no named owner.

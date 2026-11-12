@@ -226,31 +226,6 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   the `ps -o ppid=,lstart=` ancestry reader to the client and the engine, and
   a macOS reader for the leftover-process sweep. See issue 183 and issue 120
   in [issues.md](issues.md).
-- **Herding names for the command-line tool** (idea; shelved by the owner on
-  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `lgtm`
-  command-line tool would offer herding names for its commands. The plain
-  names would stay as aliases, and they would stay the names of the agents'
-  tools. The proposed mapping:
-
-  | Plain name | Herding name |
-  | --- | --- |
-  | `serve --detach` | `fold` |
-  | `start` | `lamb` |
-  | `prompt` | `call` |
-  | `answer` | `gate allow` or `gate deny` |
-  | `ask` | `bleat` |
-  | `pass-up` | `holler` |
-  | `wait` | `watch` |
-  | `stop` | `pen` |
-  | `resume` | `graze` |
-  | `compact` | `shear` |
-  | `group` | `flock` |
-  | `accounts` | `pasture` |
-  | `accounts mark-available` | `pasture regrown` |
-  | `harnesses` | `breeds` |
-  | `subscribe` | `lookout` |
-  | `debug.compare-views` | `debug headcount` |
-  | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
 - **One password login** (built). The service reads the password from the environment variable `LGTM_WEB_PASSWORD`, and the dashboard asks for it. One person uses LGTM Studio, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
 - **Owner phone notification actions** (built, 2026-11-08). The owner can
@@ -263,15 +238,14 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
 
-## 5. The sheepdog
+## 5. The stall watch
 
-A lgtm leads the flock, and the lgtm's dog keeps the sheep in line so
-none of them wander off. In LGTM Studio, the orchestrator and the owner lead. The
-sheepdog is the part of LGTM Studio's background service that keeps every agent
-moving without spending their turns. It never decides what the work is; it
-only notices when an agent has strayed and nudges it back, or tells its lead.
+The orchestrator and the owner lead the work. The stall watch is the part of
+LGTM Studio's background service that keeps every agent moving without
+spending their turns. It never decides what the work is; it only notices when
+an agent has stopped and nudges it back, or tells its lead.
 
-- **Stall watch** (built). The sheepdog knows each agent's work state (off,
+- **Stall detection** (built). The stall watch knows each agent's work state (off,
   assigned, working, waiting, done) and notices an agent that has stopped
   without finishing. It wakes the agent once, then tells its lead. A worker
   that stalls three times in a row on the same work is replaced. The rules
@@ -289,9 +263,9 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   the cached part. Posts that need an answer and can wait are delivered
   before the cache expires. See research item 4.
 - **Replacement waits for the lead's team** (agreed, 2026-11-07). When a
-  lead has not answered three nudges, the sheepdog marks the lead as advised
+  lead has not answered three nudges, the stall watch marks the lead as advised
   for replacement and tells the orchestrator. When the lead's workers have all
-  finished, the sheepdog tells the orchestrator that the lead is ready to
+  finished, the stall watch tells the orchestrator that the lead is ready to
   replace. The new lead starts from the original order and the old lead's
   transcript, and it reaches the team's workers directly. Issue 520 holds the
   details.
@@ -299,7 +273,7 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
 - **Cache lifetime setting** (built). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
-- **"Compact me when I am next idle"** (idea). An agent asks the sheepdog to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
+- **"Compact me when I am next idle"** (idea). An agent asks the stall watch to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
 
 ## 6. Source control
 

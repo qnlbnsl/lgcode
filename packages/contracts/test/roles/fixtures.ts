@@ -28,9 +28,9 @@ export const action = {
 // Functions match the subscription suite's existing sample convention.
 export const rolesSamples: Record<string, (agentId: string, nonce: string) => Record<string, unknown>> = {
   "roles.RoleFileSet": () => ({ content: roleFileContent, roleFileHash }),
-  "roles.SettingsChanged": () => ({ settings: { sheepdog: true, limits: { stallMinutes: 10 } } }),
+  "roles.SettingsChanged": () => ({ settings: { stallWatch: true, limits: { stallMinutes: 10 } } }),
   "roles.Snoozed": () => ({ group: "example", until: 1_900_000_000_000 }),
-  "roles.SheepdogBaseline": () => ({ position: 2, on: true }),
+  "roles.StallWatchBaseline": () => ({ position: 2, on: true }),
   "roles.StallNoticePlanned": (agentId, nonce) => ({ agentId, noticeRecipient: agentId, triggerSequence: 1,
     sourceSequence: 2, occurrence: 1, stalledPostId: `owed-${nonce}`, kind: "roles.StallSeen" }),
   ...Object.fromEntries([

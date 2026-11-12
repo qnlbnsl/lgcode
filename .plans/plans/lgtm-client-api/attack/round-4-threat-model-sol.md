@@ -96,7 +96,7 @@ The board's structural membership rule stays distinct from effective-holder mana
 
 Board status lists carry a common sequence for the owner's wait gate. The roles capacity hold remains part of the engine's settled predicate, including an empty held queue. Version 12 puts capacityHeld in the owner's snapshot and shared client fold, omits it for an agent, and assigns the change to roles unit 11b. This agrees with the board's settlement requirement.
 
-The roles services remain in-process identities with fixed command allowlists. Sheepdog's client.event read includes the envelope and occurredAt. Reducers still depend only on the event and sequence. This resolves timer restoration without making replay depend on a placeholder envelope time.
+The roles services remain in-process identities with fixed command allowlists. Stall watch's client.event read includes the envelope and occurredAt. Reducers still depend only on the event and sequence. This resolves timer restoration without making replay depend on a placeholder envelope time.
 
 The standing-rule matcher and capacity-hold condition are expressly outside the piece table guard. Each has its own bounded or pure execution requirements, content-free logging, and a malformed-result or error outcome of no. The standing-rule input is the actual redacted action. Unknown, absent, cut, or redacted evidence does not qualify for an automatic allowance. Matcher paths are resolved before the writer transaction, and a qualifying answer is committed with its request rather than publishing a transient held request.
 

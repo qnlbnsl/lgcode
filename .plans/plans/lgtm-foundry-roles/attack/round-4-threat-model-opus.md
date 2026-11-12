@@ -49,7 +49,7 @@ verdict is "revise", not "ship":
 
 The other four are smaller:
 
-- **F3.** The package boundary that kept the sheepdog on its narrow path
+- **F3.** The package boundary that kept the stall watch on its narrow path
   is gone.
 - **F4.** WS-7a adds blocking file-system work, and a blocking runner
   call, to a path that every agent shares.
@@ -128,15 +128,15 @@ No finding is a blocker or a major.
   - Board:438 (`board.close`).
 - **Scenario:**
   - Edit E13 enforces rights by caller kind, not by service name. Any service on the list may `prompt`, `compact` and `resume` any agent, and may `answer` (CAPI:807-811).
-  - The board's access table lets "an LGTM Studio service" close any post (Board:438). So `roles.standing-rules` may prompt any agent, and the sheepdog may answer permission requests and close any post.
+  - The board's access table lets "an LGTM Studio service" close any post (Board:438). So `roles.standing-rules` may prompt any agent, and the stall watch may answer permission requests and close any post.
   - E13's `answer` refuses only a persistent option and a level above the asker's mode. It says nothing of `settingsWrite`, of unknown option kinds, or of which holder a service may answer for.
   - Today the engine applies `row.settingsWrite` and `canAnswerOption` only when the caller is an agent (`packages/engine/src/routing/permissions.ts:35-43`). The owner-held settings rule therefore depends on how a builder adapts that check for a new caller kind.
-  - Suppose a defect in sheepdog code, which runs with no attack pass (units 5-9, P:1140-1144), sends an `answer` for an open request. The engine then accepts a one-time allow that no person and no rule approved, possibly on a settings write.
+  - Suppose a defect in stall watch code, which runs with no attack pass (units 5-9, P:1140-1144), sends an `answer` for an open request. The engine then accepts a one-time allow that no person and no rule approved, possibly on a settings write.
 - **Why criterion 3.4 does not cover it:** 3.4 lists the calls the services make. It does not show that the engine refuses the calls they should not make. The Key decisions sentence "and nothing else" is therefore a property of the roles' code, not of the engine.
 - **Why this is in scope now:** Round 1's answer to F5 left the generic `answer` to "a broader seam review" for other consumers. Under lead ruling L26, the roles plan writes the services' entries in `commands/services.ts` (CAPI:798-799, "which the roles plan edits"), and no other service exists.
 - **Suggested fix:**
   - Give each service its own command list in `services.ts`.
-    - `roles.sheepdog`: `subscribe`, `prompt`, `compact`, `resume`, `release`, `roles.record`, `board.post`, `board.flush` and `board.status`.
+    - `roles.stallWatch`: `subscribe`, `prompt`, `compact`, `resume`, `release`, `roles.record`, `board.post`, `board.flush` and `board.status`.
     - `roles.standing-rules`: `subscribe` and `roles.record`.
   - Have the service entry point refuse every other command.
   - Since no service calls `answer`, take `service` out of `answer`'s access entry. Rule answers come through WS-7a's second write, which needs no command access.
@@ -153,14 +153,14 @@ No finding is a blocker or a major.
   - Criterion 3.4.
   - Row 80, which supersedes the package split of row 26.
 - **Scenario:**
-  - Under v4, the sheepdog lived in its own package and reached the engine through the seam.
-  - Under v5, `packages/engine/src/roles/sheepdog/` can import `EventLog`, `Runner` or `SqlClient` directly.
-  - A builder working on a medium-complexity sheepdog unit, with no attack pass, could take a shortcut. One example is calling `runner.answerPermission` or `runner.stop`. Another is appending through `log.transact` with the runner path's fixed `{ _tag: "owner" }` caller (`CommandHandler.ts:148`).
-  - The action would then skip E13's rights, and the log would record it as the owner's. Lead ruling L8 says that the service caller is the roles' only credential, and the record must name the sheepdog, not the owner.
+  - Under v4, the stall watch lived in its own package and reached the engine through the seam.
+  - Under v5, `packages/engine/src/roles/stall-watch/` can import `EventLog`, `Runner` or `SqlClient` directly.
+  - A builder working on a medium-complexity stall watch unit, with no attack pass, could take a shortcut. One example is calling `runner.answerPermission` or `runner.stop`. Another is appending through `log.transact` with the runner path's fixed `{ _tag: "owner" }` caller (`CommandHandler.ts:148`).
+  - The action would then skip E13's rights, and the log would record it as the owner's. Lead ruling L8 says that the service caller is the roles' only credential, and the record must name the stall watch, not the owner.
   - Criterion 3.4's call list cannot see a direct import.
 - **Suggested fix:**
   - Add an import-boundary test under `packages/engine/test/roles/`.
-    - It fails if any file in `packages/engine/src/roles/sheepdog/`, or the services' files, imports `log/EventLog`, `runner/*`, `effect/sql` or `commands/CommandHandler`.
+    - It fails if any file in `packages/engine/src/roles/stall-watch/`, or the services' files, imports `log/EventLog`, `runner/*`, `effect/sql` or `commands/CommandHandler`.
     - It allows only the service entry point, the views, and the pure helpers named in E22.
   - Name that test in criterion 3.4.
 
@@ -233,7 +233,7 @@ No finding is a blocker or a major.
 | PB-R4-1 | engine/backend, unit 11a | An `execute` request whose words name a path on a stalled mount. Use a slow resolver injected in the test, or a FUSE (Filesystem in Userspace) stub. Test with standing rules on and off, and for a supported and an unsupported harness. | With standing rules off, or for an unsupported harness, nothing is resolved. Otherwise resolution stops at its time limit and counts as protected. Other agents' runner events and an owner command complete during the stall. | Timings, event order, and the test file. |
 | PB-R4-2 | engine/backend, unit 11a | A rule answers a request from a top-level `ask` agent, then from a worker whose lead is paused. | No `OwnerNeeded`, no `DeliveryQueued` and no `client.AlertRaised` is written. `PermissionAnswered` has the service caller. | The ordered events of the transaction, and the output of the alert reactor. |
 | PB-R4-3 | engine/backend (E13) and roles/backend, unit 5 | Through the real service entry point, each service calls every command in the group. | Only that service's own list is accepted. `answer`, `board.close`, `start`, `stop` and `board.read` are refused for both services. | `service-caller.test.ts` and `calls.test.ts` output. |
-| PB-R4-4 | roles/backend, unit 5 | Scan the imports of `packages/engine/src/roles/**`. | No sheepdog or service file imports the log writer, the runner, the SQL client or the command handler. | The boundary test's output. |
+| PB-R4-4 | roles/backend, unit 5 | Scan the imports of `packages/engine/src/roles/**`. | No stall watch or service file imports the log writer, the runner, the SQL client or the command handler. | The boundary test's output. |
 | PB-R4-5 | engine/backend, unit 11a | Through the real resolver, with an empty locations list: a bare-named link to `.claude/settings.json`; a linked folder followed by a missing `settings.json`; a link to the account's configuration folder. | Each is passed to the matcher as protected, and no rule matches. | PC test output. |
 | PB-R4-6 | engine/backend, unit 11b | A capacity error on a lead that holds a worker's open permission request. | The request waits behind the hold, and is never answered or moved by the hold. The time it waits is recorded. | The event log of the run. This is for the logic lens to judge (see "Noted, not filed"). |
 
@@ -257,7 +257,7 @@ None. No check was stopped by the model's policy.
 | F1 | An undefined "path-like word" can leave a bare-named link to a settings file unresolved | 6: a harness's settings are widened until fixed by hand | 5: one owner; undone with help | 2: a narrow reading together with an existing link named in a rule | 60, schedule | unresolved (plan wording; the resolver itself is confirmed sound) | engine/backend, unit 11a; the planner |
 | F2 | The services hold unused `answer`, `board.close` and `prompt` rights, and `answer` is checked more weakly than an agent's | 6: an unapproved allow, possibly on a settings write | 5 | 2: needs a service defect together with an open request | 60, schedule | confirmed (CAPI E13, Board:438, `permissions.ts:35-43`) | the lead, carried to the client API plan (E13); roles/backend, unit 5 |
 | F4 | Synchronous resolution and an awaited answer can freeze the shared runner path | 4: the service is frozen until the mount times out | 5: may need a restart | 2: a hung network mount named in a command | 40, record | confirmed (code, and the Node.js documentation) | engine/backend, unit 11a |
-| F3 | No import boundary keeps the sheepdog on the service path | 6: rights not enforced, and actions recorded as the owner's | 3 | 2: a builder shortcut together with a later wrong action | 36, record | confirmed (CAPI:101, criterion 3.4) | roles/backend, unit 5 |
+| F3 | No import boundary keeps the stall watch on the service path | 6: rights not enforced, and actions recorded as the owner's | 3 | 2: a builder shortcut together with a later wrong action | 36, record | confirmed (CAPI:101, criterion 3.4) | roles/backend, unit 5 |
 | F5 | A rule answer for an owner-held agent can raise an approval alert | 2: a spurious push | 3 | 4: a top-level agent or a paused lead | 24, record | confirmed (`holders.ts:45-50`) | engine/backend, unit 11a |
 | F6 | `release` has no named rights check and no refusal test | 2: retries spent early | 3 | 2 | 12, record | confirmed (plan text) | engine/backend, unit 11b |
 

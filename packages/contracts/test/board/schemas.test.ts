@@ -69,7 +69,7 @@ void [plain, postAsChannel, channelAsWake, wakeAsPost, agentAsPost];
   });
   it("1.1 BoardAuthor distinguishes owner, agent and service without admitting a piece caller", () => {
     const decode = Schema.decodeUnknownSync(codec("BoardAuthor"));
-    for (const author of [{ _tag: "owner" }, agent("a"), { _tag: "service", service: "roles.sheepdog" }]) expect(decode(author)).toEqual(author);
+    for (const author of [{ _tag: "owner" }, agent("a"), { _tag: "service", service: "roles.stallWatch" }]) expect(decode(author)).toEqual(author);
     for (const bad of [{ _tag: "agent" }, agent(""), { _tag: "service", service: "" }, { _tag: "piece", namespace: "board" }]) expect(() => decode(bad)).toThrow();
   });
   it("1.1 a group channel requires and retains its anchor agent id", () => {

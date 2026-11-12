@@ -3,7 +3,7 @@ import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
 import type { CallerKind } from "../commands.ts"
 import { AgentId, EpochMilliseconds, EventSequence, RequestId } from "../ids.ts"
-import { SheepdogRecord, RolesActionRecord } from "./events.ts"
+import { StallWatchRecord, RolesActionRecord } from "./events.ts"
 import { RoleFile, RoleFileHash, RolesSettings } from "./schema.ts"
 
 const request = { requestId: RequestId }
@@ -34,7 +34,7 @@ export const RolesRpcGroup = RpcGroup.make(
       limit: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
     }, success: Schema.Struct({ ...request, items: Schema.Array(RolesActionRecord), next: Schema.optionalKey(EventSequence) }), error: Refused,
   }),
-  Rpc.make("record", { payload: { ...request, action: SheepdogRecord }, success: Schema.Struct({ ...request, sequence: EventSequence }), error: Refused }),
+  Rpc.make("record", { payload: { ...request, action: StallWatchRecord }, success: Schema.Struct({ ...request, sequence: EventSequence }), error: Refused }),
 ).prefix("roles.")
 
 export const rolesAccess = {

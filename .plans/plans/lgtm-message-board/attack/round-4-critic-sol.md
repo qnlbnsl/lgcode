@@ -151,7 +151,7 @@ The plan's existing maximum-frame, redaction, source-ownership, queue/send race,
 ## Noted, not filed
 
 - The owner and lead authorize direct engine edits. The old seam-only and unchanged-test policies are superseded; engine-only regression expectations still have their stated purpose.
-- Same-user disk access, parent-thread visibility, non-deletable posts, no timed informational wake, possible duplicate external resend, silent-agent repair through close or the sheepdog, and early settlement while disabled are explicit choices. They are not new findings. Existing engine issues 113, 152 and 194 were not re-filed as board defects.
+- Same-user disk access, parent-thread visibility, non-deletable posts, no timed informational wake, possible duplicate external resend, silent-agent repair through close or the stall watch, and early settlement while disabled are explicit choices. They are not new findings. Existing engine issues 113, 152 and 194 were not re-filed as board defects.
 - The complete condition-id lists in the bounded snapshot should be exercised at the supported maximum agent population. The supplied texts do not state that population; the existing fifty-agent scenario alone does not measure every possible size. This report does not assert a new observed transport failure.
 - The lead owns issue-list and feature-list updates. This reviewer writes the assigned result only and does not modify those repository documents.
 - Review execution used Node.js 26.13.0 after `nvm use`. The checkout was clean at the last status check. No application tests, installs, repository edits, commits, pushes, delegation or team-board messages ran. No new claim about Effect's library behavior is certified here.

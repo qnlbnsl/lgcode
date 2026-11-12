@@ -143,7 +143,7 @@ another lead a question and ends its turn, anyone waiting on the first lead
 is not woken until its question closes and its closing notice has reached
 it. An agent that received a question and ended its turn without
 answering counts as finished, as the engine would say; its asker keeps
-waiting, and the sheepdog or the owner deals with the silence. An agent that is itself being
+waiting, and the stall watch or the owner deals with the silence. An agent that is itself being
 asked a question cannot be stuck behind a blocking wait on the asker; the
 wait gives way, as the engine's own waits do for engine questions.
 
@@ -663,7 +663,7 @@ reply.
 | The reactor writes a resolution twice after a restart | Medium | Each write is idempotent on the view; criterion 4.5 |
 | A text that was already sent reaches an agent that just left the channel | Medium | Accepted and stated (row 50): sent text cannot be recalled; a wake still queued is stopped at send (row 67) |
 | The reach-check inputs differ from what criteria 2.11 and 4.9 assume | Medium | They are in edit E18 at `876bf4f` (L23, rows 98, 100); a later difference goes to the lead |
-| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the sheepdog's job; `board.status` shows whom the author waits on |
+| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the stall watch's job; `board.status` shows whom the author waits on |
 | Engine change B6 makes a `wait` on a board author last longer than before | Medium | Intended (rows 33, 99); criterion 4.8 shows nothing changes without board state; criterion 4.6 has a pause control case; criterion 1.7 tests the conditions as pure functions |
 
 **Verify:** `packages/engine/test/board/reactor.test.ts`, `settled.test.ts`; the engine suite, with the tests that engine changes B6 to B8 name keeping their expectations. Device or environment QA: none.

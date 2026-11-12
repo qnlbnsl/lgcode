@@ -31,7 +31,7 @@ The generic `hash` and `recipient` exemptions were replaced by specific names. R
 
 ### Dashboard standing-rule access matches the password ruling.
 
-A valid web session becomes the owner at the shared boundary (`CAPI:309`, `CAPI:332`). The roles command table grants `roles.rules.add` to the owner, and criterion 2.10 expressly includes a logged-in dashboard while refusing agents and services (`plan.md:364`, `plan.md:755`). `roles.record` remains service-only and limited to the sheepdog's records (`plan.md:370`, `plan.md:808`). The device fields and lasting-setting alert uses have been removed from operative roles text. No computer-only exception remains.
+A valid web session becomes the owner at the shared boundary (`CAPI:309`, `CAPI:332`). The roles command table grants `roles.rules.add` to the owner, and criterion 2.10 expressly includes a logged-in dashboard while refusing agents and services (`plan.md:364`, `plan.md:755`). `roles.record` remains service-only and limited to the stall watch's records (`plan.md:370`, `plan.md:808`). The device fields and lasting-setting alert uses have been removed from operative roles text. No computer-only exception remains.
 
 ## Interacting-rule truth table
 
@@ -47,7 +47,7 @@ These are required plan outcomes, not executed test results.
 | The carry-on command already committed. | Reuse its receipt; do not submit another logical prompt. |
 | Resume is refused, reload fails, or another crash ends the attempt. | Give up; do not grant a second automatic retry. |
 | A stop or off baseline cancels admission. | Do not continue it after a later resume or switch-on. |
-| The board is off but the sheepdog is on. | Crash handling continues; an unsent notice is recorded as board-off. |
+| The board is off but the stall watch is on. | Crash handling continues; an unsent notice is recorded as board-off. |
 | Owner requests a later prompt in the hand-off. | Return its permitted redacted text. |
 | Agent requests that later prompt. | Return the specified cut marker; preserve E21 visibility. |
 | Dashboard has a valid session. | Treat it as owner, including standing-rule creation. |
@@ -56,7 +56,7 @@ These are required plan outcomes, not executed test results.
 ## Proposed post-build checks
 
 1. **R6-PB1, roles/backend.** Run CR08–CR14 through the real service composition. Also kill after resume's receipt but before its hook, and between board post, flush and the final action record. Show durable admission, receipts, rebuilt view, runner sends, hourly count and notice count. An eligible retry must finish without another logical prompt or notice.
-2. **R6-PB2, roles/backend.** Stop and resume the old agent before the sheepdog next runs. Also place off/on changes ahead of an interrupted sheepdog's saved position. Replay the switch history before continuing an admission that it cancels. Show cancellation survives rebuilding and no carry-on is revived. This verifies the stated cancellation policy, rather than introducing a new policy.
+2. **R6-PB2, roles/backend.** Stop and resume the old agent before the stall watch next runs. Also place off/on changes ahead of an interrupted stall watch's saved position. Replay the switch history before continuing an admission that it cancels. Show cancellation survives rebuilding and no carry-on is revived. This verifies the stated cancellation policy, rather than introducing a new policy.
 3. **R6-PB3, hand-off builder.** Build the thread through public start/prompt calls and runner updates. Page across the queued/sent pair; test owner, lead, recovered parent and replacement callers. Show the first brief, correct delivery correlation, hidden-prompt marker, permitted responses and encoded size limits. No synthetic PromptSent fixture may stand in for a producer.
 4. **R6-PB4, contracts and roles/backend with board/backend.** Run RI01–RI03 after merging E33, B13 and task 1b. Register colliding secrets in actor service/rule names, nested harness ids, roleFileHash, noticeRecipient and postId. Show unchanged event/receipt identities, equal live/rebuilt folds and one first-use record. The same strings in notes, words, text and unrelated nested fields must still be removed. Preserve B13's actor-and-array `to` structure.
 5. **R6-PB5, client API and roles/backend.** Add a qualifying standing rule from a logged-in dashboard, then replay the same request. Expect one rule and the stored reply. Repeat without a cookie and as an agent and service, including reuse of the owner's request id/body; none may obtain owner authority or add a rule. The harness qualification and matcher restrictions remain in force.

@@ -87,7 +87,7 @@ it("K06 catches an absent roles condition silently enabling holds instead of ret
   yield* registerRebuildCheck();
   const parent = yield* spawn(rig, runner);
   const target = yield* spawn(rig, runner, parent);
-  const deliveryId = yield* send(runner, target, "No sheepdog is installed.", parent);
+  const deliveryId = yield* send(runner, target, "No stall watch is installed.", parent);
   const before = yield* headSequence;
   yield* capacityReply(runner, target, deliveryId);
   const rows = yield* eventually(logAfter(before), (rows) => eventsNamed(rows, "DeliveryReturned").length > 0);
@@ -268,7 +268,7 @@ it("K18 catches stopping an asker closing the target's hold, or release retrying
 it("K19 catches a missing hold flag for owner and service snapshots or leaking it into an agent snapshot", async () => runCapacity((rig, runner) => Effect.gen(function* () {
   yield* registerRebuildCheck();
   const { target } = yield* startHeld(rig, runner);
-  for (const caller of [{ _tag: "owner" }, { _tag: "service", service: "roles.sheepdog" }] as const) {
+  for (const caller of [{ _tag: "owner" }, { _tag: "service", service: "roles.stallWatch" }] as const) {
     const reply = yield* clientSnapshot(caller);
     expect(reply.agents.find((row) => row.agentId === target.agentId)).toHaveProperty("capacityHeld", true);
   }

@@ -108,9 +108,9 @@ Source A: `/home/qnlbnsl/projects/personal/herdr-synapse/docs/message-board/feat
 - 55 (l.456) "Workers talk on a need-to-know basis" (owner quote about the earlier subagent workflow).
 - 56-59 (l.463-485): queues of small work, related work to the worker that knows it, focused compaction between items, retire instead of compacting again.
 - 60 (l.489) "Turns and tokens are counted and shown".
-- "Sheepdog", "standing permission" and "always allow": no match.
+- "Stall watch", "standing permission" and "always allow": no match.
 
-Source B: `docs/issues.md`. Highest issue number 211 (l.3169). No issue about roles, piece 4, the sheepdog, prompt cache, context size or standing permission rules. Relevant: #75 (l.1237, open) owner cannot wait; #80 (l.1290, fixed) waits limited to the caller's agents; #113 (l.1704, open) nothing closes a crashed agent's open questions; #114 (l.1719, open); #65 (l.1056, open) no event withdraws an owner alert; #76 (l.1246, open) engine notices name the owner as sender; #90 (l.1392, fixed) and #73 (l.1189) option-kind safety; #91 (l.1403, open), #104 (l.1625, open) deny rules; #134 (l.2040, open) out-of-usage account still sends work to idle siblings; #152 (l.2124, open) paused agent that cannot reload; #162 (l.2246, open) ancestry check rests on the caller's claim; #194 (l.2716) unaccepted prompt sent twice after restart.
+Source B: `docs/issues.md`. Highest issue number 211 (l.3169). No issue about roles, piece 4, the stall watch, prompt cache, context size or standing permission rules. Relevant: #75 (l.1237, open) owner cannot wait; #80 (l.1290, fixed) waits limited to the caller's agents; #113 (l.1704, open) nothing closes a crashed agent's open questions; #114 (l.1719, open); #65 (l.1056, open) no event withdraws an owner alert; #76 (l.1246, open) engine notices name the owner as sender; #90 (l.1392, fixed) and #73 (l.1189) option-kind safety; #91 (l.1403, open), #104 (l.1625, open) deny rules; #134 (l.2040, open) out-of-usage account still sends work to idle siblings; #152 (l.2124, open) paused agent that cannot reload; #162 (l.2246, open) ancestry check rests on the caller's claim; #194 (l.2716) unaccepted prompt sent twice after restart.
 
 ## Planner's check: Effect test clock (2026-11-03)
 

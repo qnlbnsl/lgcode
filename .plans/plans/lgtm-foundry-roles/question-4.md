@@ -77,7 +77,7 @@ benefit. If a harness qualifies, the epic's words are delivered in this
 version.
 
 The rest of the plan does not depend on the answer. The roles, the
-sheepdog, the hand-off, compaction timing and the engine changes WS-7b and
+stall watch, the hand-off, compaction timing and the engine changes WS-7b and
 WS-7c are the same under every option.
 
 ## Two related changes to the pending engine question

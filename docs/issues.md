@@ -2845,7 +2845,7 @@ command, and checks the order within each committed batch.
 The error matrix sends authenticated current-incarnation events through the
 runner handler and reopens the database after each error.
 The deferral matrix covers both stages and runs a mutual-question control
-with the sheepdog active.
+with the stall watch active.
 The alert matrix covers reverse resolution order, a fresh baseline from
 rebuilt state, and an owner wait whose status and stream are offset.
 The recovery matrices cover complete committed checkpoints, actual service
@@ -5723,7 +5723,7 @@ Why it matters: Each follower may judge the same agent differently.
 Found: 2026-11-03, while planning the message board plan.
 State: open.
 
-What happens: A hang in the middle of a turn ends no turn, so the board's reminder for an unanswered question never fires. A turn's end sends one reminder, and the next marks the agent `no-answer` and tells the asker once (board contract v15, rows 153 and 156). Only the roles plan's sheepdog catches a hang, at its two-hour runaway limit (board review round 3, logic M4, threat T3-6).
+What happens: A hang in the middle of a turn ends no turn, so the board's reminder for an unanswered question never fires. A turn's end sends one reminder, and the next marks the agent `no-answer` and tells the asker once (board contract v15, rows 153 and 156). Only the roles plan's stall watch catches a hang, at its two-hour runaway limit (board review round 3, logic M4, threat T3-6).
 What should happen: Not decided. The owner accepted this as a stated limit on 2026-11-03.
 Why it matters: The asker waits up to two hours for an agent that has hung.
 
@@ -6142,12 +6142,12 @@ What changed: The administration test pins the supported hash link, follows it, 
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The Phase 2 repair for FR-048 adds independent production-bundle width cases for the login, situation, thread, alerts and settings pages. Each waits for its real content, measures the document and body against the 360-pixel viewport, and reports its own outcome. The existing navigation, administration, thread and storage checks remain. Temporary page-specific overflow mutations fail all five cases at their width assertions.
 
-## 371. Enabling an initially disabled sheepdog skips cache initialization
+## 371. Enabling an initially disabled stall watch skips cache initialization
 
 Found: 2026-11-04, in the foundation review, record FR-008.
 State: fixed in the foundation fix for FR-008.
 
-What happened: An enabled startup initialized each sheepdog rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
+What happened: An enabled startup initialized each stall watch rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
 What changed: A switch from off to on now runs the same rule initialization as an enabled startup before arming timers. The cache rule reloads settings and reconstructs targets from current agents and their recorded turns. A future deadline keeps its original expiry. A missed cache deadline is dropped. Repeated activation does not repeat an action.
 Verification: The socket-level cache runtime tests cover settings committed before disabled startup, existing and subsequent unsplit turns, missed deadlines, repeated activation, and Claude transcript reconstruction from the default home and both account-specific home settings. Five regression cases failed against the unfixed loop because no compaction was delivered. The missed-deadline case already passed and remains a guard against extending expiry at activation.
 
@@ -6310,11 +6310,11 @@ Why it matters: The contract permits a manager to add agents it holds, even
 when their immediate parents cannot act. The fix restores that delegated
 operation without changing stored membership when an agent's state changes.
 
-## 379. The sheepdog lost its event-position switch when refreshing live state
+## 379. The stall watch lost its event-position switch when refreshing live state
 
 Status: Fixed in the foundation review corrections for finding FR-011.
 
-What happened: The sheepdog loop kept the switch at its subscriber cursor, but the production rules fetched Views again and used the latest switch. When consumption lagged behind a switch-off, an eligible earlier event could lose its advice notice or crash retry.
+What happened: The stall watch loop kept the switch at its subscriber cursor, but the production rules fetched Views again and used the latest switch. When consumption lagged behind a switch-off, an eligible earlier event could lose its advice notice or crash retry.
 
 What changed: The rules retain the cursor switch while refreshing the current lifecycle, settings limits, and action records. The regression holds the consumer before advice and crash events, commits switch-off, and then checks their outcomes through the production rules. It also proves that events committed while off remain ignored after re-enabling.
 
@@ -6457,7 +6457,7 @@ Validation: A controlled finite delay reproduces the old count failure with no p
 Found: 2026-11-04, while fixing foundation review finding FR-019.
 State: fixed.
 
-What happened: The sheepdog prompted every top agent through the engine, even
+What happened: The stall watch prompted every top agent through the engine, even
 though roles decision 60 requires a direct board post with no reply, followed
 by a flush. Only the holder notice had a board record.
 
@@ -6466,7 +6466,7 @@ flush under deterministic per-top identities. Shared holders still receive
 one notice per group and occurrence. An owner-held top still receives a board
 nudge, and the owner's notice remains the roles event. The regression checks
 the top posts and flush receipts separately from the shared holder receipt.
-It also checks sheepdog turn classification, hourly repeats, restart deduplication,
+It also checks stall watch turn classification, hourly repeats, restart deduplication,
 snooze, and a disabled board.
 
 Why it matters: The nudge now follows the promised board history and wake path.
@@ -6478,14 +6478,14 @@ State: fixed.
 
 What happened: An open crash admission treated a carry-on as absent when a
 later reload preserved it but opened a newer session. The session sequence
-comparison sent an unnecessary sheepdog continuation.
+comparison sent an unnecessary stall watch continuation.
 
 What changed: The rule recognizes a carry-on queued after the admitted crash,
 even when another session opens afterward. Earlier crashes' carry-ons do not
 satisfy that guard. Deterministic service request identifiers remain in use.
 The regression admits a crash, accepts ordinary owner work, creates an engine
 carry-on through the reload transaction builder, preserves it through another
-reload, and restarts the sheepdog twice. It requires one logical continuation
+reload, and restarts the stall watch twice. It requires one logical continuation
 and one outcome notice. Existing no-carry and service-receipt restart cases
 remain covered.
 
@@ -6648,7 +6648,7 @@ What happened: The crash window test had no timestamp for its earlier admission.
 The refused-admission test could pass without handling the crash. The generic
 action recovery test used release as a substitute for other engine commands.
 It did not exercise a committed resume before its hook, successful notice
-flushes, or an owner stop and manual resume ahead of sheepdog catch-up.
+flushes, or an owner stop and manual resume ahead of stall watch catch-up.
 
 What changed: A schema-valid admission at 45 minutes distinguishes the full
 hour from a shortened window. The refusal case requires the exact service
@@ -6657,7 +6657,7 @@ rules and planners across actual resume, prompt, release, compaction and flush
 boundaries. They rebuild the database, execute the real recovery startup twice,
 and compare logical command, delivery, notice and action identities. The owner
 stop and manual resume use the authenticated socket command path before a later
-marker proves that sheepdog catch-up completed.
+marker proves that stall watch catch-up completed.
 
 The new command boundary tests also exposed production omissions. A committed
 compaction or flush could leave its action record missing because its target
@@ -6794,11 +6794,11 @@ stall to a lead, and used direct prompts. It did not create the owner alert
 or either board wake required by the criterion.
 
 What changed: The runtime test uses the production reactor table. It observes
-an open owner stall alert, delivers a sheepdog-only board wake, and checks
+an open owner stall alert, delivers a stall-watch-only board wake, and checks
 that the same alert remains open. It then delivers a mixed board wake and
 checks one stall end and one clear of that exact alert through the client API.
 
-Validation: Temporary mutations classify every wake as sheepdog-only or omit
+Validation: Temporary mutations classify every wake as stall-watch-only or omit
 the client stall-end source. Both must fail the composed assertions before
 the original source is restored. The existing classifier cases also cover
 another author, completions, reminders and no-answer duties.
@@ -8209,10 +8209,10 @@ The product behaved correctly, and the check correctly rejected the early
 reply. The worker's prompt had not explicitly covered the reminder turn.
 
 The prompt now identifies the reminder about `roles-live-first-stall` as
-expected. It distinguishes that reminder from the sheepdog's notice.
+expected. It distinguishes that reminder from the stall watch's notice.
 The worker must leave the obligation unanswered, must not call `board.post`,
 and must end the reminder turn with the word waiting. It may reply only
-after a notice authored by `roles.sheepdog`. A prompt regression checks
+after a notice authored by `roles.stallWatch`. A prompt regression checks
 these instructions and their inclusion in both worker start inputs.
 The check's assertions and the product code are unchanged.
 No real roles run was performed for this prompt fix.
@@ -8701,13 +8701,13 @@ The check did not cover the 526 Claude findings and 139 Grok findings that were 
 Found: 2026-11-07, recorded from review finding K-368.
 State: open. The owner ruled on 2026-11-07, and the code change waits until the freeze lifts.
 
-When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/lgtm-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
+When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/stall-watch/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/lgtm-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
 
 The owner ruled on 2026-11-07 that the lead keeps both the nudges and the replacement advice in this case. The advice changes form, as follows:
 
-- The sheepdog stops nudging after the third time, as it does today.
+- The stall watch stops nudging after the third time, as it does today.
 - The replacement advice becomes a notice to the orchestrator and a mark on the lead. The lead's row in the roles view gains a field that says replacement is advised. Today the view counts nudges in `stallCount` but records nothing for `ReplaceAdvised`.
-- When every worker under a marked lead has finished, the sheepdog tells the orchestrator that the lead's workers are done and that the lead is ready for replacement.
+- When every worker under a marked lead has finished, the stall watch tells the orchestrator that the lead's workers are done and that the lead is ready for replacement.
 - The orchestrator then saves the old lead's transcript and starts a new lead. The new lead receives the original order, the old transcript to summarise, and what to look through, so it continues where the old lead stopped. Because it is a lead, it reaches the team's workers directly.
 
 The plan's criterion 4.3 should be corrected to say that the lead is nudged. The owner expects three unanswered nudges in a row to be rare. The owner's words: "keep the nudge and also keep 'replacement advised.' The replacement advisory could just be a notice to the orchestrator and a mark on the lead."
@@ -9738,18 +9738,18 @@ Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctl
 The test now gives the launcher an empty search-path folder.
 The launcher itself was right and is unchanged.
 
-## 562. Two engine crash tests raced the roles sheepdog
+## 562. Two engine crash tests raced the roles stall watch
 
 Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
 State: fixed.
 
 The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
 The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
-Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
-On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+Both run with the roles stall watch on, and the stall watch resumes a crashed agent by design.
+On the build server, the stall watch acted after the checks had finished, so both tests passed.
 On the faster computer, it resumed the agent first.
 The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
-Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Both tests now turn the stall watch off, because each checks an engine rule rather than the stall watch.
 Other tests may have the same hidden dependence on a slow computer.
 
 ## 563. Context search counted item bytes without the complete result

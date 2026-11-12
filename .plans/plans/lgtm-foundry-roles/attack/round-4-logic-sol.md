@@ -26,7 +26,7 @@ Repository paths are relative to the recorded checkout. References name the froz
 
 Category: Bug (timing, failures).
 Evidence status: Confirmed contradiction between the decision procedure and the acceptance requirements.
-Responsible builder: The roles sheepdog rules builder.
+Responsible builder: The roles stall watch rules builder.
 
 Scenario: An orchestrator has an open post that needs its idle lead's reply. The lead's only child met a usage limit after its delivery was accepted. The adapter supplied no reset time. The worker is paused, and it has no queued or sent delivery. The lead is waiting for that worker's work.
 
@@ -67,21 +67,21 @@ Suggested fix: State that derived wait checks see the combined projected request
 
 This is a missing integration decision, not a claim that the unbuilt implementation already has this bug. Deferring workstream 7a under ruling L27 removes the branch until a harness qualifies.
 
-### R4-L3. MINOR: A completion can be mistaken for a sheepdog-only wake
+### R4-L3. MINOR: A completion can be mistaken for a stall-watch-only wake
 
 Category: Bug (timing).
 Evidence status: Confirmed mismatch between the turn classification and the board payload.
 Responsible builder: The roles notices and turn-classification builder.
 
-Scenario: A lead is owed the completion of an all-replies post, including its workers' replies. The next board wake carries that completion and one sheepdog notice. Every entry in the wake's posts list is authored by roles.sheepdog, but the completion carries ordinary work.
+Scenario: A lead is owed the completion of an all-replies post, including its workers' replies. The next board wake carries that completion and one stall watch notice. Every entry in the wake's posts list is authored by roles.stallWatch, but the completion carries ordinary work.
 
-B:284-294 gives WakeBuilt separate post and completion lists. Completions are real wake content, and do not occupy the ordinary digest slots. P:434-439 and P:684 classify the wake by post authors alone. That makes this mixed wake a sheepdog turn.
+B:284-294 gives WakeBuilt separate post and completion lists. Completions are real wake content, and do not occupy the ordinary digest slots. P:434-439 and P:684 classify the wake by post authors alone. That makes this mixed wake a stall watch turn.
 
-The lead has resumed ordinary work, but roles.StallEnded does not clear the alert. The team-idle hour is not restarted. A subsequent status post in that turn also fails the outside-sheepdog-turn progress test at P:750-754. The result is a stale alert or misleading later escalation.
+The lead has resumed ordinary work, but roles.StallEnded does not clear the alert. The team-idle hour is not restarted. A subsequent status post in that turn also fails the outside-stall-watch-turn progress test at P:750-754. The result is a stale alert or misleading later escalation.
 
-Suggested fix: Classify all content that caused the delivery. A wake carrying an ordinary completion must count as an ordinary turn even when every accompanying post is a sheepdog notice. State the completion-only case explicitly too. Add a mixed notice-plus-completion case to N13-N18 and the relevant stall and team-idle tests.
+Suggested fix: Classify all content that caused the delivery. A wake carrying an ordinary completion must count as an ordinary turn even when every accompanying post is a stall watch notice. State the completion-only case explicitly too. Add a mixed notice-plus-completion case to N13-N18 and the relevant stall and team-idle tests.
 
-Earlier answers checked: Ls-R3-L2 and TS-R3-TM-3 introduced StallEnded, and Lo-R3-L6 correctly classified sheepdog compactions. Those mechanisms remain useful. This is an additional payload branch their author-only classification does not cover.
+Earlier answers checked: Ls-R3-L2 and TS-R3-TM-3 introduced StallEnded, and Lo-R3-L6 correctly classified stall watch compactions. Those mechanisms remain useful. This is an additional payload branch their author-only classification does not cover.
 
 ### R4-L4. MINOR: The stall task still points to the abandoned board package
 
@@ -99,7 +99,7 @@ Severity, fallout and probability use the required 1-10 scales. Scores assume re
 
 | Finding | Severity and reason | Fallout and reason | Probability and reason | Product and band | Evidence | Owner | Decision | Deadline |
 |---|---|---|---|---|---|---|---|---|
-| R4-L1, unknown-reset pause | 6: The recovery flow gives false replacement advice until the owner fixes the account state. | 3: One team; the owner can restore the account. | 6: A valid usage pause lacks an optional deadline; this needs no second fault. | 108, Schedule | Confirmed specification conflict | Roles sheepdog builder | Pending owner decision | Within this phase, or a dated follow-up with an owner |
+| R4-L1, unknown-reset pause | 6: The recovery flow gives false replacement advice until the owner fixes the account state. | 3: One team; the owner can restore the account. | 6: A valid usage pause lacks an optional deadline; this needs no second fault. | 108, Schedule | Confirmed specification conflict | Roles stall watch builder | Pending owner decision | Within this phase, or a dated follow-up with an owner |
 | R4-L2, automatic answer cancels wait | 6: The promised automatic permission flow can return the lead's blocking call and spend another model step. | 3: One run; the lead can wait again. | 6: A matched permission request while its lead waits is an ordinary specific workflow, conditional on a qualifying harness. | 108, Schedule | Unresolved integration boundary; present predicate confirmed | Engine workstream 7a builder | Pending owner decision | Within this phase, before 7a is accepted, or a dated follow-up with an owner |
 | R4-L3, completion classification | 4: An ordinary work turn retains a stale stall or idle classification until a later correctly classified turn. | 3: One agent; subsequent activity repairs the state. | 6: A completion and notice can share an ordinary board wake; no fault is required. | 72, Schedule | Confirmed specification mismatch | Roles notices builder | Pending owner decision | Within this phase, or a dated follow-up with an owner |
 | R4-L4, stale placement anchor | 1: This is implementation guidance, with no direct user-visible fault. | 1: Development only. | 10: Every implementation following this task encounters the stale path. | 10, Record | Confirmed stale anchor | Roles plan owner | Pending owner decision | Review at the end of the phase |
@@ -126,12 +126,12 @@ The table records the intended result where the plan is clear. "Gap" identifies 
 | A board wake is withdrawn and replaced during a capacity hold | Replacement remains behind the agent's hold. | Defined, P:967. |
 | Owner or holder releases a capacity hold | Count that release in the same per-agent outage budget. | Defined, P:772 and P:967-968. |
 | Restart or account return finds a held queue | Reload idle and held, with no working-with-nothing-sent state. | Defined, P:967. |
-| Sheepdog is off at startup, with open holds | Release each hold once and create no new capacity holds. | Defined, P:683. |
+| Stall watch is off at startup, with open holds | Release each hold once and create no new capacity holds. | Defined, P:683. |
 | First current crash, retry setting 1 | Resume once, wait for SessionOpened, send carry-on only if absent, and tell the holder that old posts resolved gone. | Defined, P:773. |
 | Retry setting 0, repeat crash, refused resume, or reload failure | Give up, with the specified holder notice or owner alert. | Defined, P:773 and P:776. |
 | Board is off | Suspend stall, idle and cache-flush rules; preserve counts; restart their clocks on return; retain the explicit give-up alert exception. | Defined, P:441-450 and P:679. |
-| Wake carries only sheepdog notices, with no ordinary completions | Sheepdog turn; no StallEnded and no false progress reset. | Defined, P:434-439 and P:684. |
-| Wake carries sheepdog notices plus ordinary work completions | Ordinary turn. | Gap R4-L3. |
+| Wake carries only stall watch notices, with no ordinary completions | Stall watch turn; no StallEnded and no false progress reset. | Defined, P:434-439 and P:684. |
+| Wake carries stall watch notices plus ordinary work completions | Ordinary turn. | Gap R4-L3. |
 | Missed stall, idle or capacity deadline after downtime | Recheck current state and take one step only. | Defined, P:682. |
 | Missed cache deadline or unknown cache lifetime | Drop the missed action; do not invent a new lifetime. | Defined, P:805-833. |
 
@@ -156,8 +156,8 @@ The round-3 map contains 27 findings. The following groups account for all of th
 | C-R3-C4 | Board-off GaveUp owner alert exception, P:679. | Holds. |
 | C-R3-C5 | Crash retries have values 0 or 1, with explicit zero behavior, P:773. | Holds. |
 | Lo-R3-L5 | Open blocking-wait time is excluded from runaway duration, P:771. | Holds. |
-| Lo-R3-L6 | Sheepdog-requested compaction is a sheepdog turn, P:437 and P:684. | Holds. |
-| Lo-R3-L7 | Only file change, reply to the owed post, or a post outside a sheepdog turn resets progress, P:750-754. | Holds, subject to R4-L3's turn classification. |
+| Lo-R3-L6 | Stall-watch-requested compaction is a stall watch turn, P:437 and P:684. | Holds. |
+| Lo-R3-L7 | Only file change, reply to the owed post, or a post outside a stall watch turn resets progress, P:750-754. | Holds, subject to R4-L3's turn classification. |
 
 The earlier round-1 and round-2 answer maps were also checked for preservation. The rework keeps fail-closed matcher guards, receipt ownership and stable action identifiers, narrow service rights, inherited available-holder routing, board-off suspension, explicit crash carry-on and gone-post notices, bounded hand-off with lead relay, and switch-off behavior. I found no additional reopened earlier answer beyond the branches identified above.
 
@@ -174,19 +174,19 @@ The direct engine edits were checked against their current consumers rather than
 
 ## Proposed post-build checks
 
-1. Unknown-reset pauses. Drive an accepted worker turn into a usage pause with resetAt absent. Its idle lead owes an orchestrator a reply. Advance through three stall limits and a team-idle hour, then restart and repeat. Expected: no false lead nudge, replacement advice or team-idle event; the account owner-needed signal remains. Recover the account and verify clocks start from the specified new baseline. Evidence: event sequences, delivery state, roles view before and after rebuild. Owner: sheepdog rules builder.
+1. Unknown-reset pauses. Drive an accepted worker turn into a usage pause with resetAt absent. Its idle lead owes an orchestrator a reply. Advance through three stall limits and a team-idle hour, then restart and repeat. Expected: no false lead nudge, replacement advice or team-idle event; the account owner-needed signal remains. Recover the account and verify clocks start from the specified new baseline. Evidence: event sequences, delivery state, roles view before and after rebuild. Owner: stall watch rules builder.
 
 2. Automatic answer while blocked. If 7a is built, enter the lead's blocking wait before the child asks a matching permission. Expected: two correctly attributed permission envelopes, one runner answer after commit, no holder delivery, no WaitCancelled/request-held return, and the wait ends only for its actual member condition. Run unmatched and throwing-matcher controls: W19 must still return request-held. Evidence: wait row, blocking call result, log envelopes and runner calls. Owner: 7a builder.
 
-3. Completion wake classification. Build a wake with a sheepdog-only posts list and an ordinary completion, then a completion-only wake. Expected: both start ordinary turns, end an applicable stall alert, and allow ordinary progress accounting. Compare a true notice-only wake and sheepdog compaction. Evidence: WakeBuilt lists, DeliverySent, StallEnded and resulting alerts. Owner: notices builder.
+3. Completion wake classification. Build a wake with a stall-watch-only posts list and an ordinary completion, then a completion-only wake. Expected: both start ordinary turns, end an applicable stall alert, and allow ordinary progress accounting. Compare a true notice-only wake and stall watch compaction. Evidence: WakeBuilt lists, DeliverySent, StallEnded and resulting alerts. Owner: notices builder.
 
-4. Capacity through the real runner boundary. Feed recorded capacity errors through AcpRunner.finish, not only a stub classifyError call. Expected: the third class reaches the hold path rather than becoming a usage/sign-in pause or an invalid runner event. Exercise before and after first content, a replaced board wake, a manual release, last retry, restart, account return, crash, and sheepdog-off startup. Evidence: runner events, held queue order, counts, absence of DeliveryReturned during allowed holds, idle state after rebuild, and exactly one carry-on for accepted work. Owner: 7b builder.
+4. Capacity through the real runner boundary. Feed recorded capacity errors through AcpRunner.finish, not only a stub classifyError call. Expected: the third class reaches the hold path rather than becoming a usage/sign-in pause or an invalid runner event. Exercise before and after first content, a replaced board wake, a manual release, last retry, restart, account return, crash, and stall-watch-off startup. Evidence: runner events, held queue order, counts, absence of DeliveryReturned during allowed holds, idle state after rebuild, and exactly one carry-on for accepted work. Owner: 7b builder.
 
-5. Durable action repair. Kill between every command and its action record for post, flush, release, resume, carry-on and compaction. Include a notice accepted before the action record and a recipient crash before replay. Expected: stable caller/request/body deduplication, one logical command per action, correct read-state fold, no lost later flush and no extra resumed turn. Check the allowed physical replay limits separately from logical command counts. Evidence: command receipts, log sequence, rebuilt cursor/action view and runner calls. Owner: sheepdog base builder.
+5. Durable action repair. Kill between every command and its action record for post, flush, release, resume, carry-on and compaction. Include a notice accepted before the action record and a recipient crash before replay. Expected: stable caller/request/body deduplication, one logical command per action, correct read-state fold, no lost later flush and no extra resumed turn. Check the allowed physical replay limits separately from logical command counts. Evidence: command receipts, log sequence, rebuilt cursor/action view and runner calls. Owner: stall watch base builder.
 
 6. Permission guard precedence and lifecycle. If built, exercise malformed and throwing pre-checks, expired or disabled rules, device revocation, mode refusal, a disallowed persistent option and protected paths. Change relevant state between path resolution and transaction entry. Expected: current transactional guards deny the automatic answer; ordinary holder routing remains usable; diagnostics contain no raw request content. Separately measure the acknowledged post-resolution symbolic-link race. Evidence: input fixtures, service/holder caller envelopes, diagnostic capture and runner options. Owner: permission builder.
 
-7. Event integration and alerts. Add roles events to roundtrip and visibility coverage, run the lifecycle matrix, and compare rebuilt views. Interleave an engine failure alert and GaveUp in the same transaction. Expected: no lifecycle transition from an action record, owner-only role-event visibility, and one applicable alert with the specified clearing event. Evidence: named existing suites, replay/live subscription output and compare-views results. Owner: contracts and sheepdog builders.
+7. Event integration and alerts. Add roles events to roundtrip and visibility coverage, run the lifecycle matrix, and compare rebuilt views. Interleave an engine failure alert and GaveUp in the same transaction. Expected: no lifecycle transition from an action record, owner-only role-event visibility, and one applicable alert with the specified clearing event. Evidence: named existing suites, replay/live subscription output and compare-views results. Owner: contracts and stall watch builders.
 
 8. Production timing and bounded delivery. Retain the plan's real child-process stall check with production minutes. Exercise cache reads that renew a mixed-lifetime entry, missing usage, a missed deadline, and waiting agents. Exercise maximum encoded snapshot and hand-off sizes, including cut-part relay by the lead. Expected: no invented cache lifetime, no catch-up compaction, no compaction while blocked, bounded encoded replies, and a usable lead relay. Evidence: real-process timestamps, usage/transcript records, encoded byte counts and the replacement's received content. Owner: cache, hand-off and acceptance builders.
 

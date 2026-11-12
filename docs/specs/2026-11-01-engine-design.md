@@ -31,7 +31,7 @@ authenticated API through which agents and the owner's devices control them.
 The other three pieces are built on top of the engine without changing it.
 The client API adds device pairing, phone alerts and the web page. The message
 board adds channels, direct messages and wake rules. The foundry roles add the
-orchestrator, team leads, workers and the sheepdog that watches for stalls.
+orchestrator, team leads, workers and the stall watch that watches for stalls.
 
 ## How the engine is judged finished
 
@@ -75,7 +75,7 @@ These are built on the capabilities above, in later pieces:
 - The rules for each role, and standing permission rules such as "always
   allow running the tests" (piece 4).
 - Retrying, replacing or giving up on a failing agent (piece 4, the
-  sheepdog).
+  stall watch).
 - Git worktrees.
 - Usage meters.
 - Interactive mode, where an agent runs in a Herdr pane. It is added later as
@@ -365,7 +365,7 @@ Every change of state is an event, so `subscribe` reports it.
    open permission requests close as cancelled. Anyone waiting on it is woken
    once with the reason "crashed", and its parent is told. For an agent the
    owner started, the parent is the owner, so the crash produces an "owner
-   needed" event. The engine does not restart it. Retrying is the sheepdog's job, in piece 4, because an
+   needed" event. The engine does not restart it. Retrying is the stall watch's job, in piece 4, because an
    agent that crashes on some input will usually crash again on the same
    input.
 2. **LGTM Studio itself restarts.** The engine rebuilds the views from the log.

@@ -69,12 +69,12 @@ it.effect(
           const { database } = yield* Sqlite;
           database.exec("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL)");
           const insert = database.prepare("INSERT INTO notes (body) VALUES (?)");
-          insert.run("the lgtm keeps the flock");
+          insert.run("the service keeps the log");
           return readNotes(database);
         }).pipe(Effect.provide(sqliteLayer(filename)));
 
         assert.strictEqual(rows.length, 1);
-        assert.strictEqual(rows[0]?.body, "the lgtm keeps the flock");
+        assert.strictEqual(rows[0]?.body, "the service keeps the log");
         assert.strictEqual(rows[0]?.id, 1);
         assert.strictEqual(directory.startsWith(tmpdir()), true);
         assert.strictEqual(existsSync(filename), true);

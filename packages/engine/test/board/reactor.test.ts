@@ -529,7 +529,7 @@ for (const stage of ["reminder", "no-answer"] as const) for (const obstacle of [
   })));
 }
 
-it.effect("4.14 mutual questions remain free of reminder/no-answer traffic with the real sheepdog running across its timers", () => Effect.gen(function* () {
+it.effect("4.14 mutual questions remain free of reminder/no-answer traffic with the real stall watch running across its timers", () => Effect.gen(function* () {
   const ids = yield* run((c) => Effect.gen(function* () {
     const a = yield* postAs(c.worker!, { to: [agent("other")] });
     const b = yield* postAs(c.other!, { to: [agent("worker")] });
@@ -543,14 +543,14 @@ it.effect("4.14 mutual questions remain free of reminder/no-answer traffic with 
     expect((yield* eventually(snapshot, (state) => (state.roles as any).baseline?.on === true)).roles).toMatchObject({ baseline: { on: true } });
     yield* TestClock.adjust("30 minutes");
     // A settings transition is a positive follower barrier after the timer
-    // interval. An absent/dead sheepdog cannot satisfy this assertion.
-    success(yield* call(ownerCredential, "roles.settings.set", { settings: { sheepdog: false } }));
+    // interval. An absent/dead stall watch cannot satisfy this assertion.
+    success(yield* call(ownerCredential, "roles.settings.set", { settings: { stallWatch: false } }));
     expect((yield* eventually(snapshot, (state) => (state.roles as any).baseline?.on === false)).roles).toMatchObject({ baseline: { on: false } });
     const rows = yield* readLog;
     expect(eventsOf(rows, "board.WakeBuilt").filter((wake) => wake.reminders.some((id) => ids.includes(id)) || wake.noAnswers.some((notice) => ids.includes(notice.postId)))).toEqual([]);
     expect(eventsOf(rows, "board.AddresseeResolved").filter((event) => ids.includes(event.postId) && event.disposition === "no-answer")).toEqual([]);
     for (const id of ids) expect((yield* boardState).posts[id]?.status).toBe("open");
-  }), { sheepdog: true });
+  }), { stallWatch: true });
 }));
 
 it.live("4.14 two agents waiting on each other's posts do not create reminder traffic", () => run((c) => Effect.gen(function* () {

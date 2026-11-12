@@ -117,7 +117,7 @@ export const apply = (view: RolesView, event: Event, sequence: number): RolesVie
     case "roles.RoleFileSet": return reduceRoleFile(view, event) as RolesView;
     case "roles.SettingsChanged": return { ...view, settings: event.settings };
     case "roles.Snoozed": return { ...view, snoozes: { ...view.snoozes, [event.group]: event.until } };
-    case "roles.SheepdogBaseline": return {
+    case "roles.StallWatchBaseline": return {
       ...view, position: Math.max(view.position, event.position),
       baseline: { position: event.position, on: event.on, sequence, firstSequence: view.baseline?.firstSequence ?? sequence },
       ...(event.boardOn === undefined ? {} : { boardClock: { on: event.boardOn,

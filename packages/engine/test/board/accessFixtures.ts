@@ -13,7 +13,7 @@ import { channel, envelopes, event, freeze, owner, post, start } from "./fixture
 export { channel, event, owner, post };
 const agentId = Schema.decodeUnknownSync(AgentId);
 export const agent = (id: string) => ({ _tag: "agent" as const, agentId: agentId(id) });
-export const service = { _tag: "service", service: "sheepdog" } as const;
+export const service = { _tag: "service", service: "stallWatch" } as const;
 
 // Public pure seams for unit 2b. No fallback implements the missing policy.
 export interface PostAccess {

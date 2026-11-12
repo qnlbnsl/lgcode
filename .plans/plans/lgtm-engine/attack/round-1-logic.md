@@ -206,7 +206,7 @@ the server. The order inside recovery is not given.
 | `wait` on W | Nobody: O's `wait` covers only its own children. |
 | `prompt`, `stop` or `compact` W | Only the owner |
 | `resume` W after W crashes | Only the owner. W's crash notice goes to the dead L. |
-| Replace L (the sheepdog, piece 4) | Impossible without orphaning L's team. There is no reparent or adopt. |
+| Replace L (the stall watch, piece 4) | Impossible without orphaning L's team. There is no reparent or adopt. |
 | Cascade | Undefined. The spec says "stopping or losing an agent cleans up everything under it". If that means child agents, rule 4's move-up never applies. If it does not, the workers are orphaned. |
 
 The answer to question 7: parent-only rights do not break capability 7 for

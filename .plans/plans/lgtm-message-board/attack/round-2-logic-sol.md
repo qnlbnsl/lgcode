@@ -142,7 +142,7 @@ The original redaction, sender-label, namespace-withdrawal, snapshot and maximum
 
 - Known gaps were excluded from the finding count. Package/test-project ownership, scopes, vendor allowances, pending seam authorization and the four widened exclusions remain with the lead.
 - The supplied API contract already uses the board sender label at `../../inputs/client-api-contract.md:237`. Known gap 4's statement that the supplied API wording still names the caller is stale relative to this review input. L16 resolves the intended behavior, so this is not another finding.
-- A live agent deliberately or accidentally never answering remains the sheepdog's responsibility, with `board.close` as repair. The findings above concern questions made unanswerable by the board's own rules or lost completion notifications.
+- A live agent deliberately or accidentally never answering remains the stall watch's responsibility, with `board.close` as repair. The findings above concern questions made unanswerable by the board's own rules or lost completion notifications.
 - Same-user disk access, parent visibility and indefinite retention remain the stated boundaries. Existing engine issues 113, 152 and 194 were considered; none is re-filed as a new engine defect.
 - Review execution: `nvm use` selected Node.js 26.13.0. Code anchors were checked at the recorded commit. The working tree was clean at the final read-only check. No application tests, dependency installs, repository edits, commits, pushes, delegation or board messages were performed.
 - Some initial multi-file reads exceeded the output budget. Relevant review and source sections were reread in smaller reads before relying on them. No failed probe changed a file.

@@ -581,7 +581,7 @@ reply.
 | The reactor writes a resolution twice after a restart | Medium | Each write is idempotent on the view; criterion 4.5 |
 | A text that was already sent reaches an agent that just left the channel | Medium | Accepted and stated (row 50): sent text cannot be recalled; a wake still queued is stopped at send (row 67) |
 | The engine's send-time reach check differs from what criterion 4.9 assumes | Medium | It is in seam item 15 at `ed1755d` (L19); a later difference goes to the lead |
-| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the sheepdog's job; `board.status` shows whom the author waits on |
+| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the stall watch's job; `board.status` shows whom the author waits on |
 | The seam's settled test moves into the engine's contracts package, and the board's condition reads only its own snapshot section | Medium | Criterion 4.8 keeps the engine's wait tests unchanged; criterion 1.7 tests the conditions as pure functions |
 
 **Verify:** `packages/board/test/reactor.test.ts`, `settled.test.ts`; the unchanged engine suite. Device or environment QA: none.

@@ -441,11 +441,11 @@ These rules apply to the three kinds:
 ### Services
 
 A service is LGTM Studio's own code acting on the owner's behalf with narrow,
-fixed rights: the foundry roles' sheepdog and their standing-rule answerer
+fixed rights: the foundry roles' stall watch and their standing-rule answerer
 (lead ruling, row 27). Edits E11, E13 and E14 build these rules:
 
 - **It is in-process only.** A piece adds each of its services by name to
-  the engine's service list, such as `roles.sheepdog` or
+  the engine's service list, such as `roles.stallWatch` or
   `roles.standing-rules`. A service calls the engine's in-process command
   path directly. No service credential exists on the wire or on disk, so
   there is nothing to steal. The Unix socket and the web server never
@@ -462,7 +462,7 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
   the service list names the commands it may call, out of this list and
   the piece commands whose access includes `service`. The roles plan adds
   one engine command, `release`, in its own unit, and gives it to the
-  sheepdog (roles plan WS-7b, row 120):
+  stall watch (roles plan WS-7b, row 120):
   - `subscribe`, seeing every event, as the owner does;
   - `prompt`, to any agent, as a nudge. The text is wrapped as data, a
     leading `/` is escaped as it is for agents' prompts, and the sender is
@@ -719,7 +719,7 @@ as `HarnessChanged`. Its access is `owner`, `service` and `agent`.
 The reply carries the event with its envelope, including `occurredAt` and the
 sequence (row 176). So a piece can read an event's time here, which a reducer may not
 hold, because a projection passes `occurredAt: 0` (`routing/waits.ts:28-31`). The
-roles' sheepdog re-arms its timers this way after a restart. It calls `client.event`
+roles' stall watch re-arms its timers this way after a restart. It calls `client.event`
 as the service caller that this table already allows, through its entry in the service
 list, and this gives it no new reach, because it already sees every event.
 
@@ -924,7 +924,7 @@ setting. Its defaults are:
 | Kind | Raised when | Pushed to the phone by default |
 | --- | --- | --- |
 | `roles.stall` | A stall has reached the owner | Yes. Research item 11 names it. |
-| `roles.replace` | The sheepdog asks the owner to replace a worker | Yes. It needs an owner decision. |
+| `roles.replace` | The stall watch asks the owner to replace a worker | Yes. It needs an owner decision. |
 | `roles.runaway` | Work has run far past its expected length | No. It is shown in the clients. |
 | `roles.rule-first-use` | A standing permission rule is used for the first time | Yes. An automatic allow is security-relevant, so the owner sees its first use. |
 
@@ -2473,8 +2473,8 @@ The foundry roles planner listed six needs, in
 | --- | --- | --- |
 | 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees only the agents it may read by the read rule (section 3, lead ruling L29), not its whole subtree, so the roster never shows more than `subscribe` does. |
 | 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
-| 3 | A narrow caller kind for LGTM Studio's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped credential was not used: it would put a token for an in-process service on disk for no gain. The roles plan adds `release` for the sheepdog in its own unit (row 120). |
-| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` (section 1). `roles.rules.add` works from a logged-in dashboard, as the owner, and stays refused for agents and services (rows 29, 186). |
+| 3 | A narrow caller kind for LGTM Studio's own services (the stall watch, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped credential was not used: it would put a token for an in-process service on disk for no gain. The roles plan adds `release` for the stall watch in its own unit (row 120). |
+| 4 | Owner commands for the roles' settings: standing rules, the stall watch's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` (section 1). `roles.rules.add` works from a logged-in dashboard, as the owner, and stays refused for agents and services (rows 29, 186). |
 | 5 | Alert kinds the roles raise | Taken in: four namespaced kinds with default phone settings (section 4, row 28). A notice for a lead stays on the board. |
 | 6 | Subscribe filters by group and by event kind | Taken in: `client.subscribe` filters by agent, group and event kind (section 3, row 30). |
 

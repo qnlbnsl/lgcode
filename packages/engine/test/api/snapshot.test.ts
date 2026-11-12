@@ -102,7 +102,7 @@ it("1.7 before, during and after COMMIT/publication, snapshot plus catch-up incl
     const log = yield* EventLog;
     const views = yield* Views;
     // Let the required startup write finish before holding a fixture commit.
-    yield* subscribe(0).pipe(Stream.filter((row) => row.event._tag === "roles.SheepdogBaseline"), Stream.take(1), Stream.runDrain);
+    yield* subscribe(0).pipe(Stream.filter((row) => row.event._tag === "roles.StallWatchBaseline"), Stream.take(1), Stream.runDrain);
     yield* log.append(owner, freshRequest(), "1".repeat(64), [asEvent({ _tag: "client.FixtureRecorded", id: "a", text: "A" })], {});
     const before = yield* snapshot(owner, lists);
     const entered = yield* Deferred.make<void>();

@@ -13,7 +13,7 @@ registerRebuildCheck({ noLog: true });
 it("SN01 a real client.snapshot has the owner summary and leaves the roles section out for an agent", async () => run(Effect.gen(function* () {
   const agent = yield* seedAgent({ id: "worker" });
   yield* appendSetup([fileEvent("Private advice must not enter the summary."),
-    event({ _tag: "roles.SettingsChanged", settings: { sheepdog: false, limits: { stallMinutes: 20 } } }),
+    event({ _tag: "roles.SettingsChanged", settings: { stallWatch: false, limits: { stallMinutes: 20 } } }),
     event({ _tag: "roles.Snoozed", group: "build", until: 1_900_000_000_000 }),
     action("StallSeen"), action("StallSeen", { occurrence: 2, sourceSequence: 3 }), action("RunawayReported"),
   ]);
@@ -22,7 +22,7 @@ it("SN01 a real client.snapshot has the owner summary and leaves the roles secti
   const summary = snapshot.roles as RolesSection;
   expect(summary).toMatchObject({
     roleFile: { name: "Build team", roleFileHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
-    settings: { sheepdog: false, limits: { stallMinutes: 20 } },
+    settings: { stallWatch: false, limits: { stallMinutes: 20 } },
     snoozes: { items: [{ group: "build", until: 1_900_000_000_000 }], truncated: false },
     matters: { items: expect.arrayContaining([{ key: "stall:worker", kind: "roles.stall", agentId: "worker" }, { key: "runaway:worker", kind: "roles.runaway", agentId: "worker" }]), truncated: false },
     agents: { truncated: false },
@@ -41,7 +41,7 @@ it("SN01 services receive the bounded owner summary and a stopped agent's histor
     event({ _tag: "AgentStopped", agentId: "old" }), start("new"), action("CacheFlushed", { agentId: "new" })]);
   const summary = section(view);
   expect(summary.agents.items.map((row) => row.agentId)).toEqual(["new"]);
-  expect(section(view, { _tag: "service", service: "roles.sheepdog" })).toEqual(summary);
+  expect(section(view, { _tag: "service", service: "roles.stallWatch" })).toEqual(summary);
   expect(engineLists.snapshotSections.roles({ _tag: "agent", agentId: "new" as never }, view)).toBeUndefined();
 });
 
@@ -77,7 +77,7 @@ it("SN02 exactly the list maxima do not claim truncation when every item fits", 
 
 const crowdedRoles = (): Event[] => [
   fileEvent("A full role file's advice stays out of a summary."),
-  event({ _tag: "roles.SettingsChanged", settings: { sheepdog: true, limits: { turnMinutes: 180 } } }),
+  event({ _tag: "roles.SettingsChanged", settings: { stallWatch: true, limits: { turnMinutes: 180 } } }),
   ...snoozes(200),
   ...Array.from({ length: 256 }, (_, index) => {
     const id = `agent-${String(index).padStart(3, "0")}-${"界".repeat(12)}`;
@@ -92,7 +92,7 @@ it("SN02 encoded byte pressure preserves file/settings/open matters and snoozes 
   const events = [...crowdedRoles(), start("owner-matter"), action("StallSeen", { agentId: "owner-matter" })];
   const summary = section(fold(events));
   expect(summary.roleFile?.name).toBe("Build team");
-  expect(summary.settings).toMatchObject({ sheepdog: true, limits: { turnMinutes: 180 } });
+  expect(summary.settings).toMatchObject({ stallWatch: true, limits: { turnMinutes: 180 } });
   expect(summary.matters).toEqual({ items: [{ kind: "roles.stall", key: "stall:owner-matter", agentId: "owner-matter" }], truncated: false });
   expect(summary.snoozes.items).toHaveLength(200);
   expect(summary.snoozes.truncated).toBe(false);

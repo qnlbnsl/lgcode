@@ -9,7 +9,7 @@ afterEach(async () => { await stopAllServices(); });
 
 for (const checkpoint of ["trigger", "reminder-queued", "reminder-accepted", "answer-turn-end", "answer-turn-error", "notice-queued", "notice-accepted"] as const) {
   scenario(`SIGKILL after the complete ${checkpoint} batch recovers each board duty without another logical reminder or notice`, (w) => Effect.gen(function* () {
-    yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { sheepdog: false } } as never);
+    yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { stallWatch: false } } as never);
     const originalGate = `${w.root.root}/original`;
     const reminderGate = `${w.root.root}/reminder`;
     const noticeGate = `${w.root.root}/notice`;

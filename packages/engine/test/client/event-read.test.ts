@@ -14,7 +14,7 @@ it.each(["owner", "service"])("3.8 %s event read returns a whole unscoped event 
   if (kind === "owner") reply = yield* read("client.event", { sequence: source!.sequence });
   else {
     const handler = yield* CommandHandler;
-    const input = yield* handler.input({ _tag: "service", service: "roles.sheepdog" });
+    const input = yield* handler.input({ _tag: "service", service: "roles.stallWatch" });
     const reader = engineLists.reads["client.event"];
     expect(reader, "client.event must provide an in-process service read").toBeTypeOf("function");
     const result = yield* reader!(input, { requestId: "service-event", sequence: source!.sequence }) as Effect.Effect<any, any, any>;

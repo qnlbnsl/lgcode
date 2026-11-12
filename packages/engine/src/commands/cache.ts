@@ -6,9 +6,9 @@ import { canRead } from "../board/access.ts";
 import { boardView, isUnread } from "../board/wake.ts";
 import type { EngineLists } from "../pieces/lists.ts";
 import type { RolesView } from "../roles/view.ts";
-import { cacheAction } from "../roles/sheepdog/rules/cache.ts";
-import { resolveSettings, roleSettings } from "../roles/sheepdog/settings.ts";
-import { actionRequestId } from "../roles/sheepdog/requests.ts";
+import { cacheAction } from "../roles/stall-watch/rules/cache.ts";
+import { resolveSettings, roleSettings } from "../roles/stall-watch/settings.ts";
+import { actionRequestId } from "../roles/stall-watch/requests.ts";
 import { withWaitChecks } from "../routing/waits.ts";
 import { callerKey } from "../identity/caller.ts";
 import { checkPieceBatch } from "./pieceBatch.ts";
@@ -29,7 +29,7 @@ export const lastEnd = (snapshot: Snapshot, agentId: string) => snapshot.threads
 export const cacheActionFor = (snapshot: Snapshot, target: CacheTarget, now: number, lists: EngineLists, deliveryId?: string) => {
   const agent = snapshot.agents[target.agentId];
   const roles = snapshot.roles as RolesView;
-  if (agent === undefined || roles.settings.sheepdog === false) return;
+  if (agent === undefined || roles.settings.stallWatch === false) return;
   const limits = resolveSettings(roles.settings, roleSettings(roles.file, agent.role));
   const reader = { _tag: "agent", agentId: target.agentId as AgentId } as const;
   return cacheAction({ expiry: target.expiry, now, armed: true, contextTokens: target.contextTokens,
@@ -50,13 +50,13 @@ export const cacheActionFor = (snapshot: Snapshot, target: CacheTarget, now: num
   });
 };
 
-// Called only through the sheepdog's internal service entry point. Eligibility,
+// Called only through the stall watch's internal service entry point. Eligibility,
 // unread state, planning, and acceptance all share the writer transaction.
 export const acceptCache = (runtime: Runtime, lists: EngineLists, target: CacheTarget) => runtime.log.transact((append) => Effect.gen(function* () {
   const snapshot = yield* runtime.views.snapshot;
   const action = cacheActionFor(snapshot, target, yield* Clock.currentTimeMillis, lists);
   if (action === undefined) return;
-  const caller = { _tag: "service", service: "roles.sheepdog" } as const;
+  const caller = { _tag: "service", service: "roles.stallWatch" } as const;
   const requestId = actionRequestId({ rule: "cache", subject: target.agentId, triggerSequence: target.sequence,
     kind: "accept", recipient: target.agentId, occurrence: 1 }) as RequestId;
   const receipts = yield* runtime.sql<{ request_id: string }>`SELECT request_id FROM receipts WHERE caller = ${callerKey(caller)} AND request_id = ${requestId}`;

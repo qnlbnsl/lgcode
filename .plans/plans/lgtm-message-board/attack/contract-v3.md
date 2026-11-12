@@ -157,7 +157,7 @@ A post has:
   reason.
 - **LGTM Studio as author** (roles request 4: **accepted**; the "needs-reply
   kind" part is already the `reply` field, so no kind label is added). A
-  post from one of LGTM Studio's own services, such as `roles.sheepdog`, records
+  post from one of LGTM Studio's own services, such as `roles.stallWatch`, records
   that service's name as its author. Services exist only inside LGTM Studio's
   process and call commands through the extension point's in-process path
   (client API contract, section 2, "Services"). No socket or network caller
@@ -302,7 +302,7 @@ delivery of its own that is still queued (seam item 13).
 
 ## For LGTM Studio's own services
 
-A roles service, such as the sheepdog, uses the board through the
+A roles service, such as the stall watch, uses the board through the
 extension point's in-process command path, under its own service name:
 
 - `board.post`, to post a notice. Its author is the service's name.
@@ -332,7 +332,7 @@ end early.
   from `board.status`, which already says whom each open post waits on.
 - **Tracking prompt-cache deadlines** (part of roles request 6:
   **refused**). Cache timing is harness-specific and belongs to the roles
-  plan. The board gives the sheepdog `board.flush` to act on it.
+  plan. The board gives the stall watch `board.flush` to act on it.
 - **Kind labels** such as question, blocked, hand-off and done (part of
   roles request 4). A kind list is a workflow vocabulary. The `reply` field
   carries the only thing the wake rule needs. Kinds are recorded as a
