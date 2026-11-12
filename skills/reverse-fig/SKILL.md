@@ -71,10 +71,13 @@ Options:
 - `PLAYWRIGHT_MODULE` points at another Playwright copy, and `REVERSE_FIG_OPENPENCIL` at another
   `openpencil.js`.
 
-LGTM Studio's own profile, `profiles/lgtm-mock.mjs`, runs against the web mock in `design/`, served
-on port 4178. Run it from the repository root, and it writes
+LGTM Studio's own profile, `profiles/lgtm-mock.mjs`, runs against the web mock in `design/mock/`,
+with the `design/` folder served on port 4178. Run it from the repository root, and it writes
 `design/lgtm.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
-percent, after the faults below were fixed in the scripts.
+percent, after the faults below were fixed in the scripts. On 2026-11-12 the profile moved from the
+removed `workbench.html` to `design/mock/`, with 32 variants of 8 components. Its first pass
+reached 15 of 32 within 3 percent. The rest differ in their text, which the known losses below
+describe, and no tuning pass has been run on them yet.
 
 ## Where a profile lives
 

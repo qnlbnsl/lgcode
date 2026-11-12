@@ -13,7 +13,7 @@ cd design
 python3 -m http.server 4178 --bind 127.0.0.1
 ```
 
-Then open `http://127.0.0.1:4178/mock/`. The mock has no build step and loads nothing from
+Then open `http://127.0.0.1:4178/`, which opens the mock at `http://127.0.0.1:4178/mock/`. The mock has no build step and loads nothing from
 the network.
 
 Changes you make stay until you reload the page. The colour mode, the density, and the
@@ -27,8 +27,8 @@ This folder is also a local npm package named `lgtm`, so another project can loa
 whole website and build on it. It is the basic version of LGTM Studio. The package has no build step and no dependencies.
 
 - Install it by path, for example `npm install ../lgtm-studio/design/mock`. npm links the
-  folder rather than copying it, so the links to `design/fonts/` and
-  `third_party/htm-preact/` keep working.
+  folder rather than copying it, so the links to `design/fonts/`,
+  `third_party/htm-preact/` and `third_party/codemirror/` keep working.
 - Load the stylesheets that `index.html` loads, from the package's `css/` folder.
 - Import `mount` from `lgtm` and call it with an empty element. It seeds the sample
   data, starts the simulation, renders the website, and returns `{ store, act }`.
@@ -68,7 +68,7 @@ This folder's own page starts the mock the same way, through `js/main.js`.
 | Messages, the agents' message board | `/p/console/messages` |
 | Agents, the roster by situation | `/p/console/agents` |
 | Terminal | `/p/console/terminal` |
-| Files, the inspected worktree as a folder tree and a read-only file view | `/p/console/files`, and one file at `/p/console/files?f=README.md` |
+| Files, the inspected worktree as a folder tree and a small editor that saves and commits one file | `/p/console/files`, and one file at `/p/console/files?f=README.md` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
 | Repository design page, the design file on a canvas | `/r/lgtm/design`, and `/r/<repository>/design/<category>/<item>` |

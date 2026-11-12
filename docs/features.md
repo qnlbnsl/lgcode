@@ -293,7 +293,7 @@ an agent has stopped and nudges it back, or tells its lead.
   Installation asks which folder contains the owner's repositories.
   Repository setup stays on the host. The mock uses known sample paths.
 - **Repositories contain projects** (agreed, 2026-11-05; mocked in
-  `design/workbench.html`). Repositories are the top level of navigation.
+  `design/mock/`). Repositories are the top level of navigation.
   Each repository has a page listing its projects and an Add Project
   action. Multiple projects can work within the same repository.
 - **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
@@ -363,7 +363,8 @@ an agent has stopped and nudges it back, or tells its lead.
 
 Agreed on 2026-11-06 and represented in the browser mock. These are existing
 product capabilities, not permission to remove them during implementation.
-The source-to-mock mapping is in `design/FEATURE-PARITY.md`.
+The source-to-mock mapping was `design/FEATURE-PARITY.md`. It was removed with the older
+workbench on 2026-11-12, and it remains in the git history.
 
 - Login, logout, and session expiry stay available. Rejected login and an
   unavailable session have explicit recovery states. Entered secrets clear
@@ -731,7 +732,8 @@ service through the client API, and the service asks the machine. The rules are 
 - Images, such as SVG and PNG files, are returned as images and shown as pictures.
 - Every path is checked on the machine against the worktree's folder, after symbolic
   links are resolved, so a request cannot read a file outside the worktree.
-- The tab is read-only. Editing is not part of this feature.
+- The owner can edit a text file, save it, and commit it. "Simple editing in the Files
+  tab" below describes how.
 - When the machine is offline, the tab keeps its structure and says so. It shows the
   files again when the machine reconnects.
 - The tab follows the "Inspecting" choice in the top bar. A branch with no worktree yet
@@ -752,9 +754,13 @@ License:
 Highlighting runs in each client, so the service sends plain text and stays simple. The
 licences of the two Pierre packages have not been read yet, and they must be read before
 any code is copied. Monaco, the editor inside Visual Studio Code, was not chosen, because
-it does not support phones. CodeMirror 6 is the fallback if the Pierre packages do not
-fit, since it works on the web and in a phone's web view. The mock uses a small
-hand-written highlighter in place of either library, because the mock has no build step.
+it does not support phones.
+
+The owner chose CodeMirror 6 for the Files tab on 2026-11-12, because the tab now edits
+files and the Pierre packages only display them. CodeMirror 6 works on the web and in a
+phone's web view. The mock uses it, from one bundle in
+[third_party/codemirror/](../third_party/codemirror/README.md), because the mock has no
+build step. The Pierre packages remain the choice for the diffs in the Git tab.
 
 ## Plans written as HTML pages
 
@@ -795,3 +801,125 @@ The rules the mock follows are these:
 The service must apply the same rules to images that other clients send at full size. The
 common server image library, sharp, cannot read HEIC in its standard build, so the service
 needs a separate converter for it.
+
+## Pushing a finished project and opening its pull request
+
+The owner raised this on 2026-11-12 and decided its shape the same day. It is
+**agreed**, and it is not built in the engine or the mock. Agents merge their work
+locally, from an agent's worktree into its team branch and from the team branch into the
+project branch. Nothing reaches the remote during that work. When the project branch
+holds everything, LGTM Studio pushes that one branch and opens a pull request.
+
+LGTM Studio is meant to be the one place where the work happens, so the merge button
+lives in LGTM Studio, not only on the code host. The steps are these:
+
+- **The project lead asks.** When every team branch is integrated, every worktree of
+  the project is clean, and no merge is in progress, the project lead asks the owner a
+  question. It says that everything is ready, summarises where the work stands, and asks
+  whether to start a pull request. The question carries an "Open pull request" button.
+- **The base can be changed.** A small menu next to the button chooses the branch the
+  pull request merges into. By default it is the branch that the project's worktree was
+  made from.
+- **Push and open.** LGTM Studio pushes only the project branch. Team and agent
+  branches stay local. It then opens the pull request through the code host, such as
+  GitHub, with a title and description that the owner can edit.
+- **Review in the Git tab.** To read the pull request's changes, the owner opens the
+  project's Git tab. The project lead stays open in the side panel meanwhile.
+- **Watch.** The project shows the pull request's number, a link, the state of its
+  checks, and its review state. Later commits on the project branch, such as fixes
+  after review, are pushed to the same pull request.
+- **The final merge goes through the project lead.** The owner approves the merge in
+  LGTM Studio, and the project lead carries it out. A merge made on the code host is
+  noticed, and the project is marked merged.
+- **No remote.** A repository without a remote keeps the local merge that the mock
+  shows today.
+
+The fix-sprint exception in rule 7 of AGENTS.md could use the same path, with the pull
+request merged automatically after a passing full test run.
+
+## Simple editing in the Files tab
+
+The owner raised this on 2026-11-12 and decided its shape the same day. It is
+**agreed**, and the mock shows it. The engine does not have it yet. The Files tab is a
+small editor for minor changes, without autocomplete or other language features. The
+owner edits only one file at a time. Anything bigger is work for the project lead, and the
+owner asks the lead to do it.
+
+- The editor is CodeMirror 6, as "Which component shows the files" above says.
+- An edited file shows a dot in the folder tree until it is saved.
+- A "Save" button at the top of the file saves it. The keyboard shortcut is Control+S,
+  or Command+S on a Mac.
+- A saved file is an uncommitted change in the inspected worktree. The tree marks it as
+  changed, and the Git tab shows its diff.
+- After a save, a "Commit" button appears at the top of the file. It opens a small dialog
+  for the commit message, and it commits that one file as the owner. The message can be
+  written by the cheap model, as in the Git tab.
+- The base branch is read-only, because agents never edit it directly.
+- When the worktree's agent is working, the tab says so above the file. After a save, that
+  agent is told which file the owner changed.
+- A save carries the version of the file that the owner opened. If an agent changed the
+  file since then, the save is refused and the owner sees both versions. The mock does not
+  show this case.
+- Writes follow the same path check as reads, and nothing under `.git` can be written.
+- Every action is a client API call, as rule 5 of AGENTS.md requires.
+
+## A database tab with one keeper of migration numbers
+
+The owner raised this on 2026-11-12 and decided its shape the same day. It is
+**agreed**, and it is not built in the engine or the mock.
+
+### Where the databases are listed
+
+A repository lists its databases in its LGTM Studio config file, in the repository's
+`.lgtm` folder. Each entry names the database, its kind, such as PostgreSQL or Firestore,
+and where its schema and migrations live. When an agent sets up a new database, the entry
+is written into the config file, so the list stays current. How the agent's change reaches
+the config file is not decided yet, because agents cannot write to `.lgtm` today.
+
+A project shows a "Database" tab only when its config file lists at least one database.
+
+### What the tab shows
+
+When the config file lists more than one database, a small bar at the top of the tab
+switches between them, with a menu. With one database, the bar is hidden. The view
+depends on the kind of database, and it stays simple:
+
+- **Relational databases**, such as PostgreSQL and SQLite, show their tables, columns,
+  keys and indexes, and the list of migrations.
+- **Document databases**, such as Firestore and MongoDB, show their collections, the
+  fields their documents usually carry, their indexes, and their security rules. Their
+  migrations are usually scripts that rewrite data, and those are listed too.
+
+Other kinds, such as key-value stores, wait until a project needs them.
+
+### One keeper hands out migration numbers
+
+Parallel agents that each write a migration pick the same next number, and the merges
+then conflict. LGTM Studio's service keeps one counter for each migrations folder. An
+agent asks the service for a number before it writes a migration. No two branches hold
+the same number.
+
+The config file only lists the databases. The service tracks the migrations in its own
+local SQLite database, where it records these things:
+
+- which number was given to which agent, on which branch;
+- which numbers are already in the base branch;
+- which numbers are still being worked on;
+- whether each migration's tests have passed, and on which commit.
+
+A number is a reservation until its migration reaches the base branch. Branches often
+merge in a different order from the order they reserved in. For example, branch 1
+reserves 123 and branch 2 reserves 124, while the base branch ends at 122. If branch 2
+is ready first, it merges as 123, the next number after the base branch. The service
+then tells branch 1 to renumber to 124 and to run its tests again on the new base. So
+the final numbers follow the order of the merges.
+
+Renumbering depends on the migration tool:
+
+- Tools that order migrations by a number in the file name, such as Flyway and
+  golang-migrate, need a rename. LGTM Studio can do that rename itself.
+- Tools that chain each migration to its parent, such as Alembic and Django, need the
+  parent reference rewritten. The agent that owns the branch does this.
+- Tools that name migrations by timestamp, such as Rails, Prisma and Drizzle, rarely
+  collide on names. They can still apply migrations in an order that nobody tested, so
+  the rerun of the tests on the new base still applies.

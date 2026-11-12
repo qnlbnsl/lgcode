@@ -1,15 +1,20 @@
-// Reverse Fig profile for LGTM Studio's web mock, `design/workbench.html`.
-// Serve that folder on port 4178 first:  python3 -m http.server 4178 --bind 127.0.0.1
-const sidebar = '<aside class="sidebar" style="position:static;display:block;width:248px;height:auto;padding:4px 0">{slot}</aside>';
-const statusDot = (cls) => `<span class="dot ${cls}" style="display:block"></span>`;
-const agentRow = (dot, label) => `<button class="agent-link"><span class="dot ${dot}"></span><span class="agent-name">Rowan</span><small>${label}</small></button>`;
+// Reverse Fig profile for LGTM Studio's web mock in `design/mock/`.
+// Serve the design folder on port 4178 first:  cd design && python3 -m http.server 4178 --bind 127.0.0.1
+// The snippets below copy the mock's own markup, so they use its class names from
+// `design/mock/css/base.css`. Agents are named by their role, as everywhere in LGTM Studio.
+const sidebar = '<aside class="sidebar" style="position:static;display:block;width:264px;height:auto;padding:4px 0">{slot}</aside>';
+const statusDot = (cls) => `<i class="dot ${cls}" style="display:block"></i>`;
+const agentRow = (dot, label, state) => `<div class="tree-row agent" style="padding-left:46px"><span class="twist none"></span>`
+  + `<a href="#"><span class="avatar sm"><i class="dot ${dot}"></i></span><span class="label">${label}</span></a>`
+  + (state ? `<span class="state warn">${state}</span>` : '') + '</div>';
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 export default {
   name: 'lgtm-mock',
-  url: process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html',
+  url: process.env.MOCK_URL || 'http://127.0.0.1:4178/mock/#/home',
   output: 'design/lgtm.fig',
   work: '.reverse-fig/lgtm-mock',
-  ready: (page) => page.waitForFunction(() => window.lgtmReady),
+  ready: (page) => page.waitForSelector('.sidebar'),
   background: 'var(--color-bg)',
   tokens: {
     prefix: '--color-',
@@ -24,45 +29,49 @@ export default {
   components: [
     {
       name: 'Button',
-      variants: ['primary', 'secondary'].flatMap((kind) => [
-        { props: { Kind: kind[0].toUpperCase() + kind.slice(1), State: 'Default' }, html: `<button class="${kind}">New project</button>` },
-        { props: { Kind: kind[0].toUpperCase() + kind.slice(1), State: 'Hover' }, html: `<button class="${kind}">New project</button>`, force: ['hover'] },
-        { props: { Kind: kind[0].toUpperCase() + kind.slice(1), State: 'Disabled' }, html: `<button class="${kind}" disabled>New project</button>` },
+      variants: [['primary', 'btn primary'], ['secondary', 'btn'], ['ghost', 'btn ghost']].flatMap(([kind, cls]) => [
+        { props: { Kind: cap(kind), State: 'Default' }, html: `<button type="button" class="${cls}">New project</button>` },
+        { props: { Kind: cap(kind), State: 'Hover' }, html: `<button type="button" class="${cls}">New project</button>`, force: ['hover'] },
+        { props: { Kind: cap(kind), State: 'Disabled' }, html: `<button type="button" class="${cls}" disabled>New project</button>` },
       ]),
     },
     {
       name: 'Status dot',
-      variants: [['Working', ''], ['Waiting', 'wait'], ['Idle', 'idle'], ['Failed', 'error'], ['Stopped', 'stopped']]
+      variants: [['Working', 'working'], ['Waiting', 'waiting'], ['Idle', 'idle'], ['Failed', 'failed'], ['Stopped', 'stopped'], ['Starting', 'starting']]
         .map(([status, cls]) => ({ props: { Status: status }, html: statusDot(cls) })),
     },
     {
       name: 'Agent row',
       hug: false,
       context: sidebar,
-      variants: [['Waiting', 'wait', 'Needs answer'], ['Running', '', 'Working'], ['Idle', 'idle', 'Idle']]
-        .map(([status, dot, label]) => ({ props: { Status: status }, html: agentRow(dot, label) })),
+      variants: [['Waiting', 'waiting', 'Builder 2', 'Needs approval'], ['Working', 'working', 'Builder 1', ''], ['Idle', 'idle', 'Test runner', '']]
+        .map(([status, dot, label, state]) => ({ props: { Status: status }, html: agentRow(dot, label, state) })),
     },
     {
       name: 'Connection status',
-      variants: [['Live', '', 'Live'], ['Waiting', 'wait', 'Reconnecting'], ['Offline', 'idle', 'Offline']]
-        .map(([status, dot, label]) => ({ props: { Status: status }, html: `<span class="connection-status"><span class="dot ${dot}"></span><span>${label}</span></span>` })),
+      variants: [['Live', '', 'working', 'Live'], ['Reconnecting', 'reconnecting', 'waiting', 'Reconnecting'], ['Offline', 'offline', 'failed', 'Offline']]
+        .map(([status, cls, dot, label]) => ({ props: { Status: status }, html: `<button type="button" class="live ${cls}"><i class="dot ${dot}"></i><span>${label}</span></button>` })),
     },
     {
       name: 'Segmented control',
-      variants: [{ props: { Selected: 'First' }, html: '<span class="segmented"><button aria-pressed="true">Unified</button><button aria-pressed="false">Split</button></span>' }],
+      variants: [{ props: { Selected: 'First' }, html: '<div class="seg" role="tablist"><button type="button" aria-pressed="true">Changes<span class="count">8</span></button><button type="button" aria-pressed="false">History</button></div>' }],
     },
     {
       name: 'Inline link',
       variants: [
-        { props: { State: 'Default' }, html: '<button class="inline-link">Open sprint board →</button>' },
-        { props: { State: 'Hover' }, html: '<button class="inline-link">Open sprint board →</button>', force: ['hover'] },
+        { props: { State: 'Default' }, html: '<a class="link" href="#">Open the history</a>' },
+        { props: { State: 'Hover' }, html: '<a class="link" href="#">Open the history</a>', force: ['hover'] },
       ],
     },
-    { name: 'Attention number', variants: [{ props: {}, html: '<span class="attention-number">3</span>' }] },
     {
-      name: 'Task state',
-      variants: [['Up next', 'queue'], ['In progress', 'active'], ['In review', 'review'], ['Done', 'done'], ['Blocked', 'blocked']]
-        .map(([state, cls]) => ({ props: { State: state }, html: `<span class="task-state ${cls}" style="display:block"></span>` })),
+      name: 'Count',
+      variants: [['Default', ''], ['Warning', 'warn'], ['Error', 'error']]
+        .map(([tone, cls]) => ({ props: { Tone: tone }, html: `<span class="count ${cls}">3</span>` })),
+    },
+    {
+      name: 'Badge',
+      variants: [['Default', ''], ['Warning', 'warn'], ['Error', 'error'], ['Success', 'success'], ['Info', 'info']]
+        .map(([tone, cls]) => ({ props: { Tone: tone }, html: `<span class="badge ${cls}">Needs answer</span>` })),
     },
   ],
 };

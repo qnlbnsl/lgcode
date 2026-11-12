@@ -223,31 +223,3 @@ export function ${name.replace(/^\w/, (c) => c.toLowerCase()).replace(/[-.](\w)/
 }
 export function fileText(path) { return TEXT[path] ?? bodyFor(path); }
 export function svgUrl(path) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fileText(path)); }
-
-// ---- a small highlighter ----------------------------------------------------------------
-// It marks comments, strings, keywords, numbers and tags well enough to read. The product
-// uses a real highlighter; see docs/features.md, "A file explorer in the Git view".
-const KW = /^(import|from|export|default|function|return|const|let|var|if|else|for|of|in|new|async|await|type|interface|readonly|extends|try|catch|throw|class|true|false|null|undefined)$/;
-export function tokens(line, ext) {
-  const out = []; let i = 0;
-  const push = (cls, text) => { if (text) out.push([cls, text]); };
-  if (ext === 'md') {
-    if (/^#{1,6} /.test(line)) return [['kw', line]];
-    if (/^```/.test(line)) return [['cm', line]];
-    return line.split(/(`[^`]+`|\*\*[^*]+\*\*)/).map((t) => [t.startsWith('`') ? 'str' : t.startsWith('**') ? 'tag' : '', t]);
-  }
-  const re = ext === 'css'
-    ? /(\/\*.*?\*\/|\/\*.*$)|("[^"]*"|'[^']*')|(--[\w-]+|#[0-9a-f]{3,8}\b)|(\b\d+(?:\.\d+)?(?:px|%|vh|vw|ms)?\b)|(@[\w-]+|[.#][\w-]+(?=[^{}]*\{))/gi
-    : /(\/\/.*$|\/\*.*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b[A-Za-z_]\w*\b)|(\b\d[\d_]*(?:\.\d+)?\b)|(<\/?[A-Za-z][\w.]*|\/?>)/g;
-  let m;
-  while ((m = re.exec(line))) {
-    push('', line.slice(i, m.index)); i = m.index + m[0].length;
-    if (m[1]) push('cm', m[0]);
-    else if (m[2]) push('str', m[0]);
-    else if (m[3]) push(ext === 'css' ? 'tag' : KW.test(m[0]) ? 'kw' : /^[A-Z]/.test(m[0]) ? 'ty' : '', m[0]);
-    else if (m[4]) push('num', m[0]);
-    else if (m[5]) push(ext === 'css' ? 'kw' : 'tag', m[0]);
-  }
-  push('', line.slice(i));
-  return out;
-}

@@ -1,347 +1,59 @@
-# LGTM Studio app mockups
+# LGTM Studio's design folder
 
-## The rebuilt mock is in `mock/`, started on 2026-11-10
+This folder holds the working mock of the LGTM Studio web page, the design contract it
+follows, and the design file.
 
-The owner asked on 2026-11-10 for the mock to be rebuilt as a working wireframe of the whole
-product. That rebuild lives in [mock/](mock/README.md). Serve this directory with
-`python3 -m http.server 4178 --bind 127.0.0.1`, then open `http://127.0.0.1:4178/mock/`.
-The older `workbench.html` described below is kept until the owner approves the rebuild.
+## Opening the mock
 
-## The older workbench
+Serve this folder, then open its address. The address opens the mock straight away.
 
-Serve this directory with `python3 -m http.server 4178 --bind 127.0.0.1`, then open
-`http://127.0.0.1:4178/workbench.html`. Opening the file directly no longer works, because
-the page reads its data with `fetch`. Add `?sample=heavy` to the address to load 10 projects,
-31 agents, a long lead conversation, and a full request queue. The Design notes button in the
-sidebar links to the same sample.
+```
+cd design
+python3 -m http.server 4178 --bind 127.0.0.1
+```
+
+Then open `http://127.0.0.1:4178/`. The mock itself lives at `http://127.0.0.1:4178/mock/`,
+and [mock/README.md](mock/README.md) lists its screens and how to use it as a package.
 
 To open the mock from another computer or a phone, use `--bind 0.0.0.0` and the server's
-address. That address has no password, so anyone on the network can open it. The server shares
-this whole folder, which includes `data/prod/` if a real export exists, so do not bind to the
-network while an export is there.
+address. That address has no password, so anyone on the network can open it. The server
+shares this whole folder, which includes `data/prod/` if a real export exists, so do not bind
+to the network while an export is there.
 
-This is an exploratory browser prototype. It does not connect to the engine. Its data has the
-shape of the engine's database, and functions named after the engine's commands hand it to
-the page. [data/README.md](data/README.md) explains the files, the functions, and how to load
-a real export. Sending a message or making a decision changes only this page's memory, and
-refreshing resets the work. The selected color mode is remembered in this browser when storage
-is available. The first visit follows the device setting.
+## What is in this folder
 
-The page has three parts: `workbench.html` holds the markup and styles, `workbench.js` holds
-the app, and `data/stubs.js` holds the data functions.
+| Path | What it holds |
+|---|---|
+| `index.html` | The front door. It sends the browser on to `mock/`. |
+| `mock/` | The working mock of the whole web page, rebuilt from 2026-11-10. |
+| `DESIGN.md` | The design contract: colours, type, density, and the rules the screens keep. |
+| `tokens.css` | The approved colour and type tokens for light and dark mode. |
+| `fonts/` | Links to Inter and JetBrains Mono in `third_party/`. |
+| `lgtm.fig` | The design file, which OpenPencil opens. |
+| `openpencil/` | The OpenPencil editor that the mock's Design tab shows. |
+| `data/` | Sample events in the engine's database shape. A contracts test reads them. |
 
-The owner requested the working app on 2026-11-05. A public marketing site
-is outside this pass. LGTM Studio is a separate product inspired by Herdr
-Synapse and T3 Code.
+## The older workbench was removed
 
-## What to try
-
-Open the first run with `?sample=first`, or from the First run links in Design notes. The links
-cover one or two signed-in harnesses, only Codex, signed out, nothing installed, no repositories,
-and a computer that could not be read. Add `&reset=1` to start again from the login page.
-After setup, send the lead a message without the word screen or design. The lead asks who the
-project is for, and that first waiting question offers phone notifications, with Set up and Not
-now.
-
-- Start on Home. Needs attention gathers requests across projects, failed starts first and
-  then the longest wait. Sort switches to Newest first. A wait of an hour or more is amber.
-  Questions and Approvals support answers in place. Their tab counts show open requests, and
-  answered ones fold under Answered with Allowed, Denied, or Answered and the time.
-  Each request is one line; use its chevron or click the row to expand its
-  details underneath. Click again to collapse. There is no split detail pane.
-  An approval's row shows its command. Expanded, it shows Command and Folder, with the
-  identifiers under Details. Choose Filter for the repository, project, agent, and machine
-  filters. Each set filter shows as a chip that removes it. Narrow the window below 900
-  pixels to see the kind start each row's second line.
-  All projects opens each project's board. The bell links to the full queue.
-- In `?sample=heavy`, the Merge row has waited 1 hour and 25 minutes for the owner.
-- Open Rowan's question, Iris's approval, and Ash's failed start in their threads. All three
-  are the same block with a left rule and a label, amber for the first two and red for the
-  failed start.
-- Select a repository name to see its projects. Use its chevron to expand
-  the tree. Add Project starts a named project within a known repository.
-- Select Workspace app to open its sprint board with Sage in the right
-  chat panel. Agent recovery has Vale, and Desktop companion has Nico.
-  Each project has exactly one lead. There is no Board row in the tree.
-- The lead button at the right end of the tab row closes and reopens the lead panel. On smaller
-  screens it opens as a drawer, and Escape closes the drawer. The Chat tab opens the full
-  conversation, preserving its messages and draft.
-- The branch appears once, in the top bar, after Inspecting. Inspect another worktree, and
-  the list still marks the assigned one.
-- On the board, Thread view and Narrow-screen pass lead with an amber line and an amber left
-  rule, because a question and two approvals wait for you. Select Thread view: its status is
-  under the title, and Rowan's question and Iris's approval come first, answerable in place.
-  SH-15 says "Blocked by an approval". Select SH-15: Talk to Iris sits at the top right, and
-  each activity step has its time.
-- Open Build team's Tasks, All projects on Home, and a repository page. Each row is one line.
-  The repository page is the All projects table without its Repository column.
-- Open Iris's thread, then Git. The lead button at the right of the tab row now says Iris, and
-  it docks her thread beside the diff.
-- Widen the window past 1800 pixels. The thread panel stays open beside every project view,
-  Chat shows the agent's task and changed files beside the thread, and board cards stop at
-  300 pixels.
-- In Sage's chat, select the message that Rowan needs a decision. It opens
-  Rowan's exact question. Rowan stays highlighted until the question is
-  answered. Answering clears Sage's request and the sprint's blocker too.
-- Expand Build team and Review team to see their agents. Teams are named for their stage:
-  Design team, Planning team, Build team, and Review team. Two teams in the same stage add
-  their area, such as Build team · Exports. A single tab row offers Board, Chat, Terminal,
-  Git, and Project settings, and a team adds Tasks at the end, so no other tab moves. Drafts and reading position stay with each
-  conversation. Teams remember their last tab.
-- Open Inspecting at the top right. The list groups this repository's worktrees as Git does,
-  one line each, with the machine at the right. Type in its search field to narrow it.
-  Selecting one changes the inspected code context. It does not change repository
-  binding or redirect an agent. Git displays the selected workspace and follows its owning project and machine.
-- Select the repository, project, or team in the top bar. Each opens its page.
-- Press Control + B, or Command + B on a Mac, to fold the sidebar into a rail of icons. The
-  browser remembers it. The button at the top of the sidebar does the same.
-- Open Rowan's chat. One line under the tabs names him, his role, and his status, and no
-  title repeats the top bar.
-- Press Control + K and type "ro". Names that start with the query come first, and each row
-  shows what needs attention. Escape closes it.
-- Send a message to see a reply. Stop cancels
-  a pending reply. Both messages and drafts are scoped to their conversation.
-- Look at the composer. It is one input over one tool row: Add context, the subscription by its
-  own name, the model, the effort, and how much of the context window is in use. Choose another
-  model or effort from its menu; the agent keeps it. Type @ after a space to open Add context,
-  search it, and pick a task or a file.
-- Open Nico on Desktop companion's board. He is idle, so there is no status line and no Stop.
-  Open Iris: she waits on a tool, so the line says so and offers Stop agent.
-- Stop Rowan. The input gives way to "Rowan is stopped." and a Resume button, and his sidebar row
-  keeps "Needs answer" with a hollow amber dot. Open Ash: the composer says he failed to start and
-  offers Sign in on Buildbox and Resume.
-- In Iris's thread, load the review trace. It shows its first 12 lines with Open in full and Copy.
-  Open in full fills the main area, and Escape returns to the thread. Delivery details is a quiet
-  disclosure, and the tool call sits under the approval's Details.
-- Add a task to an active sprint. Completed sprints do not accept new tasks.
-- Every project board starts with a stage strip: Design, Plan, Build, Review, and Hand over.
-  The repository page lists each project's stage.
-- Open Desktop companion. It is in the Design stage, so its board is empty and points to the
-  mocks. The Mocks tab sits after Board in any project that has mocks.
-  - Screens lists each screen with its revision count. The frame shows the screen built from
-    real code, at phone or desktop size, with the four-project or ten-project data.
-  - Ask Nico for a change while a screen is open, such as "make it denser", "bluer",
-    "rounder", or "add lines". The screen changes in place, and Changes records it.
-  - Edit design opens OpenPencil on the project's design file, once OpenPencil runs.
-    [openpencil/README.md](openpencil/README.md) says how to start it.
-  - Data lists the fields the screens use and compares each with the schema: new,
-    matches, or differs. Components lists what the screens use, real or draft.
-  - Approve mocks promotes the drafts, moves the project to Plan, and starts a Planning team
-    with a sprint of tasks to move components, change the schema, and wire each screen.
-- Start a new project and tell its lead about screens, pages, or a design. The lead starts a
-  Design team, the Mocks tab appears, and the screens arrive one by one.
-- Open a repository page and choose Design. View shows the colors and the components every
-  project draws from, with live previews. Edit opens OpenPencil on that design file.
-- Repositories that stay on this computer go in `data/local/`, which git ignores. Open one
-  with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
-  onboarding mocks, which need Ananke's mock server on port 8091.
-- Open Service settings, the gear at the foot of the sidebar, and choose Light, Dark, or Match
-  system under Appearance.
-- Open Design notes and choose Logged out, Login rejected, Session expired, or Session
-  unavailable. The page says "Sign in to LGTM Studio" under the logo mark. A rejected password
-  shows in the error color under the field, and an expired session shows in the muted
-  color. The unavailable page offers Try again as its main button.
-- Open Git in Agent console. Commit says what it needs before it can be used. Below 1600
-  pixels the worktree list is a rail of icons; its button at the top opens it, and the browser
-  remembers that. Each worktree names its machine and says "2 changes". Drag or arrow the
-  handle beside the commit pane to resize it. Fetch, Pull, and Push sit in the pane's header,
-  and Integrate stays at its foot.
-- In Git, choose Stage all, then Unstage all. Choose Discard: it lists the files and asks first.
-- In `?sample=heavy`, open Git in Invoice exports. Its 26 changed files scroll between the
-  sync row and Integrate.
-- Open Git in Review team. Its worktree row says "1 conflict" in red, Conflicts sits above
-  Staged changes, and the conflict opens in the diff pane with ours, the base, and theirs for
-  each of its two conflicts. Choose Ours, Theirs, or Both for each, then Mark resolved. The
-  integrate line says how many conflicts are left and links to the file. Open in Terminal types
-  `vim` with the file, and Enter shows the conflict markers.
-- Open Terminal at 390 pixels. A row of Esc, Ctrl, Tab, and arrow keys sits above the keyboard,
-  and the prompt wraps only at the last column. Tap Ctrl, then type c, to stop a command.
-- Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
-  The notice appears at the top right, below the bell.
-- On Phone notifications, choose Retry on a failed row. It fails again, because no token is
-  set. Choose Fix in Service settings, type a token, and leave the field. Retry now delivers,
-  and the badge drops by one.
-- Open Service settings. The section list on the left follows scrolling. Change a field and
-  leave it: "Saved" appears beside its label. Send test notification sits beside the token.
-- Open Machines in `?sample=heavy`. Studio says "Over limit" in amber, and Laptop says
-  "Last seen 2 hours ago". Open a row's menu, the three dots, to rename or remove a machine.
-- Open Subscriptions. Usage shows per subscription, and the row menu offers Rename and Remove.
-- Open Project settings in Agent console and choose Archive. The project leaves the sidebar
-  and Home. Open All projects on Home to find it marked Archived, then choose Restore.
-- Choose New project. Type a name: the preview shows Branch and Folder on two lines. Choose
-  Buildbox in Run on and atlas-docs as the repository. One message offers "Add it to
-  Buildbox". It opens Add repository on Machines with Buildbox and a folder filled in. Add it,
-  and New project returns with Buildbox chosen and your name kept. A machine's row menu on
-  Machines offers Add repository too.
-- Narrow the window to 390 pixels. The top bar holds the menu, the project, and the bell, with
-  the connection as a dot on the bell. Open the bell for the full state and Reconnect now.
-  Inspecting sits under the tabs. The menu opens a drawer that starts with the agents needing
-  attention and scrolls as one, with the service pages at its end. The board is one list with
-  the sprints needing you first. In All projects and in a sprint's tasks, each row's second line
-  starts with its status. A diff in Git has one line-number gutter.
-- At 768 pixels with the sidebar open, Home's tabs read Attention, Projects, Questions, and
-  Approvals beside a New project icon, and the breadcrumb keeps its names.
-- Expand a request on Home and answer it. The row eases open, and the answered row folds away.
-- Open Design notes and choose Reconnecting. The Live indicator turns amber, says when it last
-  heard from the service, and offers Reconnect now. Nothing on the page moves. Hover a disabled
-  button to read why. After 30 seconds it says Offline. The Offline preview shows that state at once.
-- Open the bell in `?sample=heavy`. It lists six requests, failed starts first and then the longest
-  wait, each with its age, and ends with View all 10.
-
-## Existing page capabilities and new workspace views
-
-The navigation footer is a row of icons for Phone notifications, Machines,
-Subscriptions, Service settings, and Design notes, above the account and Log out. The top bar shows the connection state. Design notes
-contains preview controls for session expiry, login errors, connection loss and Offline,
-failed starts, permissions, and large-item failure.
-
-Agent threads retain stop/resume, failed-start reasons, permission controls,
-full large-item loading, tool calls inside their approvals, and delivery history under Delivery details. Sage surfaces team
-permission requests alongside design questions. Stopping an agent cancels
-its permissions while leaving its questions answerable.
-
-The project workspace offers Board, Chat, Terminal, Git, and Settings tabs.
-Terminal fills the main area below the tabs. The prompt sits in the terminal's own
-grid, directly after the last output, with no input box or Enter button. The bar
-above it holds named sessions, the branch, the machine, and the size in columns and
-rows. `vim <file>` shows how a full-screen program takes over the grid; `:q` returns.
-Sessions keep separate history and drafts. No real command runs: `help` lists the commands with canned answers.
-Git combines a repository worktree tree, staging, commit messages,
-fetch/pull/push, conflicts, unified or split diffs, and commit history. A split diff needs 900 pixels, as Visual Studio Code does; a narrower window shows it unified.
-Team branches integrate into their project branch. Project integration into
-main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Project settings shows
-the assigned repository, branch, folder, and machine as a list, with a shell
-preference that saves on change, and offers Rename and Archive. The global Settings page retains service controls.
-
-New project defaults to Create a worktree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
-branch and folder, with a numeric suffix when needed. Unchecking uses the
-selected machine's main checkout. Run on chooses the machine before the
-project name. The dialog previews that host's branch and folder. Offline
-machines and hosts without the repository cannot start a project. These are
-in-memory examples; no Git worktree is created on disk.
-Machines previews master/worker pairing and project placement. Subscriptions
-supports multiple separate accounts for the same harness on each machine.
-Machines uses compact tables for hosts and future project placement. Start
-project on a machine preserves that choice, including when no repository is
-available there. Changing future placement does not move running work.
-
-[FEATURE-PARITY.md](FEATURE-PARITY.md) maps the live page's source to each
-mock flow and states what still needs backend integration.
-
-## The current layout
-
-The owner rejected the first composition's nested project menus and
-repeated cards. The current proposal uses repositories, projects, and teams
-in a compact tree. Selecting a project opens its board with the project
-lead conversation beside it. The chat has one compact header, quiet user
-turns, readable agent replies, collapsed tool details, and a composer that
-grows with the draft. Boards, sprint details, and tasks are separate pages.
-
-The visual research inspected a [T3 Code interface screenshot](https://betterstack.com/community/guides/ai/t3-code/)
-and [Cursor's agent interface examples](https://cursor.com/changelog/2-0).
-The agent also read the owner's local Ananke Cursor build-order canvas.
-Its explicit ownership, dependencies, phases, and evidence inform the sprint
-model. No implementation code was copied. Layout and typography remain
-proposals awaiting the owner's review.
-
-The refinement captures use `previews/redesign-`. Browser results include
-`previews/workspace-redesign-checks.json`. Earlier layout and selected-state
-contrast measurements remain in `previews/projects-layout.json`. Earlier captures
-preserve previous proposals for comparison.
-
-## Browser checks
-
-Serve this directory on port 4178, then run `node design/checks.mjs` from
-the repository root with Playwright and its Chromium browser available.
-Also run `node design/operations-checks.mjs`,
-`node design/workspace-tools-checks.mjs`, and
-`node design/workspace-redesign-checks.mjs` for operational and workspace flows.
-Run `node design/revision-checks.mjs` for the terminal, Git height, naming, density,
-new repositories, and the heavy sample.
-Run `node design/onboarding-checks.mjs` for the first run, from login to the lead's first message.
-Run `node design/home-checks.mjs` for global queues, filters, inline answers,
-merge approvals, machine-aware creation, density, and keyboard navigation.
-Run `node design/mocks-checks.mjs` for stages, stage team names, the Mocks tab, live
-revisions, approval, the repository Design tab, and a local repository when one is present.
-Each script accepts `MOCK_URL` for another preview address,
-`PLAYWRIGHT_MODULE` for a local Playwright module path, and `CHROMIUM_PATH`
-for an existing Chromium executable. It does not install dependencies.
-
-The checks cover repository and project navigation, one lead per project,
-sprint details, task ownership, workspace inspection, linked request
-resolution, completed-sprint protection, shared board and lead chat, safe
-messages, sample replies, and mobile focus. Both modes are checked at 390,
-768, 1440, and 2560 pixels. The script saves screenshots and assertion
-results under `previews/`.
+The first mock was one page, `workbench.html`, with its app in `workbench.js`, its browser
+check suites, its screenshots in `previews/`, its critiques and its feature parity map. The
+rebuilt mock in `mock/` replaced it. The owner had the workbench removed on 2026-11-12, so
+that the server's address opens only the current mock. The removed files are in the git
+history, in the commit before the one that removed them.
 
 ## Where the visual directions came from
 
-The UI plugin's local design catalog was queried for a cool, dense agent
-workspace; a bright botanical team workspace; and a warm, focused workspace.
-Its first and third results paired IBM Plex Sans with JetBrains Mono. Its
-second result proposed an editorial pairing that did not fit this app.
-Its suggested marketing page patterns did not fit the requested working app.
-Those patterns and the second type pairing were discarded.
+The UI plugin's local design catalog was queried for a cool, dense agent workspace, a
+bright botanical team workspace, and a warm, focused workspace. All three palettes were
+custom explorations. Harbor used layered blue surfaces. Field used green-tinted light
+surfaces. Dusk used layered plum surfaces with a peach action colour.
 
-All three palettes are custom explorations, filtered through the UI skill's
-craft rules. Harbor uses layered blue surfaces. Field uses green-tinted light
-surfaces. Dusk uses layered plum surfaces with a peach action color. Each
-used the operating system's available sans-serif and monospace fonts. Since
-2026-11-08 the workbench uses Inter and JetBrains Mono, served from the repository, as
-DESIGN.md records.
-
-The owner selected Field as light mode and Dusk as dark mode on 2026-11-05.
-Harbor remains in the initial screenshots as a historical candidate.
-`DESIGN.md` records the palette decision. `tokens.css` contains the approved
-mode tokens. The layout and typography remain exploratory.
-
-The workbench keeps the design-forge template's token vocabulary.
-Its sample marketing page was replaced by the working app requested by
-the owner. The examples show proposed interfaces, not a claim that the
-underlying features are available in the engine.
+The owner selected Field as light mode and Dusk as dark mode on 2026-11-05. `DESIGN.md`
+records the palette decision, and `tokens.css` holds the approved tokens. Since
+2026-11-08 the mock uses Inter and JetBrains Mono, served from the repository.
 
 ## Interface copy
 
-The owner requested normal product language on 2026-11-06. Repeated sample,
-mock, and preview disclaimers have been removed from the interface,
-including its accessible labels, placeholders, replies, and save messages.
-The implementation boundary remains documented in this file and
-FEATURE-PARITY.md. This copy change does not connect any backend services.
-
-## Refinements approved after the UI critique
-
-The navigation and lead panel resize by dragging or with their focused arrow
-keys. Home resets either handle. Four board columns fit at desktop width.
-Phone users can use the status strip to jump between columns. Focused chat
-is centered on larger monitors.
-
-Find project or agent opens the quick switcher. Command or Control + K
-also opens it, and the hint shows the key for the system in use. Arrow keys and Enter choose a result. Only projects needing you filters
-the navigation tree, and the top-bar bell opens questions, approvals, and
-failed starts with direct links to the relevant thread item.
-
-The sidebar now groups Home and Find project or agent above a border.
-Projects has New project and Only projects needing you beside its repository
-tree. Repository names still open their project lists; there is no separate
-Repositories destination. Borders separate the project tree, repository
-groups, and service pages. This replaces the earlier disconnected controls.
-
-The composer shows current progress and Stop while the agent is busy, Resume in place of the
-input when it is stopped, and a tool row with Add context, the subscription, the model, the
-effort, and the context in use. Activity details link to Git.
-Terminal's plus button starts another session within that worktree. Hover a session's tab to
-close it, and double-click it to rename it. Switching projects, teams, or terminal sessions
-preserves each session's input.
-
-## Home and density critique
-
-Cursor is the primary comparison for working context and efficient use of
-space. T3 Code is secondary; the owner's difficulty discovering its controls
-is a constraint on this design. The latest comparison uses the official
-[Cursor agents-window documentation](https://cursor.com/docs/agent/agents-window)
-and [Cursor 3 announcement](https://cursor.com/blog/cursor-3).
-
-`UI-CRITIQUE-2026-11-06-HOME.md` records the observed gaps, changes, and
-remaining judgments. Fresh captures use `previews/home-final-`,
-`previews/machines-final-`, and `previews/project-machine-final-`.
-`previews/home-cold-verification.md` records independent functional verification.
+The owner asked for normal product language on 2026-11-06. The interface carries no sample,
+mock or preview disclaimers. What the mock does not connect to is documented in this
+folder instead.
