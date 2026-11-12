@@ -1,5 +1,10 @@
 # The mock's data files and stub functions
 
+These files fed the older workbench, which was removed on 2026-11-12. The rebuilt mock in
+`design/mock/` keeps its own data in `design/mock/js/data.js`. A contracts test in
+`packages/contracts/` still reads `sample/events.json`, so the files stay. They still carry
+invented agent names, which issue 613 in `docs/issues.md` tracks.
+
 The mock runs on hardcoded data, with no service behind it. The data is shaped like the
 engine's database, and functions named after the engine's commands hand it to the page.
 A real export can replace the sample without changing the page. This is the same idea as

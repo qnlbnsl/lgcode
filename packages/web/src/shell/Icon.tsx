@@ -1,6 +1,7 @@
 // Lucide Contributors 2022; portions copyright Cole Bemis 2013–2022 (Feather).
 // Paths copied from lucide-static 0.460.0 icons/*.svg (ISC; Feather portions MIT).
-// Reused from design/workbench.html and design/workbench.js. See third_party/lucide/README.md and LICENSE.
+// Reused from the older web mock's design/workbench.html and design/workbench.js, at commit
+// bef4b1090a8dc783075f835e7c5e90dbc3b8aad9. See third_party/lucide/README.md and LICENSE.
 import type { ReactNode } from "react"
 
 const paths = {

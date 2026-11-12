@@ -7,7 +7,7 @@ and a muted dark surface. Harbor is no longer an active option.
 ## What is approved
 
 `tokens.css` is the color contract for future LGTM Studio app mockups.
-The workbench embeds the same token blocks so it can be opened as one file.
+The mock in `mock/` loads the same tokens.
 Keep those blocks identical when the tokens change.
 
 The layout, typography, sample roster, and product flows remain exploratory.
@@ -68,7 +68,6 @@ have several accounts on a machine. Additional Codex sign-ins stay private.
 Terminal execution, Git mutations, remote pairing, project movement, and provider sign-in
 are not wired to live services. This boundary is documented here rather
 than repeated in product copy, at the owner’s request on 2026-11-06.
-FEATURE-PARITY.md records the integration requirements and source evidence.
 
 ## Project branch placement
 
@@ -117,7 +116,7 @@ setting.
 
 ## Type and reading
 
-The workbench uses Inter for interface text and JetBrains Mono for code,
+The mock uses Inter for interface text and JetBrains Mono for code,
 paths, and branch names. Both are served from the repository, as the
 "Fonts" section below says. Keep long replies within roughly 68 characters
 per line, with enough line spacing to follow paragraphs.
@@ -138,7 +137,7 @@ or the lead panel's header still names the agent.
 - Preserve visible keyboard focus and reduced-motion support.
 - Require at least 4.5:1 contrast for normal text and action labels.
 - Show the owner why a decision needs their attention and what each action does.
-- Use normal product copy in the workbench. Keep prototype limitations in
+- Use normal product copy in the mock. Keep prototype limitations in
   the design documentation rather than repeated labels or disclaimers.
 - Separate chevron disclosure from repository, project, and team selection.
 - Preserve each conversation's draft and reading position while navigating.
@@ -159,8 +158,7 @@ black and a bright accent. Do not introduce gradient text, decorative
 metrics, or a marketing hero into the working app. Use actual app flows
 to judge the palette.
 
-The live visual reference is `workbench.html`. Captures and browser
-verification results are in `previews/`. No separate brand brief exists
+The live visual reference is the mock in `mock/`. No separate brand brief exists
 in this design directory; this contract records the owner's choice and
 the UI skill's craft rules applied during the workshop.
 
@@ -253,9 +251,6 @@ Starting from a machine keeps that host selected. If no repository exists
 there, Start remains disabled with a concrete reason. A future placement
 change never relabels the current running workspace or implies migration.
 Actual repository registration and project transport remain service work.
-
-The latest critique and remaining design judgments are recorded in
-`UI-CRITIQUE-2026-11-06-HOME.md`.
 
 ## Rules added by the review of 2026-11-06
 
@@ -468,8 +463,6 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   `--weight-strong`.
 - **Page titles are quiet.** A page title is 15 pixels at weight 600. The application
   shell section below says which pages keep one.
-- **A check enforces the scale.** `revision-checks.mjs` fails when the stylesheet or the
-  script holds a raw font size, and when a rendered page shows a size outside the scale.
 
 ### Spacing and shape
 
@@ -633,8 +626,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 
 - **The bell uses Home's kinds.** They are Question, Approval, Merge, and Failed start.
 - **The bell's order is shared.** Failed starts come first, then the request that has waited
-  longest. The comparator is `byAttention` in `workbench.js`, and `attentionQueue()` returns
-  the open queue in that order, so Home can use the same order.
+  longest. Home uses the same order.
 - **Rows are 44 pixels.** Each row has the request, its age at the right, and a second line
   with the kind, the agent, and the project.
 - **The bell shows at most six rows.** "View all 10" follows them and opens Needs attention
@@ -642,8 +634,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 
 ### Empty states
 
-- **One short sentence and at most one action.** The helper `emptyState(line, action)` in
-  `workbench.js` draws one. Examples are "No sprints until you approve the mocks." with
+- **One short sentence and at most one action.** Examples are "No sprints until you approve the mocks." with
   Open the mocks, and "No matching requests." with Clear filters.
 - **An empty list is not shown.** A table with no rows becomes its sentence. A sprint shows
   Completion evidence only once it has evidence. Only projects needing you says "Nothing
@@ -659,7 +650,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 ### Order and age
 
 - **Home uses the bell's order.** Failed starts come first, then the request that has waited
-  longest. The comparator is `byAttention` in `workbench.js`.
+  longest.
 - **Sort offers Oldest first and Newest first.** Newest first flips only the age, so failed
   starts still lead.
 - **A long wait is amber.** A request that has waited an hour or more shows its age in the
@@ -700,7 +691,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   because the row above names the agent, the project, and the title, and its chevron closes
   it. The footer has the links, the machine, and the worktree.
 - **One request block.** Questions, approvals, merges, and failed starts use
-  `requestBlock(kind, …)` in `workbench.js`. It has a 2 pixel left rule and a label that
+  one block. It has a 2 pixel left rule and a label that
   names the kind. Both are amber while a question, approval, or merge is open, red for a
   failed start, and the line color once closed. It has no top rule.
 - **The block spans the thread.** A question sits inside its agent's turn, so it reaches

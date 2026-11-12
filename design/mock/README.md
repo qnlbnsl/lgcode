@@ -13,7 +13,7 @@ cd design
 python3 -m http.server 4178 --bind 127.0.0.1
 ```
 
-Then open `http://127.0.0.1:4178/mock/`. The mock has no build step and loads nothing from
+Then open `http://127.0.0.1:4178/`, which opens the mock at `http://127.0.0.1:4178/mock/`. The mock has no build step and loads nothing from
 the network.
 
 Changes you make stay until you reload the page. The colour mode, the density, and the

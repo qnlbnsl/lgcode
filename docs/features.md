@@ -293,7 +293,7 @@ an agent has stopped and nudges it back, or tells its lead.
   Installation asks which folder contains the owner's repositories.
   Repository setup stays on the host. The mock uses known sample paths.
 - **Repositories contain projects** (agreed, 2026-11-05; mocked in
-  `design/workbench.html`). Repositories are the top level of navigation.
+  `design/mock/`). Repositories are the top level of navigation.
   Each repository has a page listing its projects and an Add Project
   action. Multiple projects can work within the same repository.
 - **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
@@ -363,7 +363,8 @@ an agent has stopped and nudges it back, or tells its lead.
 
 Agreed on 2026-11-06 and represented in the browser mock. These are existing
 product capabilities, not permission to remove them during implementation.
-The source-to-mock mapping is in `design/FEATURE-PARITY.md`.
+The source-to-mock mapping was `design/FEATURE-PARITY.md`. It was removed with the older
+workbench on 2026-11-12, and it remains in the git history.
 
 - Login, logout, and session expiry stay available. Rejected login and an
   unavailable session have explicit recovery states. Entered secrets clear

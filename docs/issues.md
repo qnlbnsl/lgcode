@@ -10916,7 +10916,8 @@ Open: the owner rejected invented agent names on 2026-11-10. An agent is named b
 The engine still gives each project lead a name from a fixed list at
 `packages/engine/src/project/lifecycle.ts:21`. The list starts with Sage and Rowan.
 The test `packages/engine/test/api/subscribe-visibility.test.ts` uses those names.
-The older `design/workbench.html` and the files under `design/data/` also use such names.
+The files under `design/data/` also use such names. The older `design/workbench.html` used
+them too, until it was removed on 2026-11-12.
 The rebuilt mock in `design/mock/` names every agent by its role.
 The engine change is not made yet, because the lead's name is passed to the agent start
 at `lifecycle.ts:251` and is written into stored events.
@@ -11000,3 +11001,14 @@ State: accepted.
 The web page and the mock store the theme, panel sizes and dismissed notices under keys named after the product.
 The rename changed those keys to start with `lgtm-`.
 A browser that used the page before the rename shows the defaults once, and then remembers new choices.
+
+## 621. The Reverse Fig profile for the mock points at the removed workbench
+
+Found: 2026-11-12, while removing the older workbench from `design/`.
+State: open.
+
+The profile `skills/reverse-fig/profiles/lgtm-mock.mjs` builds `design/lgtm.fig` from the web mock.
+It opens `http://127.0.0.1:4178/workbench.html`, and its component snippets use the workbench's class names.
+The workbench was removed on 2026-11-12, so the profile cannot run until it is pointed at `design/mock/`.
+The rebuilt mock uses different class names, so the snippets need rewriting as well as the address.
+The existing `design/lgtm.fig` is unchanged.

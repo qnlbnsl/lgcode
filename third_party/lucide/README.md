@@ -59,9 +59,10 @@ LGTM Studio's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 
 ## Where the paths live
 
-The paths are inline in `design/workbench.html` (static buttons) and in the
-`paths` table near the top of `design/workbench.js`. A comment beside the table
-names this folder. The LGTM Studio logo mark is LGTM Studio's own drawing, not Lucide's.
+The paths were inline in `design/workbench.html` (static buttons) and in the
+`paths` table near the top of `design/workbench.js`. Those two files were removed on
+2026-11-12, and the rebuilt mock's paths are in `design/mock/js/icons.js`, described
+below. The LGTM Studio logo mark is LGTM Studio's own drawing, not Lucide's.
 
 ## Production shell paths
 

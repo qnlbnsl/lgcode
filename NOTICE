@@ -33,8 +33,8 @@ where the code lives in LGTM Studio, and where the licence text is.
 - Lucide (https://lucide.dev)
   Copyright Lucide Contributors 2022, with portions copyright Cole Bemis
   2013-2022 as part of Feather (MIT). ISC License.
-  In LGTM Studio: icon paths inline in design/workbench.html and design/workbench.js,
-  and in design/mock/js/icons.js for the rebuilt mock.
+  In LGTM Studio: icon paths in design/mock/js/icons.js for the web mock, and
+  earlier in design/workbench.html and design/workbench.js, removed on 2026-11-12.
   Each icon and where it is used are listed in third_party/lucide/README.md.
   Licence text: third_party/lucide/LICENSE.
 
@@ -84,7 +84,8 @@ Simonovich, Apache License 2.0. No Synapse code has been copied into LGTM Studio
 If any is, it will be listed here with its licence.
 
 The production shell in packages/web/src/shell/Icon.tsx reuses Lucide
-Contributors' lucide-static 0.460.0 icons/*.svg paths, through the already
-credited design/workbench.html and design/workbench.js. See
+Contributors' lucide-static 0.460.0 icons/*.svg paths, taken from the older
+web mock's design/workbench.html and design/workbench.js at LGTM Studio commit
+bef4b1090a8dc783075f835e7c5e90dbc3b8aad9. See
 third_party/lucide/README.md and third_party/lucide/LICENSE (ISC; Feather
 portions copyright Cole Bemis 2013–2022, MIT).
