@@ -39,7 +39,7 @@ export function enrich(patch) {
       const old = previous.get(r.id);
       return old?.sourceSequence === r.sourceSequence ? { ...r, body: old.body, command: old.command, options: old.options } : r;
     });
-    for (const old of previous.values()) if (old.kind !== 'failed' && old.status !== 'open' && !patch.requests.some((r) => r.id === old.id)) patch.requests.push(old);
+    for (const old of previous.values()) if (old.kind !== 'failed' && old.status !== 'open' && (patch.agents || S().agents).some((a) => a.id === old.agent) && !patch.requests.some((r) => r.id === old.id)) patch.requests.push(old);
     patch.requests.push(...(patch.agents || S().agents).flatMap((a) => mapping.mapFailedStart(a) || []));
   }
   return patch;

@@ -6,6 +6,7 @@
 // A field the engine does not hold gets an empty value, never a sample value. The list of
 // those fields is in .foundry/result.md and in the plan for connecting the mock.
 import type { ClientSnapshot, RosterEntry } from "@lgtm/contracts"
+import { workspaceIdentity } from "./git.ts"
 import { startFailureText } from "@lgtm/contracts/startFailure"
 
 type ProjectSection = NonNullable<ClientSnapshot["project"]>
@@ -70,7 +71,7 @@ export interface StoreRequest {
 }
 export interface StoreWorktree {
   readonly id: string; readonly repo: string; readonly kind: "base" | "project" | "team"; readonly branch: string
-  readonly parent: string | null; readonly machine: string; readonly folder: string
+  readonly parent: string | null; readonly parentId: string | null; readonly machine: string; readonly folder: string
   readonly files: ReadonlyArray<never>; readonly commits: ReadonlyArray<never>; readonly ahead: number; readonly behind: number
   readonly merge: null; readonly owner: string | null; readonly team: string | null; readonly project: string | null
 }
@@ -154,14 +155,11 @@ export function mapRepository(repo: EngineRepository, workspaces: ReadonlyArray<
   }
 }
 
-export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<EngineWorkspace>, projects: ReadonlyArray<EngineProject>): StoreWorktree {
-  const parent = row.parentId === undefined ? undefined : workspaces.find((other) => other.worktreeId === row.parentId)
-  const project = row.projectId === undefined ? undefined : projects.find((p) => p.projectId === row.projectId)
-  const kind = row.teamId !== undefined ? "team" : row.projectId !== undefined ? "project" : "base"
+export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<EngineWorkspace>, projects: ReadonlyArray<EngineProject>, teams: ReadonlyArray<EngineTeam> = []): StoreWorktree {
   return {
-    id: row.worktreeId, repo: row.repoId, kind, branch: row.branch, parent: parent?.branch ?? null, machine: row.machineId,
+    id: row.worktreeId, repo: row.repoId, branch: row.branch, machine: row.machineId,
     folder: row.path, files: [], commits: [], ahead: 0, behind: 0, merge: null,
-    owner: kind === "project" ? project?.leadAgentId ?? null : null, team: row.teamId ?? null, project: row.projectId ?? null
+    ...workspaceIdentity(row, workspaces, projects, teams)
   }
 }
 
@@ -351,7 +349,7 @@ export function mapSnapshot(snapshot: Pick<ClientSnapshot, "agents" | "requests"
     worktrees: section.workspaces.filter((w) => repos.some((r) => r.id === w.repoId)
       && (w.projectId === undefined || projectExists(w.projectId))
       && (w.teamId === undefined || teams.some((t) => t.id === w.teamId)))
-      .map((w) => mapWorktree(w, section.workspaces, section.projects))
+      .map((w) => mapWorktree(w, section.workspaces, section.projects, section.teams))
       .map((w) => ({ ...w, owner: agents.some((a) => a.id === w.owner) ? w.owner : null })),
     sprints: sprints.map((sp) => ({ ...sp, team: tasks.find((t) => t.sprint === sp.id)?.team ?? null,
       dependsOn: sp.dependsOn.filter((id) => sprints.some((other) => other.id === id && other.project === sp.project)) })), tasks

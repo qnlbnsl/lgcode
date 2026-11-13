@@ -13,6 +13,8 @@ import { displayedState, type ClientSnapshot, type EventSequence, type RequestId
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import * as board from "./board.ts"
+import { mapAlerts } from "./git.ts"
+import * as Redacted from "effect/Redacted"
 import * as mocks from "./mocks.ts"
 import * as Schema from "effect/Schema"
 import { DisplayFrame } from "@lgtm/contracts/project/display"
@@ -32,6 +34,8 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly taskDetails?: object
   readonly boardAgents?: object
   readonly setupData?: object | null
+  readonly notifications?: ReturnType<typeof mapAlerts>
+  readonly accountLimits?: Readonly<Record<string, number | null>>
   readonly mocks?: object
   readonly design?: object
   readonly machineDetails?: object | null
@@ -44,9 +48,9 @@ export interface LiveConnection {
   readonly label: string
   readonly board: typeof board
   readonly mocks: typeof mocks
-  request(tag: string, payload: object): Promise<unknown>
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
+  request(tag: string, payload: object): Promise<unknown>
   open(write: Write): void
   signIn(password: string): Promise<"in" | "rejected" | "unavailable">
   signOut(): Promise<void>
@@ -78,7 +82,8 @@ const refreshTags = new Set([
   "AgentConfigurationChosen", "AgentConfigurationApplied", "AgentConfigurationRefused", "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten",
   "AccountChanged", "AccountNeedsSignIn", "AccountAvailable"
 ])
-const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("roles.") || tag.startsWith("client.Alert")
+const accountTags = ["AccountChanged", "AccountAvailable", "AccountNeedsSignIn", "AccountOutOfUsage", "HarnessChanged"]
+const needsRefresh = (tag: string) => accountTags.includes(tag) || refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("roles.") || tag.startsWith("client.Alert")
 
 const emptyRecords: EngineRecords = { machines: [], subscriptions: [], repos: [], projects: [], teams: [], agents: [], requests: [], worktrees: [], sprints: [], tasks: [] }
 
@@ -103,12 +108,16 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   const timing: Timing = {}
 
   let write: Write = () => {}
+  // Retain a retry receipt after transport loss. Recovering the same carrier
+  // exchange must not create a second delivery with a new request identifier.
+  const retryIds = new Map<string, RequestId>()
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
   let sessionAttempt = 0
   let closed = false
   let activeClient: Client | undefined
   let boardRevision = 0
+  let accountLimits: Record<string, number | null> = {}
   let lastHeard = 0
   let connectionStatus: ConnectionStatus = "reconnecting"
 
@@ -125,7 +134,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, mocks: {}, design: {}, machineDetails: null, boardUnread: {}, boardRevision: 0, boardDetails: {} })
+  const forget = () => { retryIds.clear(); accountLimits = {}; write({ ...emptyRecords, notifications: [], accountLimits, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, mocks: {}, design: {}, machineDetails: null, boardUnread: {}, boardRevision: 0, boardDetails: {} }) }
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -150,7 +159,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     const publish = (snapshot: ClientSnapshot) => {
       current = snapshot
       const records = board.mapBoardRecords(snapshot, mapSnapshot(snapshot, now()))
-      if (!signal.aborted) write({ ...records, channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision, boardDetails: board.mapStalls(snapshot.roles),
+      if (!signal.aborted) write({ ...records, notifications: mapAlerts(snapshot.alerts ?? [], records.agents), channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision, boardDetails: board.mapStalls(snapshot.roles),
         session: { status: "in", firstRun: snapshot.project?.setup !== undefined && snapshot.project.setup.completedAt === undefined } })
     }
     const program = Effect.gen(function* () {
@@ -251,6 +260,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     const apply = (item: ClientEnvelope, refresh: (minimum?: number) => Effect.Effect<void, unknown>) => Effect.gen(function* () {
       const event = item.event
       if (event._tag.startsWith("project.") || event._tag.startsWith("board.") && event._tag !== "board.Read") boardRevision++
+      if (event._tag === "AccountOutOfUsage" || event._tag === "AccountAvailable") {
+        accountLimits = { ...accountLimits, [event.accountId]: event._tag === "AccountOutOfUsage" ? event.resetAt ?? null : null }
+        write({ accountLimits })
+      }
       if (event._tag === "StateChanged" && current !== undefined && item.sequence > current.sequence) {
         publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => {
           if (agent.agentId !== event.agentId) return agent
@@ -275,6 +288,8 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     kind: "engine",
     label: "the service",
     board, mocks,
+    call() {},
+    push() {},
     async request(tag, payload) {
       const client = activeClient
       if (tag === "display.open" || tag === "display.close") {
@@ -294,15 +309,26 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         return frame
       }
       if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
-      const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, unknown>>)[tag]
-      if (method === undefined) throw new Error("This request is not available.")
-      const result = await Effect.runPromise(Effect.result(method({ ...payload, requestId: requestId() })), { signal: controller!.signal })
-      if (result._tag === "Success") return result.success
-      const error = result.failure
-      throw new Error(typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string" ? error.reason : "The service could not confirm the request.")
+      const invoke = (client as unknown as Record<string, (input: object) => Effect.Effect<unknown, unknown>>)[tag]
+      if (typeof invoke !== "function" || tag.endsWith("subscribe")) throw new Error("Unknown service request.")
+      // Credential ingress is decoded by the existing client, which requires Redacted.
+      const secret = tag === "client.alerts.carrier.set-token" && "value" in payload
+        ? Redacted.make(String(payload.value), { label: "secret value" }) : undefined
+      const retryKey = tag === "client.alerts.retry" ? JSON.stringify(payload) : undefined
+      const id = retryKey === undefined ? requestId() : retryIds.get(retryKey) ?? requestId()
+      if (retryKey !== undefined) retryIds.set(retryKey, id)
+      try {
+        const result = await Effect.runPromise(invoke({ ...payload, ...(secret ? { value: secret } : {}), requestId: id }).pipe(Effect.result), { signal: controller!.signal })
+        if (result._tag === "Failure") {
+          const error = result.failure as { _tag?: unknown; reason?: unknown; message?: unknown }
+          const refused = error?._tag === "CommandError"
+          if (refused && retryKey !== undefined) retryIds.delete(retryKey)
+          throw Object.assign(new Error(typeof error?.reason === "string" ? error.reason : typeof error?.message === "string" ? error.message : "The service refused the request."), { refused })
+        }
+        if (retryKey !== undefined) retryIds.delete(retryKey)
+        return result.success
+      } finally { if (secret) Redacted.wipeUnsafe(secret) }
     },
-    call() {},
-    push() {},
     open(next) {
       write = next
       setSession("checking")

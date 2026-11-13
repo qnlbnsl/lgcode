@@ -1,4 +1,5 @@
 import * as board from "../src/board.ts"
+import * as git from "../src/git.ts"
 import * as mocks from "../src/mocks.ts"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { Client, connect } from "@lgtm/client/browser"
@@ -20,21 +21,26 @@ interface Website {
 }
 let website: Website
 let element: HTMLElement
-beforeAll(async () => { website = await import("../../../design/mock/js/app.js" as string) as Website })
+beforeAll(async () => {
+  const actions = await import("../../../design/mock/js/live/git.js" as string) as { installMappings(value: typeof git): void }
+  actions.installMappings(git)
+  website = await import("../../../design/mock/js/app.js" as string) as Website
+})
 afterEach(() => { website.unmount(element); element.remove() })
 async function mount(route: string, connection?: LiveConnection, records = mapSnapshot(engineSnapshot, 1)) {
   const calls: string[] = []
+  const screenReads: Record<string, unknown> = {
+    "project.setup.discover": { result: { state: "available", repositories: [], truncated: false, harnesses: [{ harness: "codex", installed: true, configured: false, accounts: [] }] } },
+    "client.sequence": { sequence: engineSnapshot.sequence }, "project.mocks.read": { items: [] },
+    accounts: { accounts: [] }, harnesses: { harnesses: [] }, "project.settings": { settings: { workspaceFolder: "/srv/repos", shell: "sh" } },
+    "roles.settings.get": { settings: {} }, "client.web.settings": { enabled: false, port: 8787, heartbeatSeconds: 25, proxyMode: false },
+    "roles.role-file.get": { file: null }, "client.snapshot": engineSnapshot,
+    "client.alerts.settings": { carrier: { _tag: "none" }, tokenSet: false, kinds: [], pushPromptDismissed: false }
+  }
   const live: LiveConnection = connection ?? {
-    kind: "engine", label: "test engine", board, mocks, async request(tag) {
-      calls.push(tag)
-      if (tag === "project.setup.discover") return { result: { state: "available", repositories: [], truncated: false,
-        harnesses: [{ harness: "codex", installed: true, configured: false, accounts: [] }] } }
-      if (tag === "project.settings") return { settings: { workspaceFolder: "/srv/repos", shell: "sh" } }
-      if (tag === "client.web.settings") return { port: 8787 }
-      if (tag === "client.sequence") return { sequence: engineSnapshot.sequence }
-      if (tag === "project.mocks.read") return { items: [] }
-      throw new Error("Test refusal")
-    }, call(tag) { calls.push(tag) }, push() {},
+    kind: "engine", label: "test engine", board, mocks,
+    async request(tag) { calls.push(tag); if (Object.hasOwn(screenReads, tag)) return screenReads[tag]; throw new Error("Test refusal") },
+    call(tag) { calls.push(tag) }, push() {},
     open(write) { write({ ...records, session: { status: "in", firstRun: false }, conn: { status: "reconnecting", lastHeard: 0 } }) },
     async signIn() { return "in" }, async signOut() {}, reconnect() { calls.push("reconnect") }, close() {}
   }
@@ -42,7 +48,10 @@ async function mount(route: string, connection?: LiveConnection, records = mapSn
   location.hash = "#" + route
   const { store } = website.mount(element, { mode: "live", connection: live })
   await settle()
-  // Actions are checked separately from the settled reads that opening a screen needs.
+  if (route.startsWith("/settings")) await vi.waitFor(() => expect(store.state.ui.serviceReady).toBe(true))
+  // Opening a connected screen reads its settings. The assertions below inspect
+  // every request after the control is clicked, independently of those reads.
+  expect(calls.every((tag) => Object.hasOwn(screenReads, tag))).toBe(true)
   const initialCalls = calls.splice(0)
   return { store, calls, initialCalls }
 }
@@ -207,6 +216,28 @@ it("shows a fast initial session response before passive effects run", async () 
   expect(store.state.session.status).toBe("in")
   expect(element.querySelector(".tree-row.project")).not.toBeNull()
   expect(element.querySelector(".tree-row.project")?.textContent).toContain("Harvest report")
+})
+
+it("the actual logout clears an answered request retained by the Home reader", async () => {
+  const mapping = await import("../src/chat.ts")
+  const chat = await import("../../../design/mock/js/live/chat.js" as string) as { setMapping(value: typeof mapping | undefined): void }
+  chat.setMapping(mapping)
+  try {
+    const client = {
+      "client.snapshot": () => Effect.succeed(engineSnapshot), "project.settings": () => Effect.succeed({}),
+      "client.subscribe": () => Stream.never, accounts: () => Effect.succeed({ accounts: [] }),
+      "client.alerts.settings": () => Effect.succeed({ carrier: { _tag: "none" }, pushPromptDismissed: false }),
+      "client.requests": () => Effect.succeed({ items: [{ ...engineSnapshot.questions[0]!, kind: "question", status: "answered", canAnswer: false, answer: "Recorded answer" }] })
+    } as unknown as Client
+    const connection = engineConnection({ location: { protocol: "http:", host: "127.0.0.1:8787" }, debug() {},
+      connect: (() => Effect.succeed(client)) as typeof connect, fetch: async () => new Response(null, { status: 204 }) })
+    const { store } = await mount("/home", connection)
+    await vi.waitFor(() => expect(store.state.requests).toEqual(expect.arrayContaining([expect.objectContaining({ status: "answered", answer: "Recorded answer" })])))
+    element.querySelector<HTMLElement>('[aria-label="Log out"]')!.click()
+    await vi.waitFor(() => expect(store.state.session.status).toBe("out"))
+    expect(store.state.requests).toEqual([])
+    expect(element.querySelector("#login-password")).not.toBeNull()
+  } finally { chat.setMapping(undefined) }
 })
 
 it("answers an approval with Allow and Deny, and keeps a long standing answer in the Allow menu", async () => {

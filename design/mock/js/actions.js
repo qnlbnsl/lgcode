@@ -1,3 +1,4 @@
+import * as liveGit from './live/git.js';
 import * as chat from './live/chat.js';
 // Everything that changes the mock's state, and the small simulation that makes agents
 // answer and move. Nothing here talks to a service. Each change the real product sends to the
@@ -161,6 +162,7 @@ export function setAgentConfig(agentId, patch) { if (live.on) return chat.setAge
 
 // ---- requests ------------------------------------------------------------------
 export function answerRequest(requestId, optionId, text) {
+  if (live.on && S().worktrees?.some((w) => w.review?.id === requestId)) return liveGit.answerReview(requestId, optionId);
   if (live.on) return chat.answerRequest(requestId, optionId, text);
   const s = S(); const r = byId(s.requests, requestId); if (!r || r.status !== 'open') return;
   const a = agentOf(s, r.agent); const opt = (r.options || []).find((o) => o.id === optionId);

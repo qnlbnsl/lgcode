@@ -11031,12 +11031,14 @@ The gap table is `.plans/plans/connect-mock/gap-table.md`.
 ## 623. The live website shows the page's default settings, not the engine's
 
 Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
-State: open.
+State: fixed for Service settings and Phone notifications in step 2.
 
-The live website at `/studio/` fills its Service settings and Notifications pages from the page's own defaults.
-The engine does not send these settings in `client.snapshot`, so the values shown may differ from the engine's real ones.
-Changing a setting is refused with a short notice, so nothing wrong is saved.
-Step 2 of the plan connects the settings to the engine's commands.
+These pages now read their settings from the engine when opened.
+The Home notification offer reads the same carrier and dismissal settings.
+Unsupported settings are empty.
+Unset role overrides stay empty because the engine does not return effective role defaults.
+Appearance keeps browser preferences, as intended.
+Supplied actions call the authenticated client API.
 
 ## 624. The live website's Machines page has no figures for the engine's machine
 
@@ -11314,38 +11316,6 @@ The production web source, engine source, and affected test file are unchanged f
 The cause remains unproved.
 The task result records the complete checks and baseline comparisons.
 
-## 654. The Nudge regression test still expected an unconnected control after the merge.
-
-Found: 2026-11-13, while merging the area branch into the chat worker branch.
-State: fixed in this merge.
-
-The area regression test expected Nudge to refuse before sending any request.
-The chat implementation connects Nudge to the engine's direct board post request.
-The merged test now checks that the request reaches the connection.
-It also checks that an engine refusal appears and leaves the local posts empty.
-The other unconnected controls keep their original refusal checks.
-
-## 655. The merged Messages module imported the live binding twice.
-
-Found: 2026-11-13, during the remote browser check of this merge.
-State: fixed in this merge.
-
-Both branches added the live binding to the Messages module's imports.
-Git kept both declarations when it merged the import lists.
-The browser rejected the module and left both the live page and the standalone mock blank.
-The test transformer accepted the declarations, so the Studio tests did not expose the error.
-Removing the redundant import lets the browser parse the module.
-
-## 656. The board mapping replaced worker names with role labels.
-
-Found: 2026-11-13, during the merged chat browser journey.
-State: fixed in this merge.
-
-The area board mapping replaced each worker's engine name with its role label.
-The chat roster needs the engine name to identify a worker and its controls.
-The merged mapping keeps worker names and retains the area's project lead and team lead labels.
-The browser journey checks the same worker in the blocked lane and the table.
-
 ## 654. The snapshot could not be read once an account was added without an enabled flag
 
 Found: 2026-11-13, while setting up the first real project on LGTM Studio itself.
@@ -11529,3 +11499,171 @@ An answered question card puts the accepted answer in the button row, between "D
 The owner finds that placement odd.
 The owner wants a short form of the accepted answer on its own line above the buttons, as the card's second or third line.
 The owner will work on this part of the look later, so it is recorded and not changed.
+
+## 671. A fast connection reply could leave a reloaded page blank.
+
+Found: 2026-11-13, while testing the service screens against the real engine.
+State: fixed in this change.
+
+The store subscribed after the browser painted the page.
+A fast session check and snapshot could arrive before that subscription existed.
+The page then kept its initial checking screen until another update arrived.
+The store now subscribes during layout, before asynchronous connection replies can arrive.
+
+## 672. Registered workspaces need their project and team links joined.
+
+Found: 2026-11-13, while connecting the Git picker.
+State: fixed in this change.
+
+A registered workspace need not hold a project identifier or a team identifier.
+Projects and teams name their workspaces in their own records.
+The mapping now joins those records so that the Git picker includes their worktrees.
+
+## 673. The settings contract does not return effective role defaults.
+
+Found: 2026-11-13, while connecting Service settings.
+State: open.
+
+The role settings request returns stored overrides.
+It does not return the effective limits after the engine applies its defaults and role files.
+The website shows an empty number for an unset limit.
+An unset switch is labelled as not set by the service.
+Worker stall time edits the service-wide stall limit.
+The separate lead and assigned timers have no matching setting and remain empty.
+
+## 674. Notification retries need the original receipt after a lost reply.
+
+Found: 2026-11-13, while connecting notification delivery actions.
+State: fixed in this change.
+
+A carrier exchange can finish before its reply reaches the browser.
+A repeated click must recover the original request instead of creating another delivery.
+The connection keeps the request identifier until a reply confirms the result.
+The notification page keeps the original alert generation and attempt while recovery is pending.
+A unit test checks that recovery reuses the identifier.
+
+## 675. Git destinations must keep their workspace identifiers.
+
+Found: 2026-11-13, while reviewing the integration mapping.
+State: fixed in this change.
+
+The page displays a parent branch name.
+A branch name alone does not identify a registered workspace.
+The mapping also keeps the parent workspace identifier.
+Integration and main review use that identifier to select their destinations.
+
+## 676. The existing website's browser assertions failed in the full check.
+
+Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
+State: open.
+
+The full check of commit `5802092` passed all typechecks and 7,909 unit tests.
+All three Studio browser journeys passed.
+The existing website's bulk staging test failed at `git.spec.ts:208`.
+Its five-second assertion could not find the disabled `Commit 2 files` button.
+The failure snapshot showed that staging had succeeded while the working refresh remained pending.
+The existing component preview test failed at `new-project.spec.ts:605`.
+It observed issuance status 0 instead of 200 within five seconds.
+The preview failure is already described in issue 611.
+Both unchanged tests passed in isolation against baseline `8f9f321`.
+That isolated pass does not establish either failure's cause.
+No production code, assertion, or deadline was changed for these failures.
+The full parallel browser suite was then run against an isolated export of baseline `8f9f321`.
+It reproduced both failures at the exact same assertions.
+It also reached the existing logout test's 30-second timeout at `new-project.spec.ts:225`.
+The implementation branch's full run passed that logout test.
+The baseline run finished with 43 passed tests and three failed tests.
+The implementation run finished with 45 passed browser tests and two failed browser tests.
+The complete comparison is recorded in the builder's result.
+The first area merge's full check passed all 529 unit files and 7,920 unit tests.
+All five merged Studio browser cases passed.
+Three existing website cases failed.
+The Git lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
+The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
+Their causes remain unproved.
+
+The review merge's full check passed 532 unit files and 7,960 unit tests.
+All five Studio browser cases passed.
+The existing website's cases failed at `git.spec.ts:208`, `git.spec.ts:271`, and `new-project.spec.ts:626`.
+The final merge with area commit `aed0fce` passed 533 unit files and 7,980 unit tests.
+All six Studio browser cases passed.
+The browser suite finished with 48 passed cases and two failed cases.
+The lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The component preview case observed issuance status 0 instead of 200 at `new-project.spec.ts:605`, as described in issue 611.
+The separate credits check passed.
+No existing website assertion or deadline was changed.
+
+## 677. The automatic merge retained duplicate shared declarations.
+
+Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
+State: fixed in the merge.
+
+Both builders added a request method to the live website's test connection.
+The automatic merge kept both methods without reporting a conflict.
+The Studio type check rejected the duplicate identifier.
+The automatic merge also duplicated the JavaScript request export and the dialog's live import.
+The merge now keeps one request method, one request export, and one live import.
+The test connection keeps the board builder's request recording.
+
+## 678. The review control fixtures did not load connected service settings.
+
+Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
+State: fixed in the merge.
+
+Four review regression tests looked for controls before the service settings had loaded.
+Their fake connection refused every read and did not install the live mapping functions.
+The fixture now installs the same mappings as the live entry point.
+It returns explicit settings read replies and waits for the service controls to become ready.
+It checks that opening the screen issued only known reads.
+The original refusal assertions still inspect every request after each control is clicked.
+The service browser journey also waits for the standing-rules write to finish before clicking its next control.
+The streamed setting can update before the write's final refresh has completed.
+The test keeps its original refusal assertion and deadlines.
+The initial stall-time input also waits for the settings fieldset's pending state to clear.
+A later remote run observed an empty value after the initial stall-time edit.
+The remote settings save also waits for the form to report no unsaved changes before reloading.
+A subsequent run read the previous check-in value after reloading.
+
+## 679. The Home reader retained an answered request after logout.
+
+Found: 2026-11-13, while merging the chat work with the connection review fixes.
+State: fixed in the merge.
+
+The chat reader kept answered requests across snapshot updates.
+It also restored an answered request when logout cleared the connection's records.
+The reader now retains an answered request only while its agent is still present.
+A regression test loads an answered request through the Home reader and clicks the actual logout control.
+It checks that the connection signs out and the request store becomes empty.
+
+## 680. The Nudge regression test still expected an unconnected control after the merge.
+
+Found: 2026-11-13, while merging the area branch into the chat worker branch.
+State: fixed in this merge.
+
+The area regression test expected Nudge to refuse before sending any request.
+The chat implementation connects Nudge to the engine's direct board post request.
+The merged test now checks that the request reaches the connection.
+It also checks that an engine refusal appears and leaves the local posts empty.
+The other unconnected controls keep their original refusal checks.
+
+## 681. The merged Messages module imported the live binding twice.
+
+Found: 2026-11-13, during the remote browser check of this merge.
+State: fixed in this merge.
+
+Both branches added the live binding to the Messages module's imports.
+Git kept both declarations when it merged the import lists.
+The browser rejected the module and left both the live page and the standalone mock blank.
+The test transformer accepted the declarations, so the Studio tests did not expose the error.
+Removing the redundant import lets the browser parse the module.
+
+## 682. The board mapping replaced worker names with role labels.
+
+Found: 2026-11-13, during the merged chat browser journey.
+State: fixed in this merge.
+
+The area board mapping replaced each worker's engine name with its role label.
+The chat roster needs the engine name to identify a worker and its controls.
+The merged mapping keeps worker names and retains the area's project lead and team lead labels.
+The browser journey checks the same worker in the blocked lane and the table.

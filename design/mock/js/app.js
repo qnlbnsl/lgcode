@@ -1,3 +1,4 @@
+import * as liveGit from './live/git.js';
 import * as chat from './live/chat.js';
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
@@ -388,8 +389,10 @@ export function mount(el, { connection, slots: fills, mode = 'mock' } = {}) {
 function mountLive(el) {
   const state = emptyState();
   state.ui = {};
+  for (const key of Object.keys(state.settings)) state.settings[key] = typeof state.settings[key] === 'boolean' || typeof state.settings[key] === 'number' ? null : typeof state.settings[key] === 'string' ? '' : {};
+  state.settings.quiet = { on: null, from: '', to: '', failed: null };
   seedTerminal(state);
-  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], workflow: {}, mocks: {}, design: {}, machineDetails: null });
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], phoneOffer: null, workflow: {}, mocks: {}, design: {}, machineDetails: null });
   store.state = guardStore(state);
   act.applyPrefs();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
@@ -412,6 +415,7 @@ function mountLive(el) {
     for (const x of [...(patch.agents || []), ...(patch.subscriptions || [])]) {
       if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
     }
+    liveGit.observe(patch);
     engineWrite(patch);
     if (patch.conn?.status === 'live') chat.connected();
     // The sidebar opens each repository the first time the engine names it, as the sample does.

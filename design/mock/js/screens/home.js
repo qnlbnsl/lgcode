@@ -1,7 +1,7 @@
 import { watchHome, loadRequest, busy } from '../live/chat.js';
 // Home is one triage table: everything that needs the owner, across every project.
 // Project navigation lives in the sidebar and on the All projects page, not here.
-import { html, useState, useEffect, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
+import { html, useState, useEffect, Icon, cx, href, go, ago, clock, useNow, HOUR, live } from '../lib.js';
 import {
   openRequests, projectOf, repoOf, agentOf, teamOf, machineOf, KIND_LABEL, projectStatus, leadOf, agentStatus,
   agentsOfProject, byId, routeForRequest, STAGES,
@@ -31,7 +31,7 @@ const COLS = [
 ];
 
 function PhoneOffer({ s }) {
-  if (s.phoneOffer !== 'open' || s.settings.ntfyServer) return null;
+  if (s.phoneOffer !== 'open' || !live.on && s.settings.ntfyServer) return null;
   return html`<div class="phone-offer" role="note" aria-busy=${busy('phone-offer')}>
     <${Icon} name="smartphone" size=${14} /><span>Phone notifications are off</span>
     <a class="btn sm" href=${href('/notifications')}>Set up</a>
