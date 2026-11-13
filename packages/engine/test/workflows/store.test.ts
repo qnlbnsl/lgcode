@@ -147,7 +147,7 @@ test('missing descriptor filesystem is refused with a plain sentence', async () 
 
 test('the engine default loads from a checkout with spaces without a design folder', () => {
   const checkout = join(root, 'checkout with spaces'); mkdirSync(checkout)
-  for (const name of ['store.ts', 'build-loop.json']) writeFileSync(join(checkout, name), readFileSync(new URL('../../src/workflows/' + name, import.meta.url)))
+  for (const name of ['store.ts', 'folder.ts', 'build-loop.json']) writeFileSync(join(checkout, name), readFileSync(new URL('../../src/workflows/' + name, import.meta.url)))
   symlinkSync(fileURLToPath(new URL('../../node_modules', import.meta.url)), join(checkout, 'node_modules'))
   const code = `const { WorkflowStore } = await import(${JSON.stringify(new URL('file://' + checkout + '/store.ts').href)}); console.log((await new WorkflowStore(${JSON.stringify(home)}).read('default', 'build-loop')).name)`
   expect(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim()).toBe('Build loop')

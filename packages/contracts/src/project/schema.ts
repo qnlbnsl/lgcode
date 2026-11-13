@@ -33,7 +33,7 @@ export const ProjectLeadDefaults = Schema.Struct({
   harness: HarnessId, account: Schema.Union([Schema.TaggedStruct("any", {}), Schema.TaggedStruct("named", { accountId: AccountId })]),
   model: Schema.optionalKey(ProjectName), effort: Schema.optionalKey(ProjectName), permission: PermissionLevel
 })
-export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName, lead: Schema.optionalKey(ProjectLeadDefaults), displayName: Schema.optionalKey(ProjectName) })
+export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName, workflowFolder: Schema.optionalKey(ProjectPath), reviewDefaults: Schema.optionalKey(Schema.Struct({ reviewers: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(9)), differentVendor: Schema.Boolean })), lead: Schema.optionalKey(ProjectLeadDefaults), displayName: Schema.optionalKey(ProjectName) })
 export type ProjectSettings = typeof ProjectSettings.Type
 export const Repository = Schema.Struct({ repoId: RepositoryId, name: ProjectName, path: ProjectPath })
 export type Repository = typeof Repository.Type
