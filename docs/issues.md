@@ -11148,3 +11148,14 @@ and the editor route's refusal of changed design evidence.
 The expanded standalone test also caught and verified a palette regression introduced
 while connecting this page.
 This problem is fixed on the worker branch.
+
+## s2-mocks-3. Machines displayed unsupported capacity and installation placeholders.
+
+The live page treated a zero slot limit as real capacity.
+It also showed a persistent scanning state without reading harness discovery.
+The step 2 adapter now loads discovery and the saved workspace and web port.
+The page leaves unrecorded status, hardware, versions, limits, and timestamps empty.
+It counts worktrees from the loaded workspace records.
+Pairing, renaming, removing, and changing the limit retain the existing refusal.
+Browser tests cover these refusals, discovery, rescanning, and repository registration.
+This problem is fixed on the worker branch.

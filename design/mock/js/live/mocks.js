@@ -25,12 +25,13 @@ export async function readMocks(projectId) {
   return maps().mapMocks(items, approval);
 }
 export function loadMocks(projectId) {
+  const initial = S(), connection = engine.connection(), revision = S().boardRevision;
   return run('read-mocks:' + projectId, async () => {
     const state = S(), connection = engine.connection();
     const m = await readMocks(projectId);
     if (valid(state, connection)) engineWrite({ mocks: { ...S().mocks, [projectId]: m } });
     return m;
-  });
+  }).finally(() => { if (valid(initial, connection) && revision !== S().boardRevision) void loadMocks(projectId); });
 }
 export function approveMocks(project) {
   const revisionId = S().mocks[project.id]?.revisionId;
@@ -57,6 +58,7 @@ export function requestChanges(project, screen, text, designer) {
   }, 'Change request sent');
 }
 export function loadDesign(repoId) {
+  const initial = S(), connection = engine.connection(), revision = S().boardRevision;
   return run('read-design:' + repoId, async () => {
     const state = S(), connection = engine.connection();
     const reply = await engine.request('project.design.read', { repoId });
@@ -64,16 +66,17 @@ export function loadDesign(repoId) {
     const d = maps().mapDesign(reply.result);
     if (valid(state, connection)) engineWrite({ design: { ...S().design, [repoId]: d } });
     return d;
-  });
+  }).finally(() => { if (valid(initial, connection) && revision !== S().boardRevision) void loadDesign(repoId); });
 }
 export function loadMachines() {
+  const initial = S(), connection = engine.connection(), revision = S().boardRevision;
   return run('read-machines', async () => {
     const state = S(), connection = engine.connection();
     const [discovery, settings, web] = await Promise.all([engine.request('project.setup.discover', {}), engine.request('project.settings', {}), engine.request('client.web.settings', {})]);
     const details = maps().mapMachineDetails(discovery.result, settings.settings, web.port);
     if (valid(state, connection)) engineWrite({ machineDetails: details });
     if (details.reason) toast(details.reason, 'error');
-  });
+  }).finally(() => { if (valid(initial, connection) && revision !== S().boardRevision) void loadMachines(); });
 }
 
 // Displays use only identities from engine records. The connection validates the URL.
