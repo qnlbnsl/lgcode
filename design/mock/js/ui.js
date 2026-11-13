@@ -221,7 +221,7 @@ function Cited({ text }) {
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
 // What an answered card says about its answer: a short label, and the owner's words when the
 // answer was typed.
-export function requestOutcome(r, rec) {
+export function requestOutcome(r, rec, shown) {
   const a = (r.answer || '').trim();
   if (r.status === 'cancelled') return { label: 'Cancelled', text: a && a !== 'Cancelled' ? a : '', icon: 'x', tone: 'off' };
   if (r.kind !== 'question') {
@@ -229,7 +229,8 @@ export function requestOutcome(r, rec) {
     const label = byKind || a || 'Answered'; const no = /^(denied|sent back)/i.test(label);
     return { label, text: '', icon: no ? 'x' : 'check', tone: no ? 'no' : 'yes' };
   }
-  if (rec && a === rec.label) return { label: 'Accepted the recommendation', text: '', icon: 'check', tone: 'yes' };
+  // The accepted answer is named when the card does not already show the same words.
+  if (rec && a === rec.label) return { label: 'Accepted the recommendation', text: a === (shown || '').trim() ? '' : a, icon: 'check', tone: 'yes' };
   return { label: 'You answered', text: a, icon: 'check', tone: 'yes' };
 }
 function BriefCard({ s, r, openThread, who }) {
@@ -269,7 +270,7 @@ function BriefCard({ s, r, openThread, who }) {
   const done = r.status !== 'open';
   if (!live && !done) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Held: ' + brief}>
     <div class="qc-top"><b class="qc-q">${brief}</b></div></section>`;
-  const outcome = done ? requestOutcome(r, rec) : null;
+  const outcome = done ? requestOutcome(r, rec, recShort) : null;
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
