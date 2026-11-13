@@ -11130,7 +11130,119 @@ The registered component preview case did not observe the expected document resp
 The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
 The result file records the baseline checks for these failures.
 
-## 635. A fast connection reply could leave a reloaded page blank.
+## 635. A failed logout claimed that the engine had ended the session.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The connection treated every logout response as a confirmed session revocation.
+It now removes the records immediately and shows a persistent warning unless the engine confirms the logout.
+An older session probe could also restore the records after logout.
+Session attempts now invalidate older replies.
+
+## 636. Truncated snapshots left references to missing records.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The mapping retained requests whose agents were absent from the mapped roster.
+Other bounded lists could leave missing repositories, projects, teams, sprints, tasks, or request holders.
+The mapping now recovers agent membership from unambiguous retained evidence.
+It omits children with missing required parents and clears optional links to omitted records.
+It does not turn a missing request holder into an owner-held request.
+
+## 637. Account and configuration events left the website stale.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Four account and configuration event types advanced the subscription cursor without refreshing mapped records.
+Those events now request a fresh snapshot before advancing the cursor.
+Oversized event markers use the same refresh rule.
+
+## 638. Lifecycle updates kept the previous activity text.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+An agent could resume working while its activity still said that it was signed out.
+The connection now recomputes the display state with the contracts helper.
+
+## 639. Failed retries postponed the offline deadline.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Every failed attempt restarted the offline timer and claimed a new contact time.
+Retries now share one outage deadline.
+Only a successful connection or a received stream item updates the last contact time.
+
+## 640. Refused settings changes still displayed Saved.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The Saved indicator bypassed the store's refusal guard.
+Its write now passes through the guarded update function.
+
+## 641. Unconnected controls simulated successful service actions.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Reconnect now claimed success before the connection answered.
+Update checks, workflow checks, restarts, and harness scans also simulated successful work.
+The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
+Unconnected actions now show the required refusal notice before their simulation starts.
+Reconnect now leaves its status to the real connection.
+The standalone mock retains its simulation.
+
+## 642. The logout test supplied its own record cleanup.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The previous rendering test supplied an ended session and empty records itself.
+Its name now describes that limited assertion.
+New tests invoke the actual logout control through the real connection.
+They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## 643. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: open.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
+
+## 644. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.
+
+## 645. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11140,7 +11252,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## 636. Registered workspaces need their project and team links joined.
+## 646. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11149,7 +11261,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## 637. The settings contract does not return effective role defaults.
+## 647. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11161,7 +11273,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## 638. Notification retries need the original receipt after a lost reply.
+## 648. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11172,7 +11284,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## 639. Git destinations must keep their workspace identifiers.
+## 649. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11182,7 +11294,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## 640. The existing website's browser assertions failed in the full check.
+## 650. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11205,8 +11317,15 @@ The implementation branch's full run passed that logout test.
 The baseline run finished with 43 passed tests and three failed tests.
 The implementation run finished with 45 passed browser tests and two failed browser tests.
 The complete comparison is recorded in the builder's result.
+The first area merge's full check passed all 529 unit files and 7,920 unit tests.
+All five merged Studio browser cases passed.
+Three existing website cases failed.
+The Git lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
+The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
+Their causes remain unproved.
 
-## 641. The automatic merge retained duplicate shared declarations.
+## 651. The automatic merge retained duplicate shared declarations.
 
 Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
 State: fixed in the merge.
@@ -11217,3 +11336,18 @@ The Studio type check rejected the duplicate identifier.
 The automatic merge also duplicated the JavaScript request export and the dialog's live import.
 The merge now keeps one request method, one request export, and one live import.
 The test connection keeps the board builder's request recording.
+
+## 652. The review control fixtures did not load connected service settings.
+
+Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
+State: fixed in the merge.
+
+Four review regression tests looked for controls before the service settings had loaded.
+Their fake connection refused every read and did not install the live mapping functions.
+The fixture now installs the same mappings as the live entry point.
+It returns explicit settings read replies and waits for the service controls to become ready.
+It checks that opening the screen issued only known reads.
+The original refusal assertions still inspect every request after each control is clicked.
+The service browser journey also waits for the standing-rules write to finish before clicking its next control.
+The streamed setting can update before the write's final refresh has completed.
+The test keeps its original refusal assertion and deadlines.

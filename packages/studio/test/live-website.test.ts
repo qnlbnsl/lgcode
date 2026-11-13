@@ -190,7 +190,7 @@ describe("the live website", () => {
     expect(() => { (store.state as Record<string, unknown>)["repos"] = [] }).toThrow()
   })
 
-  it("shows the Login page after signing out, and keeps no records", async () => {
+  it("renders the Login page when the connection supplies an ended session", async () => {
     fake.write({ session: { status: "out", firstRun: false }, repos: [], projects: [], agents: [] })
     location.hash = "#/home"
     await settle()

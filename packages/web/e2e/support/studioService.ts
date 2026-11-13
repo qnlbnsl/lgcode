@@ -61,6 +61,7 @@ export async function exerciseStudioService(page: Page, origin: string) {
   }
   await page.getByRole('switch', { name: 'Standing permission rules', exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Standing permission rules', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.locator('.svc-pane fieldset')).toHaveAttribute('aria-busy', 'false')
   await page.getByRole('switch', { name: 'Wake it once first', exact: true }).click()
   await expect(page.locator('.toasts')).toContainText('not connected to the service yet')
   await page.getByRole('switch', { name: 'Stall watch', exact: true }).click()

@@ -56,7 +56,7 @@ const subAgents = (s, sid) => s.agents.filter((a) => a.subscription === sid && !
 
 let savedTimer = null;
 function markSaved() {
-  store.state.ui.saved = Date.now();
+  update((s) => { s.ui.saved = Date.now(); });
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => update((s) => { s.ui.saved = null; }), 1800);
 }
@@ -169,9 +169,9 @@ export function Machines({ s }) {
             <td class="svc-acts" onClick=${(e) => e.stopPropagation()}><${Menu} class="icon-btn sm" label=${'Actions for ' + m.name} align="end" width=${230} trigger=${html`<${Icon} name="ellipsis" size=${15} />`}
               items=${[
                 { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: `Rename ${m.name}`, value: m.name, taken: s.machines.map((x) => x.name), onRename: (v) => { update(() => { m.name = v; }); act.toast('Machine renamed'); } }) },
-                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.toast(`Scanned ${m.name}. Nothing changed.`) },
+                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => { if (act.refused()) return; act.toast(`Scanned ${m.name}. Nothing changed.`); } },
                 { label: 'Add repository', icon: 'folder-git-2', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.openDialog({ type: 'add-repository', machine: m.id }) },
-                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
+                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { if (act.refused()) return; act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
                 { sep: true },
                 { label: 'Remove machine', icon: 'trash-2', danger: true, disabled: m.role === 'master', why: m.role === 'master' ? 'The master runs the service and cannot be removed.' : null, onSelect: () => remove(m) },
               ].filter(Boolean)} /></td>
@@ -586,15 +586,15 @@ function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
     <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGTM Studio ${set.version}</b><span class="tag">${set.commit}</span>
-      <button type="button" class="btn sm" onClick=${() => { if (live.on) return refuse(); setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
+      <button type="button" class="btn sm" onClick=${() => { if (act.refused()) return; setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
       ${chk === 'done' && html`<span class="row success-text" style="gap:4px;font-size:var(--text-sm)"><${Icon} name="check" size=${13} />Up to date</span>`}</span><//>
     <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? (live.on ? 'Running' : `Running on ${master.name}`) : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
     <${Row} label="Data folder"><span class="mono">${set.dataFolder}</span><//>
     <${Row} label="Machines"><a class="link" href=${href('/machines')}>${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</a><//>
     <${Row} label="Licence"><span>${live.on ? '' : 'Apache License 2.0'}</span><//>
     <${Row} label="Restart the service" hint="Agents keep their place. Web connections close and reconnect.">
-      <button type="button" class="btn" onClick=${() => live.on ? refuse() : act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
-        onConfirm: () => { act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
+      <button type="button" class="btn" onClick=${() => act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
+        onConfirm: () => { if (act.refused()) return; act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
   </div>`;
 }
 const SECTIONS = [

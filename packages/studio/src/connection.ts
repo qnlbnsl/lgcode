@@ -9,7 +9,7 @@
 // Step 3 of .plans/plans/connect-mock/plan.md replaces this file when the contract moves to
 // gRPC. The reconnection loop follows packages/web/src/watchSituation.ts.
 import { connect, type Client, type ClientEnvelope } from "@lgtm/client/browser"
-import type { ClientSnapshot, EventSequence, RequestId } from "@lgtm/contracts"
+import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import * as board from "./board.ts"
@@ -17,7 +17,7 @@ import { mapAlerts } from "./git.ts"
 import * as Redacted from "effect/Redacted"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
-export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable"
+export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable" | "logout-unconfirmed"
 export interface StorePatch extends Partial<EngineRecords> {
   readonly session?: { readonly status: SessionStatus; readonly firstRun: boolean }
   readonly conn?: StoreConn
@@ -71,7 +71,8 @@ const refreshTags = new Set([
   "AgentStarted", "AgentStartFailed", "SessionOpened", "AgentGrouped", "ModeChanged",
   "TurnStarted", "TurnEnded", "AgentCrashed", "AgentInterrupted", "AgentStopped", "AgentReloadFailed",
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
-  "AgentConfigurationChosen", "AgentConfigurationApplied", "AgentConfigurationRefused", "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
+  "AgentConfigurationChosen", "AgentConfigurationApplied", "AgentConfigurationRefused", "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten",
+  "AccountChanged", "AccountNeedsSignIn", "AccountAvailable"
 ])
 const accountTags = ["AccountChanged", "AccountAvailable", "AccountNeedsSignIn", "AccountOutOfUsage", "HarnessChanged"]
 const needsRefresh = (tag: string) => accountTags.includes(tag) || refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("roles.") || tag.startsWith("client.Alert")
@@ -104,16 +105,24 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   const retryIds = new Map<string, RequestId>()
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
+  let sessionAttempt = 0
   let closed = false
   let activeClient: Client | undefined
   let boardRevision = 0
   let accountLimits: Record<string, number | null> = {}
+  let lastHeard = 0
+  let connectionStatus: ConnectionStatus = "reconnecting"
 
   const setConn = (status: ConnectionStatus) => {
-    clearTimeout(offlineTimer)
-    write({ conn: mapConnection(status, now()) })
-    // A connection that stays down for 30 seconds is shown as offline, as on the old page.
-    if (status === "reconnecting") offlineTimer = setTimeout(() => write({ conn: mapConnection("offline", now()) }), 30_000)
+    if (status === "live") {
+      clearTimeout(offlineTimer)
+      offlineTimer = undefined
+      lastHeard = now()
+    } else if (connectionStatus === "offline") status = "offline"
+    connectionStatus = status
+    write({ conn: mapConnection(status, lastHeard) })
+    // Retries share one outage deadline, and never count as contact with the service.
+    if (status === "reconnecting" && offlineTimer === undefined) offlineTimer = setTimeout(() => setConn("offline"), 30_000)
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
@@ -210,6 +219,8 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
               debug(`LGTM Studio: the first pushed update arrived ${timing.firstPushMs.toFixed(1)} ms after subscribing (${timing.firstPushKind})`
                 + (timing.firstPushDeliveryMs === undefined ? "" : `, ${timing.firstPushDeliveryMs} ms after the engine recorded it`))
             }
+            if (signal.aborted) return
+            setConn("live")
             if (item.sequence <= after) return
             if ("event" in item) {
               if (item.event._tag === "project.SettingsChanged") yield* refreshOwner()
@@ -225,6 +236,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
           setConn("reconnecting")
           // A browser hides an HTTP refusal of a WebSocket. Ask the session route instead.
           const status = yield* Effect.promise(() => post("/api/session"))
+          if (signal.aborted) return
           if (status === 401) { ended = true; current = undefined; forget(); setSession("expired") }
           // A refused cursor needs a fresh snapshot to anchor the stream again.
           if (typeof error === "object" && error !== null && "_tag" in error && error._tag === "CommandError") current = undefined
@@ -241,15 +253,20 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         write({ accountLimits })
       }
       if (event._tag === "StateChanged" && current !== undefined) {
-        publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => agent.agentId === event.agentId ? { ...agent, state: event.state } : agent) })
+        publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => {
+          if (agent.agentId !== event.agentId) return agent
+          const updated = { ...agent, state: event.state }
+          return { ...updated, displayedState: displayedState(updated) }
+        }) })
       } else if (needsRefresh(event._tag)) yield* refresh(item.sequence)
     })
     void Effect.runPromise(program, { signal }).catch(() => { if (!signal.aborted) setConn("reconnecting") })
   }
 
   const check = async () => {
+    const attempt = ++sessionAttempt
     const status = await post("/api/session")
-    if (closed) return
+    if (closed || attempt !== sessionAttempt) return
     if (status === 204) { setSession("in"); follow() }
     else if (status === undefined || status >= 500) setSession("unavailable")
     else setSession("out")
@@ -293,19 +310,26 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       void check()
     },
     async signIn(password) {
+      const attempt = ++sessionAttempt
       const status = await post("/api/login", { password })
+      if (closed || attempt !== sessionAttempt) return "unavailable"
       if (status === 204) { setSession("in"); follow(); return "in" }
       if (status === undefined || status >= 500) { setSession("unavailable"); return "unavailable" }
       setSession("rejected")
       return "rejected"
     },
     async signOut() {
+      const attempt = ++sessionAttempt
       stop()
-      await post("/api/logout")
+      clearTimeout(offlineTimer)
+      offlineTimer = undefined
       forget()
-      setSession("out")
+      setSession("checking")
+      const status = await post("/api/logout")
+      if (closed || attempt !== sessionAttempt) return
+      setSession(status === 204 ? "out" : "logout-unconfirmed")
     },
     reconnect() { if (!closed) void check() },
-    close() { closed = true; stop(); clearTimeout(offlineTimer) }
+    close() { closed = true; sessionAttempt++; stop(); clearTimeout(offlineTimer) }
   }
 }
