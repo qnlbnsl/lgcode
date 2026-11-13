@@ -9,7 +9,7 @@ import { checkedMetadata, cleanText, directory, filePath, inside, slug, smallFil
 import { parseChanges, parseConflict, parseFiles, parseHistory, parseNumstat } from "./parse.ts";
 import { boundedUtf8, gitProcess, processFailure, type ProcessReply } from "./process.ts";
 import { GitFailure, type Bounded, type Change, type Conflict, type ConflictChoice, type Diff, type DiscardPlan,
-  type GitFailureReason, type GitService, type Repository, type Review, type Worktree } from "./types.ts";
+  type GitFailureReason, type ResolvedConflict, type GitService, type Repository, type Review, type Worktree } from "./types.ts";
 export * from "./types.ts";
 
 export interface GitConfiguration {
@@ -324,7 +324,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
   // Git retains the original unmerged stages in its resolve-undo index extension.
   // Only the current merge can use them; never reconstruct from client content.
   const resolvedConflicts = async (folder: string, signal: AbortSignal) => {
-    if (await mergeHead(folder, signal) === null) return list<string>([]);
+    if (await mergeHead(folder, signal) === null) return list<ResolvedConflict>([]);
     const records = (await git(folder, ["ls-files", "--resolve-undo", "-z"], signal)).split("\0").filter(Boolean);
     const paths = new Map<string, Set<string>>();
     for (const record of records) {
@@ -334,11 +334,18 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       stages.add(match[3]!); paths.set(match[4]!, stages);
     }
     const unresolved = new Set((await completeChanges(folder, signal)).filter((row) => row.conflict).map((row) => row.path));
-    const result: string[] = [];
+    const result: ResolvedConflict[] = [];
     for (const [path, stages] of paths) {
       if (stages.size !== 3 || unresolved.has(path)) continue;
-      await filePath(folder, path);
-      result.push(path);
+      try {
+        const full = await filePath(folder, path);
+        result.push({ path, fingerprint: hash(path, await smallFile(full, diffBytes)) });
+      } catch (error) {
+        // One no-longer-readable resolved leaf cannot hide the remaining merge.
+        if (error instanceof GitFailure && ["invalid_path", "output_limit"].includes(error.reason)
+          || ["ENOENT", "EACCES", "ELOOP", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) continue;
+        throw error;
+      }
     }
     return list(result);
   };
@@ -375,6 +382,23 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       await file.write(`${previous.endsWith("\n") || previous === "" ? "" : "\n"}/.worktrees/\n`);
     } finally { await file.close(); }
   };
+  const integrate = (source: string, destination: string, expectedHead: string, requireCleanSource: boolean) => operation(async (signal) => {
+      const from = await repository(source, signal), to = await repository(destination, signal);
+      if (from.commonDirectory !== to.commonDirectory || from.path === to.path) return fail("invalid_path");
+      const destinationBranch = await branch(to.path, signal);
+      if (destinationBranch === null) return fail("invalid_ref");
+      if (["main", "master"].includes(destinationBranch)) return fail("base_requires_review");
+      if ((await completeChanges(to.path, signal)).length > 0 || await mergeHead(to.path, signal) !== null) return fail("dirty_destination");
+      if (requireCleanSource && ((await completeChanges(from.path, signal)).length > 0 || await mergeHead(from.path, signal) !== null)) return fail("dirty_source");
+      const sourceHead = await head(from.path, signal);
+      if (sourceHead !== expectedHead) return fail("stale_state");
+      const reply = await mutateRun(to.path, ["-c", "merge.conflictStyle=diff3", "merge", "--no-edit", "--no-autostash", sourceHead!], signal);
+      if (reply.code !== 0) {
+        if (await mergeHead(to.path, signal) !== null && (await completeChanges(to.path, signal)).some((change) => change.conflict)) return determinate("conflicts");
+        throw processFailure(reply);
+      }
+      return (await head(to.path, signal))!;
+    });
   return {
     mutationIdentity: (folder) => withRepo(folder, async (path, signal) => {
       const tree = await run(path, ["write-tree"], signal);
@@ -552,23 +576,8 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       await localBranch(path, name, signal);
       await mutateGit(path, ["push", "--set-upstream", "origin", `refs/heads/${name}:refs/heads/${name}`], signal, "push");
     }, true),
-    mergeTeam: (source, destination, expectedHead) => operation(async (signal) => {
-      const from = await repository(source, signal), to = await repository(destination, signal);
-      if (from.commonDirectory !== to.commonDirectory || from.path === to.path) return fail("invalid_path");
-      const destinationBranch = await branch(to.path, signal);
-      if (destinationBranch === null) return fail("invalid_ref");
-      if (["main", "master"].includes(destinationBranch)) return fail("base_requires_review");
-      if ((await completeChanges(to.path, signal)).length > 0 || await mergeHead(to.path, signal) !== null) return fail("dirty_destination");
-      if ((await completeChanges(from.path, signal)).length > 0 || await mergeHead(from.path, signal) !== null) return fail("dirty_source");
-      const sourceHead = await head(from.path, signal);
-      if (sourceHead !== expectedHead) return fail("stale_state");
-      const reply = await mutateRun(to.path, ["-c", "merge.conflictStyle=diff3", "merge", "--no-edit", "--no-autostash", sourceHead!], signal);
-      if (reply.code !== 0) {
-        if (await mergeHead(to.path, signal) !== null && (await completeChanges(to.path, signal)).some((change) => change.conflict)) return determinate("conflicts");
-        throw processFailure(reply);
-      }
-      return (await head(to.path, signal))!;
-    }),
+    mergeTeam: (source, destination, expectedHead) => integrate(source, destination, expectedHead, true),
+    updateFromParent: (source, destination, expectedHead) => integrate(source, destination, expectedHead, false),
     review: (folder, base, agentRead = false) => withRepo(folder, (path, signal) => review(path, base, signal, agentRead)),
     reviewMain: (source, destination) => operation(async (signal) => (await mainComparison(source, destination, signal)).comparison),
     approveMain: (source, destination, reviewed, caller, confirmed) => operation(async (signal) => {
@@ -621,16 +630,26 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     abortMerge: (folder, expectedHead, expectedMergeHead, confirmed) => withRepo(folder, async (path, signal) => {
       if (confirmed !== true) return fail("confirmation_required");
       await expectedMerge(path, expectedHead, expectedMergeHead, signal);
-      await mutateGit(path, ["merge", "--abort"], signal);
+      const beforeIndex = await git(path, ["ls-files", "--stage", "-z"], signal);
+      const reply = await mutateRun(path, ["merge", "--abort"], signal);
+      if (reply.code !== 0) {
+        const overlap = /^error: Entry '[^\r\n]+' not uptodate\. Cannot merge\.\r?\n(?:fatal: )?Could not reset index file to revision 'HEAD'\.\r?\n?$/.test(reply.stderr);
+        if (reply.code > 0 && !reply.truncated && overlap && await mergeHead(path, signal) === expectedMergeHead
+          && await head(path, signal) === expectedHead && await git(path, ["ls-files", "--stage", "-z"], signal) === beforeIndex) return determinate("abort_blocked");
+        throw processFailure(reply);
+      }
       if (await mergeHead(path, signal) !== null || await head(path, signal) !== expectedHead) return fail("stale_state");
     }),
     resolvedConflicts: (folder) => withRepo(folder, resolvedConflicts),
-    reopen: (folder, requested, expectedHead, expectedMergeHead) => withRepo(folder, async (path, signal) => {
+    reopen: (folder, requested, expectedHead, expectedMergeHead, fingerprint, confirmed) => withRepo(folder, async (path, signal) => {
+      if (confirmed !== true) return fail("confirmation_required");
       await filePath(path, requested);
       await expectedMerge(path, expectedHead, expectedMergeHead, signal);
       const resolved = await resolvedConflicts(path, signal);
       if (resolved.truncated) return fail("output_limit");
-      if (!resolved.items.includes(requested)) return fail("unsupported_conflict");
+      const seen = resolved.items.find((row) => row.path === requested);
+      if (seen === undefined) return fail("unsupported_conflict");
+      if (seen.fingerprint !== fingerprint) return fail("stale_state");
       await mutateGit(path, ["checkout", "--conflict=diff3", "-m", "--", requested], signal);
       await conflict(path, requested, signal);
     }),

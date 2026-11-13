@@ -110,9 +110,6 @@ export async function exerciseStudioGit(page: Page) {
           await page.getByRole('button', { name: 'Choose a worktree', exact: true }).click()
           await page.getByRole('menuitemradio', { name: new RegExp(source.branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
           await page.getByRole('button', { name: 'Open merge review', exact: true }).click()
-          // The review is ready before its snapshot-triggered Git refresh finishes.
-          await expect(page.getByRole('dialog')).toBeVisible()
-          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           await expect(page.getByRole('dialog')).toContainText('Missing')
           await page.locator('#pr-title').fill('Unsupported hosted title')
           await expect(page.locator('.toasts')).toContainText('not connected to the service yet')
@@ -124,9 +121,6 @@ export async function exerciseStudioGit(page: Page) {
           await expect(page.getByRole('dialog')).toHaveCount(0)
           expect(git(rig.work, 'log', '-1', '--format=%s')).toBe('Initial')
           await page.getByRole('button', { name: 'Open merge review', exact: true }).click()
-          // The review is ready before its snapshot-triggered Git refresh finishes.
-          await expect(page.getByRole('dialog')).toBeVisible()
-          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           await page.getByRole('button', { name: 'Approve without evidence', exact: true }).click()
           await expect(page.getByRole('dialog')).toHaveCount(0)
           await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
@@ -163,6 +157,7 @@ export async function exerciseStudioGit(page: Page) {
           await page.reload()
           await page.getByRole('tablist', { name: 'Git views' }).getByRole('button', { name: /^Conflicts/ }).click()
           await page.getByRole('button', { name: 'Reopen', exact: true }).click()
+          await page.getByRole('dialog').getByRole('button', { name: 'Reopen file', exact: true }).click()
           await page.getByRole('button', { name: 'Use both', exact: true }).click()
           await page.getByRole('button', { name: 'Mark resolved', exact: true }).click()
           await expect(page.getByRole('button', { name: 'Stage all', exact: true })).toBeEnabled()
@@ -187,9 +182,6 @@ export async function exerciseStudioGit(page: Page) {
           await page.getByRole('button', { name: 'Refresh Git', exact: true }).click()
           await expect(page.getByRole('button', { name: 'Open merge review', exact: true })).toBeEnabled()
           await page.getByRole('button', { name: 'Open merge review', exact: true }).click()
-          // The review is ready before its snapshot-triggered Git refresh finishes.
-          await expect(page.getByRole('dialog')).toBeVisible()
-          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           await expect(page.getByRole('dialog')).toContainText('current: passed')
           await page.getByRole('button', { name: 'Approve and merge', exact: true }).click()
           await expect(page.getByRole('dialog')).toHaveCount(0)

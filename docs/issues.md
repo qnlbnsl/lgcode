@@ -12290,3 +12290,117 @@ The broader regression run found that callers without the optional team list dis
 The mapping now retains the existing workspace team identifier as a display fallback.
 A registered builder parent still takes precedence in the page mapping.
 The engine continues to require the registered parent relationship for integration authority.
+
+## s4-git2-10. The first send-back composition dropped board withdrawals.
+
+Review of df9e486 found that tag-prefix filtering discarded an unprefixed DeliveryWithdrawn event.
+The named composition now checks the complete board plan before appending its final project decision.
+It retains the board planner's event order and deliveries.
+It rejects an afterCommit hook and side rows outside the board namespace through the ordinary checks.
+A regression replaces an earlier queued lead wake and verifies its withdrawal in the same decision transaction.
+Separate malformed planner tests verify both boundary refusals.
+
+## s4-git2-11. A sent-back review did not wake an idle lead.
+
+The original addressed notice required no reply and created no independent wake duty.
+The post now requires a reply from the recorded project lead.
+A regression verifies a queued board delivery containing the reason without any earlier duty.
+A stopped, missing, crashed, or unavailable interrupted lead makes the decision refuse.
+The fixed reason says that the project lead is unavailable and the review was not sent back.
+The stored review remains open in that case.
+This refusal policy is an implementation choice for the owner to review.
+
+## s4-git2-12. Parent updates incorrectly required a clean parent checkout.
+
+The parent supplies only a committed object and is not mutated by an update.
+The dedicated update operation now shares the integration implementation without its source cleanliness requirement.
+The child must still be clean.
+The expected parent head and the common repository must still match.
+Tests retain uncommitted and untracked parent files while integrating its committed changes.
+The existing builder and team integrations retain their source cleanliness checks.
+
+## s4-git2-13. Reopening a conflict could discard an edit made after resolution.
+
+The resolved file read now returns a bounded content fingerprint with each path.
+The reopening request requires that observation and explicit confirmation.
+The page captures the observation before asking for confirmation.
+The confirmation says that the current file contents are replaced.
+An edit since that observation returns the fixed stale-state refusal and preserves the edit.
+The ordinary filesystem race limit documented in issue 49 still applies.
+
+## s4-git2-14. An unsafe resolved path could hide the rest of a merge.
+
+A resolved file can later become a directory, a symbolic link, or a member of a nested checkout.
+The resolved file read now skips such paths and returns the other safe files.
+Unreadable and oversized individual files are also omitted from the bounded list.
+The reopening operation continues to validate its requested path independently.
+Regressions cover each unsafe kind while retaining another resolved file.
+
+## s4-git2-15. Background Git reads disabled owner controls.
+
+Review rejected the idle-state wait introduced in s4-git2-8 because its debounce remained racy.
+The built page now tracks automatic refreshes under a separate Git read key.
+Only an owner action in flight sets the pending key used to disable its controls.
+The owner action invalidates earlier background reads before writing fresh state.
+The extra merge-review idle waits were removed from the browser journey.
+A rendered merge dialog regression holds a background read and verifies that approval stays enabled.
+It then starts an owner action and verifies that approval becomes disabled.
+The design reference is unchanged and the build-time replacement fails on a mismatch.
+The original full check also reproduced issue 689 at Stage file.txt after a discard.
+That run passed 8230 unit tests and 52 browser tests before this browser failure.
+
+## s4-git2-16. A blocked merge abort was reported as uncertain.
+
+Git can refuse an abort when a working edit overlaps an index entry that the abort must replace.
+The service recognizes that bounded refusal only when both heads and the index entries remain unchanged.
+It returns the fixed abort_blocked reason.
+Other failed mutations retain uncertainty when their outcome is not proved.
+A wire test verifies that the refusal is replayable and leaves no pending attempt.
+The abort confirmation now says that files added during the merge are removed.
+A changed-index test verifies that Git removes a newly staged file and restores the original clean state.
+
+## s4-git2-17. Builder Git reads currently have project-wide access.
+
+The workspace mapping added in df9e486 widened the existing project Git read scope to builder worktrees under registered teams.
+Every authenticated agent assigned to that project can read those builder worktrees through changes, diff, history, commit.files, git.state, review, and conflict.
+This includes a project agent in another team.
+An outsider cannot read them by supplying the project identifier.
+A project agent cannot use those requests to read the repository base checkout.
+The owner can read registered local workspaces independently of project membership.
+A wire regression pins these cases across all seven read requests.
+The policy is recorded for the owner to rule on and is not changed by this review fix.
+
+## s4-git2-18. Unscoped Git destination lookup relies on owner-only access.
+
+Integration, parent update, and durable attempt admission resolve their registered destination without inheriting the source project's scope.
+That lookup is safe only while these mutations remain owner-only.
+Comments now state this dependency at each lookup.
+The requests still validate the registered relationship and repository identity.
+The authenticated agent refusal regression pins the new owner-only requests.
+A future access change must review the destination lookup as well.
+
+## s4-git2-19. Builder integration holds the source workspace operation lane.
+
+Builder-into-team integration mutates the team checkout while holding the builder's operation lane.
+The shared Git gate bounds individual external operations but does not make the team lane its operation owner.
+This can matter when another command targets the team during the integration.
+The review explicitly requested recording this issue without changing the lane.
+The source lane is retained for the owner's ruling.
+
+## s4-git2-20. The live-check difference matches the documented Codex-seat context.
+
+The three additional failures compared with the nineteen-of-twenty-three reference are state-read, permission-kinds, and reload.
+The reference failures were removed-variables, always-allow, and token-scan.
+Issue 526 records the same sixteen-of-twenty-three outcome inside a Codex seat at unchanged application code.
+The new run reports that Claude did not attempt the requested state command or expose permission options.
+It also reports that Claude ended the hold turn without the exact restart command.
+These Git changes do not alter the live-check probes, runner, or permission implementation.
+Those probes do not call the new Git requests.
+The available evidence attributes these extra failures to the already documented harness execution context rather than the Git change.
+The sixteen-of-twenty-three run remains evidence from this worker and is not substituted for the manager's baseline.
+
+## s4-git2-21. New fixed Git refusals were hidden by the public reason allowlist.
+
+Exact wire assertions found that the blank reason, unavailable lead, invalid parent, and inactive merge cases reached the client as command refused.
+The public allowlist now includes their fixed messages and abort_blocked.
+No caller text, filesystem path, or subprocess diagnostic is exposed by these additions.

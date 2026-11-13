@@ -28,7 +28,7 @@ replies. Agent text must remain plain text in the page.
 | `stage`, `unstage`, `stageAll`, `unstageAll`, `commit` | Mutate the actual index and commit selected changes. Bulk operations exclude conflicts. A resolved merge can be committed with no staged file diff when its merge head still exists. |
 | `planDiscard`, `discard` | Obtain a file list and fingerprint, then supply that plan with `confirmed: true`. Only unstaged changes are discarded. Conflicts are excluded, and the staged index is preserved. Edits invalidate confirmation. |
 | `fetch`, `pull`, `push` | Synchronize through `origin`. Pull requires an upstream and a clean destination, and only fast-forwards. Push sets the branch's upstream. Fixed failures report missing prerequisites, divergence and recoverable remote errors. |
-| `mergeTeam` | Merge a clean source checkout into a clean destination in the same repository. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
+| `mergeTeam`, `updateFromParent` | Merge a clean source checkout into a clean destination in the same repository. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
 | `review` | Read evidence against a local base branch, keyed to both heads. It creates no approval, provider report, or merge. |
 | `reviewMain`, `approveMain` | Read a complete bounded comparison between registered project and base checkouts. The separate approval method requires the engine-supplied authenticated owner and explicit confirmation, revalidates both reviewed heads and branch identities, and merges the reviewed object into main or master. It refuses incomplete or binary review data, dirty worktrees, and an active merge. It never changes `mergeTeam`'s base refusal. |
 | `abortMerge`, `resolvedConflicts`, `reopen` | Abort an explicitly confirmed merge after checking its head pair, list resolved regular text files from the current merge's resolve-undo index, or restore one file's original conflict stages. Reopening never accepts replacement content. No active merge returns `no_merge` for a mutation. |
@@ -118,3 +118,13 @@ Aggregate agent reads omit excluded files; owner Git operations retain the ordin
 Literal Git path syntax remains separate, so ordinary tab-bearing filenames retain their supported behavior.
 Owner-controlled Git configuration can run content filters or merge drivers as the same Unix user.
 The current local-owner security boundary accepts that scope; this service does not claim to sandbox repository configuration.
+
+Parent updates require a clean child and the expected parent commit.
+Uncommitted parent files do not block that read-only source operation.
+Team integration still requires a clean source.
+
+The resolved file list carries each safe file's content fingerprint.
+Reopening requires that fingerprint and explicit confirmation.
+Unsafe or oversized resolved paths are omitted without hiding other resolved paths.
+A stale file observation refuses before checkout replaces its contents.
+A proven overlapping-edit abort refusal returns `abort_blocked` without mutation uncertainty.

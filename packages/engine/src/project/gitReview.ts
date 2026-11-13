@@ -136,8 +136,11 @@ export const declineMainReview: PiecePlanner = (input, raw) => Effect.gen(functi
     || review.head !== p.expectedHead || review.baseHead !== p.expectedBaseHead) return yield* refused("main review is unavailable; prepare a new review")
   const reason = yield* input.runtime.log.redactText(p.reason.trim().replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""))
   if (reason.trim() === "") return yield* refused("give a reason for sending the review back")
+  const lead = own(input.snapshot.agents, project.leadAgentId)
+  if (lead === undefined || lead.state._tag === "stopped" || lead.state._tag === "crashed"
+    || lead.state._tag === "interrupted" && lead.reloadable !== true) return yield* refused("project lead is unavailable; the review was not sent back")
   const target = { _tag: "agent", agentId: project.leadAgentId } as const
-  const board = yield* postPlanner()(input, { requestId: p.requestId, direct: target, to: [target], reply: "none",
+  const board = yield* postPlanner()(input, { requestId: p.requestId, direct: target, to: [target], reply: "all",
     text: `The owner sent back the main review for ${review.branch} into ${review.base}.\n${reason}` })
   const decided: GitMainReview = { ...review, outcome: "sent_back", reason, decision: null, mergeHead: null,
     decidedAt: (yield* Clock.currentTimeMillis) as GitMainReview["decidedAt"] }

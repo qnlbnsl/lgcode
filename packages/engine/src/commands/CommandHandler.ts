@@ -416,10 +416,13 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (external?.failure !== undefined) return yield* external.failure;
             const plan = external?.plan ?? (yield* (external?.finalize ?? finalizeLifecycle ?? lists.planners[name]!)({ runtime, actor, snapshot }, payload));
             if (name === "project.review.decline") {
-              // This engine-owned composition keeps both piece boundaries:
-              // only the board planner may construct the addressed owner post.
-              const board = yield* checkPieceBatch("board", snapshot, { events: plan.events.filter((event) => event._tag.startsWith("board.")), deliveries: plan.deliveries }, actor, lists);
-              const project = yield* checkPieceBatch("project", snapshot, { events: plan.events.filter((event) => event._tag.startsWith("project.")) }, actor, lists);
+              // The named composition appends exactly one project decision after
+              // the complete board plan, including unprefixed withdrawals.
+              if (plan.afterCommit !== undefined) return yield* refused();
+              const decision = plan.events.at(-1);
+              if (decision?._tag !== "project.MainReviewDecided") return yield* refused();
+              const board = yield* checkPieceBatch("board", snapshot, { events: plan.events.slice(0, -1), deliveries: plan.deliveries, sideRows: plan.sideRows }, actor, lists);
+              const project = yield* checkPieceBatch("project", snapshot, { events: [decision] }, actor, lists);
               return { ...plan, events: [...board, ...project] };
             }
             const namespace = pieceNamespace(name);
