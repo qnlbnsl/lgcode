@@ -10785,6 +10785,14 @@ The fix stays as stated above: wait on the correct event, not a longer deadline.
 It is the next unit on area/website after the master merge.
 The original logs and failure contexts remain in the W09 author result.
 
+The web-flaky investigation reproduced the lost-reply failure once in two full browser repetitions with two workers.
+The engine log contained one completed commit.
+The page still showed the initial unconfirmed acknowledgment while its coherent Git refresh was pending.
+The test now observes that acknowledgment and the completed refresh before checking terminal uncertainty.
+The same run reproduced the fetch assertion with the old incoming count once in two repetitions.
+The synchronization test now observes the fetch, pull, and commit acknowledgment before checking each subsequent count.
+Every assertion retains its original five-second deadline.
+
 A related timing failure appeared in the full run of the rename branch on 2026-11-12, at git.spec.ts:316.
 After Pull, the sync line still said "1 incoming" after five seconds.
 The unchanged case passed on its own in 24.5 seconds.
@@ -11128,6 +11136,16 @@ The registered component preview case did not observe the expected document resp
 The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
 The result file records the baseline checks for these failures.
 
+The web-flaky investigation reproduced the bulk-stage and component failures in a two-worker full browser run.
+The Git event log recorded a successful stage before the failed count assertion.
+The page was still refreshing its coherent state when that assertion expired.
+The test now waits for the stage acknowledgment and the completed refresh before checking the count.
+The component document returned 200 before the style assertion expired with its stylesheet still pending.
+The test now observes the exact issued document response before checking its separately authorized assets.
+It also loads the second component document before changing its source for the stale-evidence check.
+These are test ordering faults.
+The same correction separates the synchronization command acknowledgments from their subsequent counts.
+
 ## 635. A failed logout claimed that the engine had ended the session.
 
 Found: 2026-11-13, in the review of the first live website connection.
@@ -11227,6 +11245,12 @@ The registered-component preview case failed earlier at `packages/web/e2e/new-pr
 The live studio case and the standalone mock case passed again.
 The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
 
+The web-flaky correction separates the Git command acknowledgment from the coherent refresh.
+It separates display issuance, the exact document response, and rendered asset evidence.
+The original five-second assertion deadlines remain unchanged.
+Its logout correction is recorded in issue 653.
+The reproduced fetch report receives the same acknowledgment ordering correction in issue 609.
+
 ## 644. A fast first response could leave the live page on its checking screen.
 
 Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
@@ -11313,6 +11337,15 @@ A bounded five-run comparison at that baseline then produced four identical time
 The production web source, engine source, and affected test file are unchanged from that baseline.
 The cause remains unproved.
 The task result records the complete checks and baseline comparisons.
+
+The web-flaky investigation reproduced five failures in five runs with two browser workers.
+Every trace stopped before logout at an attempt to fill a read-only repository name.
+The asynchronous project read had selected the existing Actual Product repository.
+Its registration detour correctly preserves that repository's name.
+The old test passed only when it opened the detour before that default selection arrived.
+This was a test fault.
+The test now explicitly selects New repository before entering its private registration draft.
+The corrected journey still verifies the real logout, the next login, and both cleared drafts.
 
 ## 654. The Nudge regression test still expected an unconnected control after the merge.
 
