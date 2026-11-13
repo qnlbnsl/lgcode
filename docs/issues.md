@@ -11885,8 +11885,10 @@ Only the application programming interface (API) and terminal can edit these ste
 The review-fix full check passed every unit test.
 The existing Git browser journey timed out at `packages/web/e2e/support/studioGit.ts:100`.
 The Approve without evidence button became disabled while Playwright waited to click it.
+The unchanged journey passed alone in 2.2 minutes.
+The full check remains a failed run.
 The Git implementation and its journey were left unchanged for their assigned builder.
-This remains open.
+This intermittent failure remains open.
 
 ## s5-workflows-12. A workflow reload could request the list before connecting.
 
