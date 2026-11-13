@@ -11121,3 +11121,27 @@ The page displays a parent branch name.
 A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
+
+## s2-git-6. The existing website's browser assertions failed in the full check.
+
+Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
+State: open.
+
+The full check of commit `5802092` passed all typechecks and 7,909 unit tests.
+All three Studio browser journeys passed.
+The existing website's bulk staging test failed at `git.spec.ts:208`.
+Its five-second assertion could not find the disabled `Commit 2 files` button.
+The failure snapshot showed that staging had succeeded while the working refresh remained pending.
+The existing component preview test failed at `new-project.spec.ts:605`.
+It observed issuance status 0 instead of 200 within five seconds.
+The preview failure is already described in issue 611.
+Both unchanged tests passed in isolation against baseline `8f9f321`.
+That isolated pass does not establish either failure's cause.
+No production code, assertion, or deadline was changed for these failures.
+The full parallel browser suite was then run against an isolated export of baseline `8f9f321`.
+It reproduced both failures at the exact same assertions.
+It also reached the existing logout test's 30-second timeout at `new-project.spec.ts:225`.
+The implementation branch's full run passed that logout test.
+The baseline run finished with 43 passed tests and three failed tests.
+The implementation run finished with 45 passed browser tests and two failed browser tests.
+The complete comparison is recorded in the builder's result.
