@@ -84,6 +84,7 @@ interface Script {
   outliveStdin?: boolean
   // Unit 7a tests: session/load does not reply until this file exists, so a test can hold the
   // engine's restart recovery inside its reload step.
+  initializeGate?: string
   loadGate?: string
 }
 
@@ -234,7 +235,10 @@ const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
   const sessions = new Map<string, { turn: number; options: AcpSchema.SessionConfigOption[]; cancel?: Deferred.Deferred<void> }>()
   let nextSession = 0
-  yield* agent.handleInitialize(() => Effect.succeed({ protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }))
+  yield* agent.handleInitialize(() => Effect.gen(function*() {
+    if (script.initializeGate !== undefined) yield* awaitGate(script.initializeGate)
+    return { protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }
+  }))
   yield* agent.handleCreateSession(() => script.sessionError !== undefined
     ? Effect.fail(new AcpRequestError({ code: -32000, errorMessage: script.sessionError }))
     : Effect.sync(() => {

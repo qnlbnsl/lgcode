@@ -64,6 +64,9 @@ live("harness discovery: signed-out and unreported sessions return no invented c
   return withEngine(rig, { harness, accounts: [account] }, () => Effect.gen(function* () {
     yield* registerRebuildCheck();
     expect(yield* read()).toMatchObject({ models: { options: [] }, reason: "Sign in to this harness account to see its models." });
+    const signedOutPid = peekEcho(echo)!.pid;
+    expect((yield* read()).reason).toBe("Sign in to this harness account to see its models.");
+    expect(peekEcho(echo)!.pid).toBe(signedOutPid);
     expect(() => process.kill(peekEcho(echo)!.pid, 0)).toThrow();
     const changed = accountFor("first", { turns: [] }, echo);
     yield* appendSetup([eventOf({ _tag: "AccountChanged", accountId: changed.id, account: changed })]);
@@ -79,9 +82,10 @@ live("harness discovery: cancelling a request closes its negotiating child and r
   const account = accountFor("first", { turns: [], configOptions: choices, configuration: { gate, entered } }, echo);
   return withEngine(rig, { harness, accounts: [account] }, () => Effect.gen(function* () {
     yield* registerRebuildCheck();
-    const request = yield* read().pipe(Effect.forkScoped);
-    yield* eventually(Effect.sync(() => existsSync(entered)), Boolean);
+    const request = yield* read({ model: "reported-model" }).pipe(Effect.forkScoped);
+    expect(yield* eventually(Effect.sync(() => existsSync(entered)), Boolean)).toBe(true);
     const child = peekEcho(echo)!;
+    expect(() => process.kill(child.pid, 0)).not.toThrow();
     yield* Fiber.interrupt(request);
     expect(() => process.kill(child.pid, 0)).toThrow();
     expect(existsSync(child.cwd)).toBe(false);

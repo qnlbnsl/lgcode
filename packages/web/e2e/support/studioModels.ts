@@ -18,6 +18,8 @@ import { buildStudio } from '../../../studio/scripts/build.ts'
 import { completedSetup } from './completedSetup.ts'
 
 export async function exerciseStudioModels(page: Page) {
+  let releaseFirst!: () => void
+  const firstReady = new Promise<void>((resolve) => { releaseFirst = resolve })
   await page.setViewportSize({ width: 1600, height: 1000 })
   const rig = makeRig(), previous = process.env.LGTM_HOME
   process.env.LGTM_HOME = rig.stateFolder
@@ -29,14 +31,15 @@ export async function exerciseStudioModels(page: Page) {
       const runner = yield* makeFakeRunner()
       runner.script('discover', ({ harness: settings, account }) => {
         const harness = settings.id
-        return Effect.succeed({ models: { source: 'negotiated', options: [{ id: account.id === 'first-alternate' ? 'alternate-only' : `${harness}-reported`, label: `${harness} reported model` }] }, efforts: { source: 'negotiated', options: [{ id: 'high', label: 'High' }] } })
+        if (harness === 'empty') return Effect.succeed({ models: { source: 'unavailable', options: [] }, efforts: { source: 'unavailable', options: [] } })
+        return (harness === 'first' ? Effect.promise(() => firstReady) : Effect.void).pipe(Effect.as({ models: { source: 'negotiated', options: [{ id: account.id === 'first-alternate' ? 'alternate-only' : `${harness}-reported`, label: `${harness} reported model` }] }, efforts: { source: 'negotiated', options: [{ id: 'high', label: 'High' }] } }))
       })
       const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, { redact: (e) => Effect.succeed(e), redactText: (s) => Effect.succeed(s) }))
       yield* Effect.scoped(Effect.gen(function* () {
         yield* registerRebuildCheck()
         yield* completedSetup()
-        for (const id of ['first', 'second', 'no-account']) {
-          yield* appendSetup([eventOf({ _tag: 'HarnessChanged', harness: harnessSettings(id, { adapterPath: process.execPath, models: [], efforts: [] }) })])
+        for (const id of ['first', 'second', 'empty', 'no-account']) {
+          yield* appendSetup([eventOf({ _tag: 'HarnessChanged', harness: harnessSettings(id, { adapterPath: process.execPath, models: id === 'empty' ? ['never-invent-this'] : [], efforts: [] }) })])
           if (id !== 'no-account') yield* appendSetup([eventOf({ _tag: 'AccountChanged', accountId: `${id}-account`, account: { id: `${id}-account`, harness: id, displayName: `${id}-account`, enabled: true } })])
         }
         yield* appendSetup([eventOf({ _tag: 'AccountChanged', accountId: 'first-alternate', account: { id: 'first-alternate', harness: 'first', displayName: 'first-alternate', enabled: true } })])
@@ -48,12 +51,19 @@ export async function exerciseStudioModels(page: Page) {
           await page.locator('#login-password').fill(password)
           await page.getByRole('button', { name: 'Sign in', exact: true }).click()
           await expect(page.locator('#login-password')).toHaveCount(0)
-          await page.goto(url)
-          await expect(page.locator('#df-model option[value="first-reported"]')).toHaveCount(1)
+          await page.evaluate(() => { location.hash = '/settings?section=defaults' })
+          await expect(page.getByText('Reading the models.', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
           const harnesses = page.getByRole('group', { name: 'Harness', exact: true })
           await harnesses.getByRole('button', { name: 'second', exact: true }).click()
           await expect(page.locator('#df-model option[value="second-reported"]')).toHaveCount(1)
           await expect(page.locator('#df-model option[value="first-reported"]')).toHaveCount(0)
+          await harnesses.getByRole('button', { name: 'first', exact: true }).click()
+          await expect(page.getByText('Reading the models.', { exact: true }).first()).toBeVisible()
+          releaseFirst()
+          await expect(page.locator('#df-model option[value="first-reported"]')).toHaveCount(1)
+          await harnesses.getByRole('button', { name: 'empty', exact: true }).click()
+          await expect(page.getByText('This harness did not report model choices.', { exact: true }).first()).toBeVisible()
+          await expect(page.locator('#df-model')).toHaveCount(0)
           await harnesses.getByRole('button', { name: 'no-account', exact: true }).click()
           await expect(page.getByText('No account is registered for this harness.', { exact: true }).first()).toBeVisible()
           await expect(page.locator('#df-model')).toHaveCount(0)
@@ -63,7 +73,7 @@ export async function exerciseStudioModels(page: Page) {
         })
         expect(runner.callsOf('prompt')).toHaveLength(0)
         expect(runner.callsOf('start')).toHaveLength(0)
-        expect(runner.callsOf('discover')).toHaveLength(3)
+        expect(runner.callsOf('discover')).toHaveLength(4)
       })).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
     })).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<void, unknown, never>)
   } finally {

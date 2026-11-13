@@ -975,3 +975,14 @@ A client can explicitly refresh a result.
 A client can request a model's effort choices.
 Reports remain separate for each account and selected model.
 The live website uses these reports for its model choices.
+
+Failures and empty reports are remembered for thirty seconds.
+Concurrent requests for one report share a discovery session.
+At most two discovery sessions run in the engine process at once.
+Service settings shows each harness's report as it arrives.
+
+## Discovery without persistent harness history
+
+A future harness-specific discovery mode could disable session persistence through supported harness interfaces.
+It must preserve the account's login and the owner's existing history.
+The investigation and its limits are recorded in issue `s4-models-15`.

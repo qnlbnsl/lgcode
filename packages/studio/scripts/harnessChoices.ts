@@ -6,17 +6,39 @@ export function harnessChoicesSource(path: string, source: string): string {
     source = source.replace(from, to)
   }
   if (path === 'js/live/git.js') {
-    replace('Object.keys(HARNESSES).forEach((k) => { delete HARNESSES[k]; });\n  Object.assign(HARNESSES, mapping.mapHarnesses(service.harnesses));', `const reports = await Promise.all(service.harnesses.map(async (h) => {
-    const account = service.project?.lead?.harness === h.id && service.project.lead.account._tag === 'named' ? { accountId: service.project.lead.account.accountId } : {};
-    const report = await request('client.harness.choices', { harnessId: h.id, ...account });
-    const model = service.project?.lead?.harness === h.id ? service.project.lead.model : h.defaultModel;
-    return model && report.models.options.some((m) => m.id === model) ? request('client.harness.choices', { harnessId: h.id, accountId: report.accountId, model }) : report;
-  }));
-  const accountReports = await Promise.all(accounts.map((a) => request('client.harness.choices', { harnessId: a.harness, accountId: a.id })));
-  if (version !== revision || S().session.status !== 'in') return;
+    replace('let service;', 'let choicesVersion = 0;\nlet service;')
+    replace('Object.keys(HARNESSES).forEach((k) => { delete HARNESSES[k]; });\n  Object.assign(HARNESSES, mapping.mapHarnesses(service.harnesses));', `const generation = ++choicesVersion;
+  const current = service, currentAccounts = accounts, currentStatuses = statuses;
+  const valid = () => generation === choicesVersion && version === revision && S().session.status === 'in';
+  const pendingReport = (harnessId, accountId) => ({ harnessId, accountId, models: { source: 'unavailable', options: [] }, efforts: { source: 'unavailable', options: [] }, reason: 'Reading the models.', effortReason: 'Reading the models.' });
+  const accountReports = new Map(currentAccounts.map((a) => [a.id, pendingReport(a.harness, a.id)]));
   Object.keys(HARNESSES).forEach((k) => { delete HARNESSES[k]; });
-  Object.assign(HARNESSES, mapping.mapHarnesses(service.harnesses, reports));`)
-    replace('engineWrite({ subscriptions: mapping.mapAccounts(accounts, statuses, service.harnesses, service.project) });', 'engineWrite({ subscriptions: mapping.mapAccounts(accounts, statuses, service.harnesses, service.project, accountReports) });')
+  Object.assign(HARNESSES, mapping.mapHarnesses(current.harnesses, current.harnesses.map((h) => pendingReport(h.id))));
+  const readChoices = async (harnessId, account, model, publish) => {
+    try {
+      const report = await request('client.harness.choices', { harnessId, ...account });
+      if (!valid()) return;
+      publish(report); notify();
+      if (model && report.models.options.some((m) => m.id === model)) {
+        const selected = await request('client.harness.choices', { harnessId, accountId: report.accountId, model });
+        if (valid()) { publish(selected); notify(); }
+      }
+    } catch {
+      if (valid()) { publish({ ...pendingReport(harnessId, account.accountId), reason: 'The harness could not report its models on this account.', effortReason: 'The harness could not report its effort choices on this account.' }); notify(); }
+    }
+  };`)
+    replace('engineWrite({ subscriptions: mapping.mapAccounts(accounts, statuses, service.harnesses, service.project) });', 'engineWrite({ subscriptions: mapping.mapAccounts(currentAccounts, currentStatuses, current.harnesses, current.project, [...accountReports.values()]) });')
+    replace('subscriptionsLoaded = true; S().ui.serviceReady = true; notify();', `subscriptionsLoaded = true; S().ui.serviceReady = true; notify();
+  for (const h of current.harnesses) {
+    const lead = current.project?.lead?.harness === h.id ? current.project.lead : undefined;
+    const account = lead?.account._tag === 'named' ? { accountId: lead.account.accountId } : {};
+    void readChoices(h.id, account, lead?.model || h.defaultModel, (report) => Object.assign(HARNESSES, mapping.mapHarnesses([h], [report])));
+  }
+  for (const a of currentAccounts) void readChoices(a.harness, { accountId: a.id }, undefined, (report) => {
+    accountReports.set(a.id, report);
+    engineWrite({ subscriptions: mapping.mapAccounts(currentAccounts, currentStatuses, current.harnesses, current.project, [...accountReports.values()]) });
+  });`)
+
   }
   if (path === 'js/live/board.js') {
     replace('const data = maps().mapSetup(setup.setup, discovery.result, settings.settings);', `const data = maps().mapSetup(setup.setup, discovery.result, settings.settings);
@@ -55,10 +77,16 @@ export function harnessChoicesSource(path: string, source: string): string {
   if (path === 'js/dialogs.js') {
     replace("The service chooses the lead from its configured defaults.'}</p>", "The service chooses the lead from its configured defaults.'}</p>${s.setupData?.leadChoices?.reason && html`<p class=\"muted\">${s.setupData.leadChoices.reason}</p>`}")
   }
-  if (path === 'js/ui.js' || path === 'js/screens/messages.js') {
-    source = source.replaceAll("...(liveMode.on ? a.models || [] : h.models).map", "...(liveMode.on && !a.models?.length ? [{ heading: a.modelReason || 'This harness did not report model choices.' }] : []), ...(liveMode.on ? a.models || [] : h.models).map")
-      .replaceAll("...(liveMode.on ? a.efforts || [] : h.efforts).map", "...(liveMode.on && !a.efforts?.length ? [{ heading: a.effortReason || 'This harness did not report effort choices.' }] : []), ...(liveMode.on ? a.efforts || [] : h.efforts).map")
-      .replaceAll("...(live.on ? a.models || [] : h.models).map", "...(live.on && !a.models?.length ? [{ heading: a.modelReason || 'This harness did not report model choices.' }] : []), ...(live.on ? a.models || [] : h.models).map")
+  const replaceAll = (from: string, to: string) => {
+    if (!source.includes(from)) throw new Error(`Harness choices integration no longer matches ${path}`)
+    source = source.replaceAll(from, to)
+  }
+  if (path === 'js/ui.js') {
+    replaceAll("...(liveMode.on ? a.models || [] : h.models).map", "...(liveMode.on && !a.models?.length ? [{ heading: a.modelReason || 'This harness did not report model choices.' }] : []), ...(liveMode.on ? a.models || [] : h.models).map")
+    replaceAll("...(liveMode.on ? a.efforts || [] : h.efforts).map", "...(liveMode.on && !a.efforts?.length ? [{ heading: a.effortReason || 'This harness did not report effort choices.' }] : []), ...(liveMode.on ? a.efforts || [] : h.efforts).map")
+  }
+  if (path === 'js/screens/messages.js') {
+    replaceAll("...(live.on ? a.models || [] : h.models).map", "...(live.on && !a.models?.length ? [{ heading: a.modelReason || 'This harness did not report model choices.' }] : []), ...(live.on ? a.models || [] : h.models).map")
   }
   return source
 }

@@ -1,4 +1,4 @@
-import type { AgentId, DeliveryId, PermissionOption, SessionReference } from "@lgtm/contracts";
+import type { AgentChoices, AgentId, DeliveryId, PermissionOption, SessionReference } from "@lgtm/contracts";
 import type * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -187,7 +187,13 @@ export interface FakeRunner {
   readonly reset: () => void;
 }
 
-export const makeFakeRunner = (options: { readonly capabilities?: Partial<RunnerCapabilities> } = {}): Effect.Effect<FakeRunner> =>
+// A peer report is its own fixture. Owner-configured allowlists never produce
+// a discovery reply; tests can replace this report without changing settings.
+const discoveryFixture: AgentChoices = {
+  models: { source: "negotiated", options: [{ id: "test-model", label: "test-model" }, { id: "other-model", label: "other-model" }] },
+  efforts: { source: "negotiated", options: [{ id: "high", label: "high" }, { id: "low", label: "low" }] },
+};
+export const makeFakeRunner = (options: { readonly capabilities?: Partial<RunnerCapabilities>; readonly discovery?: AgentChoices } = {}): Effect.Effect<FakeRunner> =>
   Effect.gen(function* () {
     const calls: Array<RunnerCall> = [];
     const pubsub = yield* PubSub.unbounded<FakeRunnerEvent>();
@@ -197,12 +203,7 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       ...(input.effort === undefined ? {} : { effort: input.effort }),
     });
     const defaults: Script = {
-      // The fake peer advertises the fixture's model lists on discovery. Live
-      // agent reads remain unavailable unless a test scripts them explicitly.
-      discover: ({ harness }) => Effect.succeed({
-        models: { source: "negotiated", options: harness.models.map((id) => ({ id, label: id })) },
-        efforts: { source: "negotiated", options: harness.efforts.map((id) => ({ id, label: id })) },
-      }),
+      discover: () => Effect.succeed(options.discovery ?? discoveryFixture),
       start: (input) => Effect.succeed({ ...sessionFor(input.agentId), configuration: configurationFor(input) }),
       load: (input) => Effect.succeed({ ...sessionFor(input.agentId), session: input.session, configuration: configurationFor(input) }),
       prompt: () => Effect.void,

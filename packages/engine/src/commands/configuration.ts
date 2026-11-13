@@ -20,21 +20,37 @@ export const choicesFor = (input: Input, agent: Agent, allowConfigured = false, 
   const incarnation = yield* liveToken(input, agent.agentId);
   const live = incarnation === undefined ? undefined : yield* input.runtime.runner.choices({ agentId: agent.agentId, incarnation }).pipe(
     Effect.catchTag("RunnerRejected", () => Effect.succeed(undefined)));
-  if (allowConfigured && (live !== undefined || agent.state._tag === "starting")) {
-    const harness = (yield* readHarnesses(input.runtime)).find((item) => item.id === agent.harness);
-    const configured = yield* configuredChoices(harness?.models ?? [], harness?.efforts ?? [], input.runtime.log.redactText);
-    return { models: live?.models.source === "negotiated" ? live.models : configured.models,
-      efforts: live?.efforts.source === "negotiated" ? live.efforts : configured.efforts };
-  }
-  if (live !== undefined && !(agent.state._tag === "starting" && live.models.source === "unavailable")) return {
-    models: live.models.options.length ? live.models : { ...live.models, reason: "This harness did not report model choices." },
-    efforts: live.efforts.options.length ? live.efforts : { ...live.efforts, reason: "This harness did not report effort choices." }
+  const harness = (yield* readHarnesses(input.runtime)).find((item) => item.id === agent.harness);
+  const configured = yield* configuredChoices(harness?.models ?? [], harness?.efforts ?? [], input.runtime.log.redactText);
+  const limitList = (reported: AgentChoices["models"], configured: AgentChoices["models"]): AgentChoices["models"] => {
+    if (!configured.options.length) return reported;
+    if (!reported.options.length) return configured;
+    const options = reported.options.filter((option) => configured.options.some((item) => item.id === option.id));
+    return { ...reported, options, ...(options.length ? {} : { reason: "The reported choices are outside this harness's configured list." }) };
   };
-  const base = yield* discoverHarnessChoices(input, agent.harness, agent.account);
-  const report = model !== undefined && base.models.options.some((o) => o.id === model)
-    ? yield* discoverHarnessChoices(input, agent.harness, agent.account, false, model) : base;
-  return { models: { ...report.models, ...(report.reason ? { reason: report.reason } : {}) },
-    efforts: { ...report.efforts, ...(report.effortReason ? { reason: report.effortReason } : {}) } };
+  const limit = (reported: AgentChoices): AgentChoices => ({
+    models: limitList(reported.models, configured.models), efforts: limitList(reported.efforts, configured.efforts),
+  });
+  if (live !== undefined && !(agent.state._tag === "starting" && live.models.source === "unavailable")) {
+    const choices = {
+      models: live.models.options.length ? live.models : { ...live.models, reason: "This harness did not report model choices." },
+      efforts: live.efforts.options.length ? live.efforts : { ...live.efforts, reason: "This harness did not report effort choices." },
+    };
+    // Live peers remain authoritative. Explicit lists can record a pending
+    // desire when a live peer does not support reporting or applying it.
+    return allowConfigured ? {
+      models: live.models.source === "negotiated" ? live.models : configured.models,
+      efforts: live.efforts.source === "negotiated" ? live.efforts : configured.efforts,
+    } : choices;
+  }
+  // The planner runs with the engine writer permit. It may only use a report
+  // already fetched by the client; it must never start discovery here.
+  const base = yield* discoverHarnessChoices(input, agent.harness, agent.account, false, undefined, allowConfigured);
+  const specific = model !== undefined && base.models.options.some((o) => o.id === model)
+    ? yield* discoverHarnessChoices(input, agent.harness, agent.account, false, model, allowConfigured) : undefined;
+  const report = specific !== undefined && (!allowConfigured || specific.models.options.length) ? specific : base;
+  return limit({ models: { ...report.models, ...(report.reason ? { reason: report.reason } : {}) },
+    efforts: { ...report.efforts, ...(report.effortReason ? { reason: report.effortReason } : {}) } });
 });
 export const configure = (input: Input, payload: Payload<"configure">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> => Effect.gen(function* () {
   const agent = input.snapshot.agents[payload.agentId];

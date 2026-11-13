@@ -11875,3 +11875,104 @@ The requested empty state allows one plain sentence.
 The error now uses one sentence.
 A session-failure regression checks that sentence and the child's cleanup.
 This is fixed in this change.
+
+## s4-models-9. Configuration discovery held the engine writer permit.
+
+A stopped agent's configuration planner could start discovery inside the single writer transaction.
+A hanging adapter therefore delayed unrelated event writes.
+The planner now uses only cached client reports and explicit configured lists.
+A regression holds a discovery open while configuration is refused and another write commits.
+An uncached caller without an explicit list must read the account's choices before saving them.
+
+## s4-models-10. Concurrent discovery and failed reports were unbounded.
+
+Concurrent requests for the same account and model could start duplicate adapters.
+Distinct keys now share two process permits in the engine process.
+Concurrent requests for the same key share one job, including explicit refreshes.
+The last waiting request closes the job's scope and waits for child cleanup.
+Successful reports expire after five minutes.
+Empty reports and failures expire after thirty seconds.
+The result cache retains at most 128 entries.
+Tests cover the deadline, cancellation, shared processes, refreshes, expiry, and eviction.
+
+## s4-models-11. Discovery left Cursor sessions and process identities behind.
+
+Cursor discovery created a persistent engine session directory for each temporary identifier.
+Discovery now removes that directory on success, failure, timeout, or cancellation.
+It also deletes its structured query language (SQL) process identity row after closing the child.
+The cleanup leaves ordinary agents' persistent sessions unchanged.
+A separate regression resolves a symbolic temporary directory before creating its folder grant.
+
+## s4-models-12. Configured lists and fake discovery reports were coupled.
+
+Stopped-agent discovery ignored a non-empty configured list when offering or accepting choices.
+The offline configuration path now intersects a non-empty report with the configured list.
+An unavailable report falls back to the owner's explicit list.
+The fake runner's discovered report is now an independent fixture that a test can replace.
+A test uses disjoint configured and discovered choices to prevent that fixture from masking the limit again.
+The original cancellation test also waited for a configuration gate without requesting a model change.
+The wait helper returned its last observation without asserting that the gate was entered.
+That test now proves both entry and a living child before interrupting the request.
+
+## s4-models-13. Settings waited for the slowest harness.
+
+The Service settings read waited for every harness and account report before rendering any choices.
+The page now renders a per-harness reading sentence as soon as its settings arrive.
+It publishes each report independently and rejects replies from an earlier page generation.
+The browser journey holds the first harness open while selecting the second harness's reported model.
+It also checks a signed-in account with an empty report and an account-free harness.
+The build now rejects every model-menu patch whose expected reference text is missing.
+
+## s4-models-14. Discovery notices must not enter the writer or an agent lane.
+
+The handler already checked the snapshot and the registered incarnation before writing runner events.
+An unregistered discovery identifier therefore could not create a permission request or change an agent mode.
+That check was inside the writer transaction.
+The handler now drops an absent roster identifier before requesting the writer or an agent lane.
+The inner checks remain in place for races and stale incarnations.
+A regression sends valid permission and mode notices for an absent discovery identifier.
+It verifies zero writer attempts, zero new events, and zero permission or mode calls.
+
+## s4-models-15. Account homes can retain discovery session history.
+
+The Agent Client Protocol (ACP) recordings show session identifiers and configuration replies.
+They do not record filesystem writes in account homes.
+A temporary working folder therefore does not prove that discovery leaves no persistent harness metadata.
+No real harness was started for this investigation.
+
+Claude Code documents transcripts under `~/.claude/projects/<encoded-working-directory>/<session-id>.jsonl`.
+Its directory documentation also lists per-session debug, tool-result, and memory data.
+The documentation establishes storage outside the working folder, but it does not establish whether a prompt-free ACP session always creates a transcript.
+The sources are [session storage](https://code.claude.com/docs/en/sessions#export-and-locate-session-data) and [the account directory](https://code.claude.com/docs/en/claude-directory).
+
+The Codex ACP adapter creates a Codex thread during `session/new`.
+Codex has a persistent rollout recorder and state index under its configured account home.
+The source distinguishes recorder creation from explicit persistence, so it does not prove that every prompt-free discovery produces a rollout file.
+LGTM Studio's named-account shadow home also shares entries from its source home.
+The sources are [the adapter's new-session implementation](https://raw.githubusercontent.com/zed-industries/codex-acp/main/src/codex_agent.rs), [the rollout recorder](https://raw.githubusercontent.com/openai/codex/main/codex-rs/rollout/src/recorder.rs), and `packages/engine/src/accounts/shadowHome.ts`.
+
+Gemini's ACP new-session handler initializes a chat before returning its model report.
+The chat initializes its recording service, which creates a chats directory and writes initial session metadata.
+Its documented session location is `~/.gemini/tmp/<project_hash>/chats/`.
+A distinct temporary project folder can therefore leave a distinct project history directory outside that folder.
+The sources are [the ACP session manager](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/cli/src/acp/acpSessionManager.ts), [chat initialization](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/core/client.ts), [the recording service](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/services/chatRecordingService.ts), and [session management](https://geminicli.com/docs/cli/session-management/).
+
+The installed Cursor runtime's `acp-storage.ts` stores its session database beneath `CURSOR_CONFIG_DIR/acp-sessions`.
+The existing `cursorMcp.ts` integration redirects that location into the engine's per-agent session folder.
+Discovery now removes both its disposable settings and its redirected session directory.
+The runtime evidence and version are recorded in `packages/engine/src/runner/cursorMcp.ts`.
+The recordings do not establish whether Cursor writes other account-wide session metadata.
+
+Cleaning arbitrary account-home history is not implemented in this change.
+Those stores can contain the owner's other sessions and use version-dependent layouts.
+The bounded cache reduces repeated discovery without deleting account data or altering login settings.
+A future harness-specific discovery mode could disable persistence where its supported interface permits it.
+
+## s4-models-16. A request could join a discovery that was already closing.
+
+The first shared-job implementation removed its key only after child cleanup finished.
+A new request arriving during the last waiter's cancellation could attach to that cancelled job.
+The final waiter now removes the key before closing the scope.
+A regression holds the old job's cleanup open and proves that a new request starts independently.
+The initial regression also held its cleanup gate across a failed assertion.
+Its release now runs in an immediate finalizer so a failing assertion cannot park the test.

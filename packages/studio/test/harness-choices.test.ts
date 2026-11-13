@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { harnessChoicesSource } from "../scripts/harnessChoices.ts";
 import { expect, it } from "vitest";
 import { mapAccounts, mapHarnesses } from "../src/git.ts";
 import type { Account, HarnessSettings } from "@lgtm/contracts";
@@ -16,4 +18,13 @@ it("keeps subscription choices on their exact account instead of borrowing anoth
   ]);
   expect(rows[0]).toMatchObject({ models: ["one-model"], modelLabels: { "one-model": "One model" } });
   expect(rows[1]).toMatchObject({ models: [], reason: "Sign in to this harness account to see its models." });
+});
+
+for (const [path, needle] of [
+  ["js/ui.js", "...(liveMode.on ? a.models || [] : h.models).map"],
+  ["js/ui.js", "...(liveMode.on ? a.efforts || [] : h.efforts).map"],
+  ["js/screens/messages.js", "...(live.on ? a.models || [] : h.models).map"],
+] as const) it(`fails the build if a choices patch no longer matches ${path}: ${needle}`, () => {
+  const source = readFileSync(`${process.cwd()}/design/mock/${path}`, "utf8");
+  expect(() => harnessChoicesSource(path, source.replaceAll(needle!, "changed-upstream"))).toThrow();
 });
