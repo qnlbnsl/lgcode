@@ -1,3 +1,4 @@
+import { openDefaultProjectChannels } from "./defaultChannels.ts"
 import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
 import { ProjectCreation, ProjectId, RepositoryId, WorkspaceId, type Event } from "@lgtm/contracts"
@@ -261,6 +262,7 @@ const finishCreation = (observed: Input, observedPlan: ProjectCreation, mainBran
     ...launch.events,
     { _tag: "project.Created", projectId: plan.projectId, repoId: plan.repository.repoId, name: plan.name, goal: plan.goal,
       leadAgentId: started.agentId, worktreeId: plan.workspace.worktreeId, machineId: plan.workspace.machineId, shell: plan.shell, stage: "plan" },
+    ...openDefaultProjectChannels({ projectId: plan.projectId, leadAgentId: started.agentId }),
     { _tag: "project.CreationFinished", creationRequestId: p.requestId }
   ], reply: () => ({ requestId: p.requestId, projectId: plan.projectId }) }
 })

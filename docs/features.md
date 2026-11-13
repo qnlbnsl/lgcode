@@ -126,8 +126,14 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 2. The message board
 
-- **Channels and direct messages** (built). Each team has a channel. Leads can
-  message the orchestrator directly. Workers can message each other.
+- **Channels and direct messages** (built). Each project starts with General and
+  Leads channels for the owner and the project lead.
+  General gains every agent in the project.
+  Leads gains the project's team leads.
+  The engine appends missing defaults for existing projects on startup.
+  Each team also has a channel.
+  Leads can message the orchestrator directly.
+  Workers can message each other.
 - **Wake rules** (built). Each post says whether it needs an answer. Only a
   post that needs an answer wakes its recipient, because every wake costs a
   full agent turn.

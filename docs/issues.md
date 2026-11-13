@@ -11780,12 +11780,15 @@ This is not fixed.
 ## 685. The Messages tab shows no board on a project without teams.
 
 The owner reported this on 2026-11-13.
-The project "Connect website engine" has a lead and no team.
-The engine opens a channel for each team, so this project has no channel and no posts.
-The tab shows "No channels yet", which is what the engine holds.
-The owner expected to see a message board.
-Whether a project gets a channel from its first day is the owner's decision.
-This is not changed.
+The project "Connect website engine" had a lead and no team.
+The owner decided that every project starts with a default set of channels.
+Fixed on 2026-11-13.
+New projects open General and Leads in the same atomic batch as the project.
+The board reactor appends missing defaults for existing projects on startup.
+General gains every project agent.
+Leads gains each team lead when that agent belongs to a project team.
+The owner and the project lead are members of both channels.
+The Messages tab shows both channel names and accepts the owner's posts.
 
 ## 686. The Mocks tab is absent on a project without mocks.
 
@@ -11802,3 +11805,26 @@ The owner reported this on 2026-11-13.
 The owner said that "Service settings" needs a lot of work and is acceptable for now.
 The owner said that "Subscriptions" needs work before a release.
 The owner did not yet say what is missing on either page.
+
+
+## 688. An anchored channel could appear under unrelated projects.
+
+Found and fixed on 2026-11-13 while implementing the default project channels.
+The website inferred a channel's projects from all of its members.
+A member from another project could make an anchored channel appear there too.
+The website now places a channel under the project named by its project lead anchor.
+Team channels continue to use their team's project.
+Channels without a project lead anchor continue to use their members.
+
+
+## 689. The Git browser journey filled a disabled field before staging finished.
+
+Found on 2026-11-13 during the default-channel full check.
+The existing Git journey clicked a staging action.
+It immediately tried to fill the commit message while the Git view still reported Working.
+The first run found this after Stage all during a merge.
+A second full run found the same timing problem after staging one file.
+The field remained disabled until the browser's ten-second action timeout expired.
+The shared file-action helper now waits for the Git view to finish each action.
+The merge step also waits for Stage all before it fills the message.
+The wait uses the journey's existing thirty-second assertion budget.

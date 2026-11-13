@@ -36,6 +36,14 @@ describe("the real project board", () => {
   })
 })
 describe("messages", () => {
+  it("keeps project defaults under their anchor's project even when other members belong elsewhere", () => {
+    const records = board.mapBoardRecords(engineSnapshot, mapSnapshot(engineSnapshot, 1))
+    const agents = [...records.agents, { ...records.agents[0]!, id: "outside", project: "other-project" }]
+    const rows = ["General", "Leads"].map((name) => ({ channelId: name, name, kind: "plain", anchorAgentId: section.projects[0]!.leadAgentId,
+      members: [{ _tag: "owner" as const }, { _tag: "agent" as const, agentId: "outside" as never }] }))
+    expect(board.mapChannels(rows, { ...records, agents })).toEqual(rows.map((row) => ({ id: row.name, project: "pj-orchard", name: row.name, kind: "plain", team: null, members: ["owner", "outside"] })))
+  })
+
   it("links team and direct channels by membership and keeps their actual names", () => {
     const snapshot = { ...engineSnapshot, project: { ...section, teams: [{ ...section.teams[0]!, channelId: "ch-alpha" as never }] } }
     const mapped = board.mapBoardRecords(snapshot, mapSnapshot(snapshot, 1))

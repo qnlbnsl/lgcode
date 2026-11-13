@@ -1,3 +1,4 @@
+import { defaultProjectChannelEvents } from "../project/defaultChannels.ts";
 import { transferName } from "./transferName.ts";
 import type { AgentId, Event, EventEnvelope } from "@lgtm/contracts";
 import type { BoardPostView } from "@lgtm/contracts/board/view";
@@ -170,8 +171,13 @@ export const boardReactor = Effect.scoped(Effect.gen(function* () {
       return lifecycleBatch(snapshot, target, lists);
     },
   }, lists);
+  const syncProjectChannels = () => writePieceBatch({ namespace: "board", kind: "reactor",
+    sourceSequence: (snapshot) => snapshot.sequence, build: (snapshot) => ({ events: defaultProjectChannelEvents(snapshot) }),
+  }, lists);
+  yield* syncProjectChannels();
   for (const agent of Object.values(initial.agents)) yield* run(agent.agentId);
   yield* subscribe(initial.sequence).pipe(Stream.runForEachArray((batch) => Effect.gen(function* () {
+    if (batch.some(({ event }) => ["project.Created", "project.TeamAdded", "AgentStarted", "AgentGrouped"].includes(event._tag))) yield* syncProjectChannels();
     const snapshot = yield* views.snapshot;
     for (const [target, sequence] of touchedTargets(snapshot, batch)) {
       if (sequence > (inspected.get(target) ?? 0)) yield* run(target, sequence);

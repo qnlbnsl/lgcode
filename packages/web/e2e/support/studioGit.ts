@@ -59,7 +59,7 @@ export async function exerciseStudioGit(page: Page) {
           await page.goto(url); await page.locator('#login-password').fill(password); await page.getByRole('button', { name: 'Sign in', exact: true }).click(); await expect(page.locator('.tree-row.project')).toBeVisible(); await page.goto(url)
           const refresh = async () => { await page.getByRole('button', { name: 'Refresh Git', exact: true }).click(); await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false') }
           const fileButton = (name: string) => page.getByRole('button', { name, exact: true, includeHidden: true })
-          const fileClick = async (name: string) => { const button = fileButton(name); await button.locator('..').locator('..').hover(); await button.click() }
+          const fileClick = async (name: string) => { const button = fileButton(name); await button.locator('..').locator('..').hover(); await button.click(); await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false') }
           await expect(fileButton('Stage file.txt')).toBeEnabled()
           await expect(page.locator('.diff')).toContainText('browser change')
           await fileClick('Stage file.txt')
@@ -125,6 +125,7 @@ export async function exerciseStudioGit(page: Page) {
           await expect(page.getByRole('button', { name: 'Stage all', exact: true })).toBeEnabled()
           expect(readFileSync(join(source.path, 'file.txt'), 'utf8')).toBe('ours\ntheirs\n')
           await page.getByRole('button', { name: 'Stage all', exact: true }).click()
+          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           await page.getByRole('textbox', { name: 'Commit message', exact: true }).fill('Resolve browser conflict')
           await page.getByRole('tablist', { name: 'Git views' }).getByRole('button', { name: /^Conflicts/ }).click()
           await page.getByRole('button', { name: 'Continue merge', exact: true }).click()
