@@ -13,6 +13,9 @@ import type { ClientSnapshot, EventSequence, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import * as board from "./board.ts"
+import * as mocks from "./mocks.ts"
+import * as Schema from "effect/Schema"
+import { DisplayFrame } from "@lgtm/contracts/project/display"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable"
@@ -28,6 +31,9 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly taskDetails?: object
   readonly boardAgents?: object
   readonly setupData?: object | null
+  readonly mocks?: object
+  readonly design?: object
+  readonly machineDetails?: object | null
 }
 export type Write = (patch: StorePatch) => void
 
@@ -36,6 +42,7 @@ export interface LiveConnection {
   readonly kind: "engine"
   readonly label: string
   readonly board: typeof board
+  readonly mocks: typeof mocks
   request(tag: string, payload: object): Promise<unknown>
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
@@ -108,7 +115,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, boardUnread: {}, boardRevision: 0, boardDetails: {} })
+  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, mocks: {}, design: {}, machineDetails: null, boardUnread: {}, boardRevision: 0, boardDetails: {} })
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -247,10 +254,24 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     label: "the service",
     // Sending changes to the engine is step 2 of the plan. Until then the website refuses
     // each action before it reaches this point.
-    board,
+    board, mocks,
     async request(tag, payload) {
       const client = activeClient
       if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
+      if (tag === "display.open" || tag === "display.close") {
+        const response = await http(tag === "display.open" ? "/api/display/open" : "/api/display/close", {
+          method: "POST", credentials: "same-origin", cache: "no-store", keepalive: tag === "display.close",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000)
+        })
+        if (response.status === 401) { stop(); forget(); setSession("expired"); throw new Error("The session expired. Sign in again.") }
+        if (!response.ok) throw new Error(tag === "display.open" ? "The isolated display could not be opened. Check the display settings and connection, then retry." : "Could not confirm closing the display. Retry closing before reopening.")
+        if (tag === "display.close") return undefined
+        const body = await response.text()
+        if (body.length > 16_384) throw new Error("The display reply is invalid.")
+        const frame = Schema.decodeUnknownSync(DisplayFrame, { onExcessProperty: "error" })(JSON.parse(body))
+        if (!mocks.validDisplayFrame(frame, where.host.split(":")[0]!, now())) throw new Error("The display reply is invalid.")
+        return frame
+      }
       const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, unknown>>)[tag]
       if (method === undefined) throw new Error("This request is not available.")
       const result = await Effect.runPromise(Effect.result(method({ ...payload, requestId: requestId() })), { signal: controller!.signal })

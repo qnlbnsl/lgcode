@@ -70,9 +70,18 @@ test("live website: signs in through the engine, shows its real records, and kee
           eventOf({ _tag: "project.RepositoryLocated", repoId: project.repoId, machineId: "local", path: rig.work }),
           eventOf({ _tag: "project.WorktreeCreated", repoId: project.repoId, worktreeId: project.worktreeId,
           branch: "main", path: rig.work, machineId: "local", checkout: "main" })])
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
+        writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Recorded screen evidence</h1>")
+        writeFileSync(join(rig.work, "studio-data.json"), "{}")
+        const field = { entity: "request", name: "title", type: "string", description: "Engine field description", screens: ["requests"], sourceId: "data" }
+        const mockRevision = success(yield* call(ownerCredential, "project.mocks.record", { projectId: project.projectId, bundle: {
+          sources: [{ sourceId: "screens", worktreeId: project.worktreeId, path: "studio-screen.html", kind: "screens" },
+            { sourceId: "data", worktreeId: project.worktreeId, path: "studio-data.json", kind: "data" }],
+          screens: [{ screenId: "requests", sourceId: "screens", name: "Engine requests screen", summary: "Actual screen summary", route: "/requests", scenarioRoutes: [] }],
+          components: [], scenarios: [], draftedFields: [field], reviewedComparisons: [{ field, status: "differs", known: "number" }]
+        } }))
         const taskId = success(yield* call(ownerCredential, "project.task.create", { ...project.task, title: "Engine task", label: "TK-1" })).taskId
         success(yield* call(ownerCredential, "project.task.note", { projectId: project.projectId, taskId, title: "Recorded note", detail: "Actual engine history" }))
-        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
         yield* seedAccount("studio-ready", "cursor")
         success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
         success(yield* call(ownerCredential, "accounts set-secret", { accountId: "studio-ready", name: "CURSOR_API_KEY", nonce: "studio-browser", value: Redacted.make("synthetic-studio-browser-key") }))
@@ -103,6 +112,43 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
           await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
           for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
+
+          // Mock data is fetched when its tab opens, with no sample thumbnails.
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/mocks`)
+          await expect(page.locator(".mk-screens")).toContainText("Engine requests screen")
+          await expect(page.locator(".mk-screens")).toContainText(mockRevision.revisionId)
+          await expect(page.locator(".mk-mini")).toBeEmpty()
+          await page.getByRole("link", { name: /^Changes/ }).click()
+          await expect(page.locator(".mk-changes")).toContainText(mockRevision.revisionId)
+          await expect(page.locator(".mk-changes")).toContainText("Owner")
+          await expect(page.locator(".mk-changes")).not.toContainText("New")
+          await page.getByRole("link", { name: /^Data/ }).click()
+          await expect(page.locator(".main .table")).toContainText("request.title")
+          await expect(page.locator(".main .table")).toContainText("Engine field description")
+          await page.getByRole("link", { name: /^Screens/ }).click()
+          await page.getByRole("link", { name: "Engine requests screen", exact: true }).click()
+          await expect(page.getByRole("button", { name: "Edit design", exact: true })).toBeDisabled()
+          await page.getByRole("button", { name: "Approve", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(page.locator(".mk-stagebar")).toContainText("Draft")
+          await page.getByRole("link", { name: "Screens", exact: true }).click()
+          await page.getByRole("button", { name: "Request changes", exact: true }).click()
+          await page.locator("#mc-text").fill("Please revise the engine screen")
+          // The existing socket carries the prompt. No optimistic comment is created.
+          await page.getByRole("dialog").getByRole("button", { name: "Send", exact: true }).click()
+          await expect(page.getByRole("dialog")).toHaveCount(0)
+          await expect(page.locator(".toasts")).toContainText("Change request sent")
+          writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Changed evidence</h1>")
+          await page.getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await page.getByRole("dialog").getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("artifact is unavailable or changed")
+          await expect(page.locator(".wf-status")).not.toContainText("Approved")
+          writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Recorded screen evidence</h1>")
+          await page.getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await page.getByRole("dialog").getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await expect(page.locator(".wf-status")).toContainText("Approved")
+          await page.reload()
+          await expect(page.locator(".wf-status")).toContainText("Approved")
 
           // The project's lead and its team come from the engine.
           await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/agents`)
@@ -220,7 +266,7 @@ test("live website: signs in through the engine, shows its real records, and kee
           // A reload keeps the session, which is the engine's cookie.
           await page.reload()
           await expect(sidebar.locator(".tree-row.project").filter({ hasText: "Renamed project" })).toBeVisible()
-          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(2)
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(3)
 
           // Logging out ends the session and leaves no records on the page.
           await page.getByRole("button", { name: "Log out" }).click()

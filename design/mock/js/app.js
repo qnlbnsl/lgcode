@@ -249,7 +249,7 @@ function ProjectView({ s, route, project }) {
   const tabs = [
     { id: 'board', label: 'Board' },
     { id: 'workflow', label: 'Workflow' },
-    project.hasMocks && { id: 'mocks', label: 'Mocks' },
+    (project.hasMocks || live.on && (project.stage === 'Design' || s.mocks[project.id]?.screens.length)) && { id: 'mocks', label: 'Mocks' },
     chatAgent && chatAgent.role !== 'project-lead'
       ? { id: 'chat', label: agentLabel(s, chatAgent, { withTeam: true }), icon: 'eye' }
       : { id: 'chat', label: 'Chat', count: open, tone: 'warn' },
@@ -386,7 +386,7 @@ function mountLive(el) {
   const state = emptyState();
   state.ui = {};
   seedTerminal(state);
-  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], workflow: {}, mocks: {}, design: {} });
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], workflow: {}, mocks: {}, design: {}, machineDetails: null });
   store.state = guardStore(state);
   act.applyPrefs();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);

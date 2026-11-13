@@ -1,9 +1,10 @@
 // The Mocks tab of a project. It follows the Workflow tab's pattern: one secondary tab row,
 // the same page padding, and the same structure when there is nothing in it yet.
 // A mock screen here is drawn from the same tokens and parts as the page itself.
-import { html, useState, useRef, useLayoutEffect, Icon, cx, href, go, ago, clock, useNow, plural, update, uid, MIN, HOUR, DAY } from '../lib.js';
+import { html, useState, useEffect, live, refuse, useRef, useLayoutEffect, Icon, cx, href, go, ago, clock, useNow, plural, update, uid, MIN, HOUR, DAY } from '../lib.js';
 import { byId, agentOf, projectOf, repoOf, leadOf, threadOf, routeForAgent } from '../data.js';
 import * as act from '../actions.js';
+import * as mocks from '../live/mocks.js';
 import { Avatar, OwnerAvatar, Dialog, registerDialog, Empty } from '../ui.js';
 import { useCanvas, Canvas, ZoomControls } from './design.js';
 
@@ -178,6 +179,7 @@ export function seedMocks(state) {
 // ---- actions -------------------------------------------------------------------------
 const designerOf = (s, p) => s.agents.find((a) => a.project === p.id && a.role === 'designer') || leadOf(s, p);
 function comment(s, p, sc, text) {
+  if (live.on) { refuse(); return; }
   const d = designerOf(s, p);
   update(() => { sc.comments.push({ from: 'owner', ts: Date.now(), text }); sc.replying = true; });
   setTimeout(() => update(() => {
@@ -188,6 +190,7 @@ function comment(s, p, sc, text) {
   }), 1800);
 }
 function approveAll(s, p) {
+  if (live.on) return mocks.approveMocks(p);
   const m = ensure(s, p);
   act.confirm({ title: 'Approve the mocks?', danger: false, action: 'Approve mocks',
     body: `${plural(m.screens.length, 'screen')} become the reference for ${p.name}. The project moves to Plan, and the project lead starts a Planning team.`,
@@ -210,12 +213,12 @@ function approveAll(s, p) {
 registerDialog('mock-changes', ({ d, s }) => {
   const p = projectOf(s, d.project); const m = ensure(s, p); const des = designerOf(s, p);
   const [text, setText] = useState(''); const [sid, setSid] = useState(d.screen || '');
-  const send = () => { if (!text.trim()) return; const sc = byId(m.screens, sid); act.closeDialog();
+  const send = () => { if (!text.trim()) return; const sc = byId(m.screens, sid); if (live.on) return mocks.requestChanges(p, sc, text, des); act.closeDialog();
     if (sc) comment(s, p, sc, text.trim());
     act.sendMessage(des.id, sc ? `Change the ${sc.name} screen: ${text.trim()}` : `Change the mocks: ${text.trim()}`);
     act.toast(`Sent to the ${des.name}`); };
   return html`<${Dialog} title="Request changes" onClose=${act.closeDialog} onSubmit=${send}
-    foot=${html`<span class="why">Goes to the ${des.name} as a message.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!text.trim()}>Send</button>`}>
+    foot=${html`<span class="why">Goes to the ${des.name} as a message.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!text.trim() || live.on && mocks.busy('mock-changes:' + p.id)}>${live.on && mocks.busy('mock-changes:' + p.id) ? 'Sending…' : 'Send'}</button>`}>
     <div class="field"><label for="mc-screen">Screen</label><select id="mc-screen" class="select" value=${sid} onChange=${(e) => setSid(e.target.value)}><option value="">All screens</option>${m.screens.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}</option>`)}</select></div>
     <div class="field"><label for="mc-text">What should change</label><textarea id="mc-text" class="textarea" rows="4" autofocus placeholder="Say what is wrong, or what you expected to see." value=${text} onInput=${(e) => setText(e.target.value)}></textarea></div>
   <//>`;
@@ -230,7 +233,7 @@ function Screens({ s, p, m }) {
   return html`<div class="table-wrap"><table class="table mk-screens"><thead><tr><th class="mk-th-thumb"></th><th>Screen</th><th>Status</th><th>Note</th><th class="num">Revision</th><th class="num">Comments</th><th class="num">Updated</th></tr></thead><tbody>
     ${m.screens.length === 0 && html`<tr><td></td><td colspan="6" class="muted" data-empty>No screens</td></tr>`}
     ${m.screens.map((sc) => html`<tr key=${sc.id} class=${cx('click', sc.status === 'changed' && 's-warn')} onClick=${() => go(`/p/${p.id}/mocks/screen/${sc.id}`)}>
-      <td class="mk-td-thumb"><span class="mk-mini"><${Frame} kind=${sc.kind} max=${.12} /></span></td>
+      <td class="mk-td-thumb"><span class="mk-mini">${!live.on && html`<${Frame} kind=${sc.kind} max=${.12} />`}</span></td>
       <td><a href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} style="font-weight:var(--weight-medium)">${sc.name}</a></td>
       <td><${Status} sc=${sc} /></td>
       <td class="muted wrap mk-note">${sc.note}</td>
@@ -256,13 +259,13 @@ function ScreenView({ s, p, m, id }) {
         <a class="icon-btn" aria-label="Previous screen" aria-disabled=${!prev} href=${prev ? href(`/p/${p.id}/mocks/screen/${prev.id}`) : null}><${Icon} name="chevron-left" size=${16} /></a>
         <a class="icon-btn" aria-label="Next screen" aria-disabled=${!next} href=${next ? href(`/p/${p.id}/mocks/screen/${next.id}`) : null}><${Icon} name="chevron-right" size=${16} /></a>
       </div>
-      <${Stage} key=${vp + sc.id + sc.rev} kind=${sc.kind} vp=${vp} />
+      ${live.on ? html`<${mocks.Display} key=${sc.id + sc.rev} selection=${sc.selection} viewport=${vp} title=${sc.name + ' preview'} />` : html`<${Stage} key=${vp + sc.id + sc.rev} kind=${sc.kind} vp=${vp} />`}
     </div>
     <aside class="mk-aside">
       <section><p class="note">${sc.note}</p>
         <div class="row" style="flex-wrap:wrap">
-          ${sc.status !== 'approved' && html`<button type="button" class="btn primary" onClick=${() => { update(() => { sc.status = 'approved'; for (const c of m.changes) if (c.screen === sc.id) c.seen = true; }); act.toast(`${sc.name} approved`); }}><${Icon} name="check" size=${14} />Approve</button>`}
-          <button type="button" class="btn ghost" onClick=${() => act.toast(`Opening ${sc.name} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${14} />Edit design</button></div></section>
+          ${sc.status !== 'approved' && html`<button type="button" class="btn primary" onClick=${() => { if (live.on) { refuse(); return; } update(() => { sc.status = 'approved'; for (const c of m.changes) if (c.screen === sc.id) c.seen = true; }); act.toast(`${sc.name} approved`); }}><${Icon} name="check" size=${14} />Approve</button>`}
+          ${live.on ? html`<${mocks.Display} key=${m.designRevision} title="Mock design editor" action="Edit design" disabled=${!m.designRevision} selection=${m.designRevision ? { _tag: 'editor', repoId: p.repo, projectId: p.id, revisionId: m.designRevision } : null} />` : html`<button type="button" class="btn ghost" onClick=${() => act.toast(`Opening ${sc.name} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${14} />Edit design</button>`}</div></section>
       <section class="mk-comments"><h3>Comments</h3>
         ${sc.comments.length === 0 && !sc.replying && html`<p class="muted" data-empty>No comments</p>`}
         <ol>${sc.comments.map((c, n) => { const a = c.from === 'owner' ? null : agentOf(s, c.from);
@@ -291,12 +294,12 @@ function Changes({ s, p, m }) {
   const now = useNow(); const [open, setOpen] = useState(null);
   return html`<div class="table-wrap"><table class="table mk-changes"><thead><tr><th>Screen</th><th>Revision</th><th>What changed</th><th>By</th><th class="num">When</th></tr></thead><tbody>
     ${m.changes.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No changes</td></tr>`}
-    ${m.changes.map((c) => { const sc = byId(m.screens, c.screen); const by = agentOf(s, c.by); if (!sc) return null; const ex = open === c.id;
+    ${m.changes.map((c) => { const sc = byId(m.screens, c.screen); const by = agentOf(s, c.by); if (!sc && !live.on) return null; const ex = open === c.id;
       return html`<tr key=${c.id} class=${cx(c.compare && 'click', !c.seen && 's-warn')} onClick=${() => c.compare && setOpen(ex ? null : c.id)}>
-          <td class="state-cell"><a class="link" href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} onClick=${(e) => e.stopPropagation()}>${sc.name}</a>${!c.seen && html` <span class="badge warn">New</span>`}</td>
-          <td class="mono muted">${c.from ? `${c.from} → ${c.to}` : '1'}</td>
+          <td class="state-cell"><a class="link" href=${href(sc ? `/p/${p.id}/mocks/screen/${sc.id}` : `/p/${p.id}/mocks`)} onClick=${(e) => e.stopPropagation()}>${sc ? sc.name : c.name}</a>${!live.on && !c.seen && html` <span class="badge warn">New</span>`}</td>
+          <td class="mono muted">${live.on ? c.to : c.from ? `${c.from} → ${c.to}` : '1'}</td>
           <td class="wrap">${c.text}${c.compare && html` <span class="link mk-cmp">${ex ? 'Hide' : 'Compare'}</span>`}</td>
-          <td class="muted">${by ? by.name : 'Designer'}</td>
+          <td class="muted">${by ? by.name : live.on ? (c.by === 'owner' ? 'Owner' : c.by) : 'Designer'}</td>
           <td class="num muted">${since(c.ts, now)}</td></tr>
         ${ex && html`<tr class="mk-cmprow"><td colspan="5"><div class="mk-pair"><figure><figcaption>Revision ${c.from}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} before=${true} max=${.42} /></div></figure>
           <figure><figcaption>Revision ${c.to}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} max=${.42} /></div></figure></div></td></tr>`}`; })}
@@ -326,19 +329,21 @@ function Components({ m }) {
   return html`<div class="table-wrap"><table class="table"><thead><tr><th>Component</th><th>Source</th><th>Preview</th><th class="num">Uses</th><th>Screens</th></tr></thead><tbody>
       ${m.components.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No components</td></tr>`}
       ${m.components.map((c) => html`<tr key=${c.name} class=${cx(!c.real && 's-warn')}><td class="state-cell wrap"><b style="font-weight:var(--weight-medium)">${c.name}</b>${c.note && html`<small class="mk-small">${c.note}</small>`}</td>
-        <td><span class=${cx('badge', c.real ? 'success' : 'warn')}>${c.real ? 'Real' : 'Draft'}</span></td><td><${Demo} kind=${c.demo} /></td><td class="num">${c.uses}</td><td class="muted">${c.on.join(', ')}</td></tr>`)}
+        <td><span class=${cx('badge', c.real ? 'success' : 'warn')}>${c.real ? 'Real' : 'Draft'}</span></td><td>${!live.on && html`<${Demo} kind=${c.demo} />`}</td><td class="num">${c.uses}</td><td class="muted">${c.on.join(', ')}</td></tr>`)}
     </tbody></table></div>`;
 }
 
 export function MocksTab({ s, project: p, route }) {
-  const m = ensure(s, p); const now = useNow(); const view = route.parts[3] || 'screens';
-  const unseen = m.changes.filter((c) => !c.seen).length;
+  const m = ensure(s, p); const now = useNow();
+  useEffect(() => { if (live.on) void mocks.loadMocks(p.id); }, [p.id, s.boardRevision]);
+  const view = route.parts[3] || 'screens';
+  const unseen = live.on ? 0 : m.changes.filter((c) => !c.seen).length;
   const tabs = [['screens', 'Screens', m.screens.length], ['changes', 'Changes', unseen, 'warn'], ['data', 'Data', m.data.length], ['components', 'Components', m.components.length]];
   const open = m.screens.filter((x) => x.status !== 'approved').length;
   const nav = html`<nav class="wf-nav" aria-label="Mock views">${tabs.map(([id, label, n, tone]) => html`<a key=${id} class="wf-tab" aria-current=${(view === 'screen' ? 'screens' : view) === id ? 'page' : null} href=${href(`/p/${p.id}/mocks${id === 'screens' ? '' : '/' + id}`)}>${label}${n > 0 && html`<span class=${cx('count', tone)}>${n}</span>`}</a>`)}</nav>`;
   if (view === 'screen') return html`<div class="wf mk-full">${nav}<${ScreenView} key=${route.parts[4]} s=${s} p=${p} m=${m} id=${route.parts[4]} /></div>`;
   const body = view === 'changes' ? html`<${Changes} s=${s} p=${p} m=${m} />` : view === 'data' ? html`<${Data} m=${m} />` : view === 'components' ? html`<${Components} m=${m} />` : html`<${Screens} s=${s} p=${p} m=${m} />`;
-  return html`<div class="wf" data-main>${nav}
+  return html`<div class="wf" data-main aria-busy=${live.on && mocks.busy('read-mocks:' + p.id)}>${nav}
     <div class="wf-body">
       <div class="wf-status">
         ${m.approvedAt ? html`<span class="badge success"><${Icon} name="check" size=${11} />Approved</span><span>${since(m.approvedAt, now)}</span>`
@@ -347,7 +352,7 @@ export function MocksTab({ s, project: p, route }) {
         <span class="grow"></span>
         ${view === 'changes' && unseen > 0 && html`<button type="button" class="btn sm ghost" onClick=${() => update(() => { for (const c of m.changes) c.seen = true; })}><${Icon} name="check" size=${13} />Mark seen</button>`}
         <button type="button" class="btn sm" disabled=${!m.screens.length} onClick=${() => act.openDialog({ type: 'mock-changes', project: p.id, screen: '' })}><${Icon} name="message-square" size=${13} />Request changes</button>
-        ${!m.approvedAt && html`<button type="button" class="btn sm primary" disabled=${!m.screens.length} onClick=${() => approveAll(s, p)}><${Icon} name="check" size=${13} />Approve mocks</button>`}
+        ${!m.approvedAt && html`<button type="button" class="btn sm primary" disabled=${!m.screens.length || live.on && mocks.busy('approve-mocks:' + p.id)} onClick=${() => approveAll(s, p)}><${Icon} name="check" size=${13} />${live.on && mocks.busy('approve-mocks:' + p.id) ? 'Approving…' : 'Approve mocks'}</button>`}
       </div>
       ${body}
     </div>

@@ -11127,3 +11127,12 @@ The Git synchronization case retained "1 incoming" after Pull.
 The registered component preview case did not observe the expected document response.
 The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
 The result file records the baseline checks for these failures.
+
+## s2-mocks-1. The live Mocks tab did not read recorded bundles.
+
+The first live connection left each project's mock record empty.
+It also hid the Mocks tab because the snapshot does not carry a bundle flag.
+The step 2 adapter now reads complete mock history when the tab opens.
+It shows the Design stage tab and preserves whole revision approval semantics.
+A browser test covers current artifacts, stale artifact refusal, approval, and reload.
+This problem is fixed on the worker branch.
