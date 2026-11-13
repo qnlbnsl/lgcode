@@ -219,6 +219,14 @@ function Cited({ text }) {
     : /^`/.test(t) ? html`<code key=${i}>${t.slice(1, -1)}</code>` : t.replace(/ $/, ' '));
 }
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
+// A command or a folder in a code box. A long one scrolls inside the box, and the button in
+// its corner copies the whole text.
+function CodeBox({ text, label }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => { navigator.clipboard?.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return html`<div class="qc-code"><pre class="code" tabindex="0">${text}</pre>
+    <button type="button" class="qc-copy" aria-label=${(copied ? 'Copied the ' : 'Copy the ') + label} title=${copied ? 'Copied' : 'Copy'} onClick=${copy}><${Icon} name=${copied ? 'check' : 'copy'} size=${14} /></button></div>`;
+}
 // What an answered card says about its answer: a short label, and the owner's words when the
 // answer was typed.
 export function requestOutcome(r, rec, shown) {
@@ -230,8 +238,8 @@ export function requestOutcome(r, rec, shown) {
     return { label, text: '', icon: no ? 'x' : 'check', tone: no ? 'no' : 'yes' };
   }
   // The accepted answer is named when the card does not already show the same words.
-  if (rec && a === rec.label) return { label: 'Accepted the recommendation', text: a === (shown || '').trim() ? '' : a, icon: 'check', tone: 'yes' };
-  return { label: 'You answered', text: a, icon: 'check', tone: 'yes' };
+  if (rec && a === rec.label) return { label: 'Accepted', text: a === (shown || '').trim() ? '' : a, icon: 'check', tone: 'yes' };
+  return { label: 'You answered', text: a, typed: true, icon: 'check', tone: 'yes' };
 }
 function BriefCard({ s, r, openThread, who }) {
   const now = useNow(); const a = agentOf(s, r.agent); const isQ = r.kind === 'question';
@@ -281,8 +289,8 @@ function BriefCard({ s, r, openThread, who }) {
     ${open && html`<div class="qc-report" id=${id}>
       <p class="qc-meta">${who && html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} /><span>Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span>Blocks ${r.blocks}</span>`}${!isQ && r.tool && html`<span>Tool ${r.tool}</span>`}</p>
       ${isQ && html`<section class="qc-part q"><h5>The question</h5><${Paras} list=${r.body || r.title} /></section>`}
-      ${!isQ && html`<section class="qc-part"><h5>Command</h5>${r.command ? html`<pre class="qc-pre">${r.command}</pre>` : html`<p class="flat">Hidden by the harness. You cannot see this tool's input.</p>`}
-        <h5 class="qc-sub">Folder</h5><pre class="qc-pre">${r.folder}</pre></section>`}
+      ${!isQ && html`<section class="qc-part"><h5>Command</h5>${r.command ? html`<${CodeBox} text=${r.command} label="command" />` : html`<p class="flat">Hidden by the harness. You cannot see this tool's input.</p>`}
+        <h5 class="qc-sub">Folder</h5><${CodeBox} text=${r.folder} label="folder" /></section>`}
       ${r.what && html`<section class="qc-part"><h5>What it is about</h5><${Paras} list=${r.what} /></section>`}
       ${(r.whyText || r.why) && html`<section class="qc-part why"><h5>Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
       ${r.recWhy && html`<section class="qc-part reco"><h5><${Icon} name="sparkles" size=${13} />Why this answer</h5><${Paras} list=${r.recWhy} /></section>`}
@@ -296,8 +304,12 @@ function BriefCard({ s, r, openThread, who }) {
         </ul></section>`}
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
-    ${done && html`<p class=${cx('qc-outcome', outcome.tone)}><${Icon} name=${outcome.icon} size=${14} /><b>${outcome.label}</b>${outcome.text && html`<span>${outcome.text}</span>`}</p>`}
     <div class="req-actions qc-actions">
+      ${done && html`
+      ${(!isQ || rec) && html`<button type="button" disabled class=${cx('btn', outcome.tone === 'yes' && !outcome.typed && 'chosen yes')}><${Icon} name=${isQ ? 'sparkles' : 'check'} size=${14} />${outcome.tone === 'yes' && !outcome.typed ? outcome.label : isQ ? 'Accept' : 'Allow'}</button>`}
+      ${(!isQ || rec) && html`<button type="button" disabled class=${cx('btn', outcome.tone === 'no' && 'chosen no')}><${Icon} name="x" size=${14} />${outcome.tone === 'no' ? outcome.label : 'Deny'}</button>`}
+      ${(outcome.text || outcome.tone === 'off' || (isQ && !rec)) && html`<span class=${cx('qc-outcome', outcome.tone)}>${(outcome.typed || outcome.tone === 'off' || !rec) && html`<b>${outcome.label}</b>`}${outcome.text && html`<span>${outcome.text}</span>`}</span>`}
+      `}
       ${!done && html`
       ${!isQ && liveMode.on && liveSplit('Allow', 'check', 'Always allow', 'allow_once', 'allow_always')}
       ${!isQ && liveMode.on && liveSplit('Deny', 'x', 'Always deny', 'reject_once', 'reject_always')}

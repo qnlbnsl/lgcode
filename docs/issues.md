@@ -11482,8 +11482,10 @@ The owner reported this on 2026-11-13.
 An answered card in a thread shrank to its title and a short answer line.
 The summary, the recommendation and the report under "Details" were gone.
 The card now keeps everything it showed before the answer.
-The answer buttons leave, and one line states the outcome.
-The outcome line reads "Allowed", "Denied", "Accepted the recommendation", "You answered" with the owner's words, or "Cancelled".
+The answer buttons stay in their row and are disabled.
+The chosen button is highlighted, in green for an allow or an accept and in red for a deny.
+A typed answer shows as "You answered" with the owner's words, and a cancelled request shows "Cancelled".
+"Details" stays usable beside them.
 The change is in `BriefCard` in `design/mock/js/ui.js`, and the live website carries the chosen option's kind as `answerKind`.
 This is a change to the visible mock, and it awaits the owner's approval of the look.
 
@@ -11497,3 +11499,16 @@ The description in `packages/mcp/src/tools.ts` now says so, and it tells the age
 This has not been checked against a real agent.
 A running agent keeps the old description until it is started again.
 The website does not hide a repeated question, because hiding an agent's free text could hide a real message.
+
+## 668. A live approval card showed the raw command as its title.
+
+The owner reported this on 2026-11-13.
+The Codex harness names a permission request with the command itself.
+The card's title was therefore a long command line.
+The live website now writes a plain title when the harness's description is only the command.
+Examples are 'Run "rm" in the terminal' and "Run a Python script of 40 lines".
+A harness's own description is kept when it differs from the command.
+The plain title names the program and not the agent's intent, because no harness reports the intent.
+The command and the folder under "Details" now sit in code boxes with a copy button.
+A long command scrolls inside its box, which is at most 260 pixels high.
+The folder now comes from the tool's own working folder when the harness reports one.

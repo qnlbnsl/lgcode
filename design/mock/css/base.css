@@ -494,13 +494,16 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 /* ---- a question or an approval in a thread: a brief, and a report under it ------------- */
 .req.qc { gap: 6px; padding: 10px 12px 10px 14px; border: 1px solid var(--color-line); border-left: 3px solid var(--color-warn); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-1); }
 .req.qc.done { border-left-color: var(--color-line-strong); background: var(--color-raised); box-shadow: none; }
-.qc-outcome { display: flex; align-items: baseline; gap: 6px; padding-top: 6px; border-top: 1px solid var(--color-line); line-height: 1.5; max-width: var(--measure); }
-.qc-outcome .icon { flex: none; align-self: center; }
-.qc-outcome b { font-weight: var(--weight-strong); flex: none; }
+.qc-outcome { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.5; }
+.qc-outcome b { font-weight: var(--weight-medium); flex: none; color: var(--color-muted); }
 .qc-outcome span { min-width: 0; overflow-wrap: anywhere; }
-.qc-outcome.yes .icon, .qc-outcome.yes b { color: var(--color-success); }
-.qc-outcome.no .icon, .qc-outcome.no b { color: var(--color-error); }
-.qc-outcome.off .icon, .qc-outcome.off b { color: var(--color-muted); }
+.qc-actions .btn.chosen { opacity: 1; font-weight: var(--weight-strong); }
+.qc-actions .btn.chosen.yes { color: var(--color-success); border-color: var(--color-success); }
+.qc-actions .btn.chosen.no { color: var(--color-error); border-color: var(--color-error); }
+.qc-code { position: relative; }
+.qc-code pre.code { max-height: 260px; padding-right: 40px; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--color-line); }
+.qc-copy { position: absolute; top: 5px; right: 5px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-muted); cursor: pointer; }
+.qc-copy:hover { color: var(--color-text); background: var(--color-raised); }
 .qc-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .qc-q { font-size: var(--text-md); font-weight: var(--weight-strong); line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
 .qc-age { margin-left: auto; flex: none; color: var(--color-muted); font-size: var(--text-sm); white-space: nowrap; }

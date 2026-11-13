@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ClientRequest, EventEnvelope } from "@lgtm/contracts"
-import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer, mapContextSearch, mapSubscriptionNames } from "../src/chat.ts"
+import { mapAgentDetails, mapFailedStart, mapHomeRequest, attemptTitle, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer, mapContextSearch, mapSubscriptionNames } from "../src/chat.ts"
 import { mapSnapshot } from "../src/mapping.ts"
 import { engineSnapshot } from "./fixtures.ts"
 
@@ -24,6 +24,13 @@ describe("Home mapping", () => {
     const row = { ...engineSnapshot.requests[0], kind: "permission", status: "answered", canAnswer: false, optionId: "custom-yes", answeredAt: 99 } as ClientRequest
     const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "Run checks", toolInput: { command: "pnpm test" }, options: [{ id: "custom-yes", name: "Allow this check", kind: "allow_once" }, { id: "custom-no", name: "Refuse", kind: "reject_once" }] }))!
     expect(result).toMatchObject({ command: "pnpm test", body: "Run checks", status: "answered", answer: "Allow this check", answerKind: "allow_once", answeredAt: 99, options: [{ id: "custom-yes", label: "Allow this check", primary: true }, { id: "custom-no", label: "Refuse", primary: false }] })
+  })
+  it("names what a command attempts and keeps a harness's own description", () => {
+    expect(attemptTitle("rm -- /tmp/probe", "rm -- /tmp/probe", "execute")).toBe('Run "rm" in the terminal')
+    expect(attemptTitle("cd app && pnpm test", "cd app && pnpm test", "execute")).toBe('Run "cd" and other commands in the terminal')
+    expect(attemptTitle("python3 - <<'PY'", "python3 - <<'PY'\nimport os\nprint(os.getcwd())\nPY", "execute")).toBe("Run a Python script of 4 lines")
+    expect(attemptTitle("Run checks", "pnpm test", "execute")).toBe("Run checks")
+    expect(attemptTitle("Read a hidden file", null, "read")).toBe("Read a hidden file")
   })
   it("preserves cancellation and agent-held identity", () => {
     expect(mapHomeRequest({ ...question, status: "cancelled", holder: { _tag: "agent", agentId: "ag-lead" as never } }, agents)).toMatchObject({ status: "cancelled", heldBy: "ag-lead" })

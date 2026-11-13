@@ -4,6 +4,22 @@ import type { ClientRequest, EventEnvelope, ContextUsage, AgentChoices, AgentCon
 import { groupThreadItems, toolText } from "@lgtm/contracts/thread"
 import { mapRequest, type StoreAgent, type StoreSubscription } from "./mapping.ts"
 
+// A harness often names a permission request with the command itself. The card then says what
+// is being attempted in plain words, and the command stays under "Details".
+const scriptNames: Record<string, string> = { python: "Python", python3: "Python", node: "Node.js", bash: "shell", sh: "shell", zsh: "shell", ruby: "Ruby", perl: "Perl" }
+export function attemptTitle(title: string, command: string | null, toolKind?: string | null): string {
+  const first = (text: string) => text.split("\n").find((line) => line.trim() !== "")?.trim() ?? ""
+  if (command === null) return title
+  if (title !== "Permission request" && first(title) !== first(command).slice(0, first(title).length)) return title
+  const words = first(command).split(/\s+/).filter((word) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word))
+  const program = (words[0] ?? "").split("/").at(-1) ?? ""
+  const lines = command.trim().split("\n").length
+  const script = scriptNames[program]
+  if (script && (lines > 1 || words[1] === "-c" || words[1] === "-e")) return `Run a ${script} script${lines > 1 ? ` of ${lines} lines` : ""}`
+  if (toolKind && toolKind !== "execute" && program === "") return title
+  const more = /&&|\|\||;|\|/.test(command) || lines > 1
+  return program ? `Run "${program}"${more ? " and other commands" : ""} in the terminal` : "Run a terminal command"
+}
 export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAgent>, source?: EventEnvelope) {
   const base = mapRequest(row, row.kind === "permission" ? "approval" : "question", agents)
   if (!base) return undefined
@@ -14,10 +30,13 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
   const proposed = question?.proposedAnswer ?? row.display?.proposedAnswer
   const input = permission?.toolInput
   const command = input && typeof input === "object" && "command" in input && typeof input.command === "string" ? input.command : null
+  const cwd = input && typeof input === "object" && "cwd" in input && typeof input.cwd === "string" ? input.cwd : null
   return { ...base, sourceSequence: row.sourceSequence, status: row.status, canAnswer: row.canAnswer,
     sprint: row.sprintId ?? question?.sprintId ?? permission?.sprintId ?? null,
     project: row.projectId ?? base.project, task: row.taskId ?? base.task,
-    title: question?.title ?? base.title, body: question?.text ?? permission?.description ?? base.body,
+    title: question?.title ?? (row.kind === "permission" ? attemptTitle(base.title, command, row.display?.toolKind ?? permission?.toolKind) : base.title),
+    body: question?.text ?? permission?.description ?? base.body,
+    ...(cwd ? { folder: cwd } : {}),
     recommendation: question?.recommendation ?? base.recommendation, command,
     blind: row.display?.inputAvailable === false || row.display?.inputRedacted === true,
     options: row.kind === "question" ? (proposed ? [{ id: "proposed", label: proposed, primary: true }] : [])

@@ -923,3 +923,10 @@ Renumbering depends on the migration tool:
 - Tools that name migrations by timestamp, such as Rails, Prisma and Drizzle, rarely
   collide on names. They can still apply migrations in an order that nobody tested, so
   the rerun of the tests on the new base still applies.
+
+## A one-sentence reason on every approval request
+
+The owner asked on 2026-11-13 for an approval card to say what is being attempted.
+The live website can name only the program, because a harness reports the command and not the reason.
+The engine could ask the requesting agent for one sentence of intent, or take it from the agent's last message before the tool call.
+The card would then show that sentence as its summary.
