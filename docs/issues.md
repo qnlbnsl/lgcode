@@ -11136,3 +11136,15 @@ The step 2 adapter now reads complete mock history when the tab opens.
 It shows the Design stage tab and preserves whole revision approval semantics.
 A browser test covers current artifacts, stale artifact refusal, approval, and reload.
 This problem is fixed on the worker branch.
+
+## s2-mocks-2. The live repository design page used the sample's fixed sheets.
+
+The page did not read the registered design, components, or tokens.
+The step 2 adapter now loads those records when the page opens.
+The canvas retains its menus and tables without inventing flows or token modes.
+The isolated display controls restore keyboard focus after their requests finish.
+Browser tests cover actual mock and component documents, private URL revocation,
+and the editor route's refusal of changed design evidence.
+The expanded standalone test also caught and verified a palette regression introduced
+while connecting this page.
+This problem is fixed on the worker branch.

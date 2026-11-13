@@ -1,8 +1,9 @@
 // Live actions for mock bundles, repository design and local discovery.
-import { store, engineWrite, live, html, useState, useEffect, useRef } from '../lib.js';
+import { store, engineWrite, live, html, useState, useEffect, useLayoutEffect, useRef } from '../lib.js';
 import * as engine from '../engine.js';
 import { run, busy } from './board.js';
-import { toast, closeDialog, confirm } from '../actions.js';
+import { Dialog, registerDialog } from '../ui.js';
+import { toast, closeDialog, confirm, openDialog } from '../actions.js';
 export { busy };
 const S = () => store.state;
 const maps = () => engine.connection().mocks;
@@ -80,6 +81,7 @@ export function loadMachines() {
 export function Display({ selection, title = 'Recorded preview', action = 'Open preview', disabled = false, viewport }) {
   const [frame, setFrame] = useState(null), [pending, setPending] = useState(false);
   const [unclosed, setUnclosed] = useState(false);
+  const closeButton = useRef(null), openButton = useRef(null);
   const ref = useRef({ alive: true, frame: null, generation: 0, connection: engine.connection() });
   const release = (f) => ref.current.connection.request('display.close', { id: f.id });
   const close = async () => {
@@ -106,10 +108,16 @@ export function Display({ selection, title = 'Recorded preview', action = 'Open 
   }; }, []);
   useEffect(() => { if (disabled) void close(); }, [disabled]);
   useEffect(() => { if (!frame) return; const timer = setTimeout(() => void close(), Math.max(0, frame.expiresAt - Date.now())); return () => clearTimeout(timer); }, [frame]);
+  useLayoutEffect(() => { if (!pending && !viewport) (frame ? closeButton : openButton).current?.focus(); }, [frame, pending]);
   return html`<section aria-label=${title} aria-busy=${pending}>
-    ${frame ? html`<iframe title=${title} src=${frame.url} sandbox=${selection._tag === 'editor' ? 'allow-scripts allow-same-origin' : 'allow-scripts'} referrerpolicy="same-origin" style=${{ border: '0', width: viewport === 'phone' ? '390px' : '100%', maxWidth: '100%', height: '780px', background: 'white' }}></iframe>
-      <button type="button" class="btn sm" disabled=${pending} onClick=${close}>Close display</button>`
-      : html`<button type="button" class="btn sm" disabled=${pending || disabled || !selection || unclosed} onClick=${open}>${pending ? 'Opening…' : action}</button>`}
+    ${frame ? html`<div inert=${selection._tag === 'component'}><iframe tabindex=${selection._tag === 'component' ? -1 : null} title=${title} src=${frame.url} sandbox=${selection._tag === 'editor' ? 'allow-scripts allow-same-origin' : 'allow-scripts'} referrerpolicy="same-origin" style=${{ border: '0', width: viewport === 'phone' ? '390px' : '100%', maxWidth: '100%', height: '780px', background: 'white' }}></iframe></div>
+      <button ref=${closeButton} type="button" class="btn sm" disabled=${pending} onClick=${close}>Close display</button>`
+      : html`<button ref=${openButton} type="button" class="btn sm" disabled=${pending || disabled || !selection || unclosed} onClick=${open}>${pending ? 'Opening…' : action}</button>`}
     ${unclosed && html`<button type="button" class="btn sm" disabled=${pending} onClick=${close}>Retry closing display</button>`}
   </section>`;
 }
+
+export function openDisplay(selection, title) { openDialog({ type: 'engine-display', selection, title }); }
+registerDialog('engine-display', ({ d }) => html`<${Dialog} title=${d.title} onClose=${closeDialog}>
+  <${Display} key=${JSON.stringify(d.selection)} selection=${d.selection} title=${d.title} action="Open display" />
+<//>`);

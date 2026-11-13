@@ -295,7 +295,7 @@ function Changes({ s, p, m }) {
   return html`<div class="table-wrap"><table class="table mk-changes"><thead><tr><th>Screen</th><th>Revision</th><th>What changed</th><th>By</th><th class="num">When</th></tr></thead><tbody>
     ${m.changes.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No changes</td></tr>`}
     ${m.changes.map((c) => { const sc = byId(m.screens, c.screen); const by = agentOf(s, c.by); if (!sc && !live.on) return null; const ex = open === c.id;
-      return html`<tr key=${c.id} class=${cx(c.compare && 'click', !c.seen && 's-warn')} onClick=${() => c.compare && setOpen(ex ? null : c.id)}>
+      return html`<tr key=${c.id} class=${cx(c.compare && 'click', !live.on && !c.seen && 's-warn')} onClick=${() => c.compare && setOpen(ex ? null : c.id)}>
           <td class="state-cell"><a class="link" href=${href(sc ? `/p/${p.id}/mocks/screen/${sc.id}` : `/p/${p.id}/mocks`)} onClick=${(e) => e.stopPropagation()}>${sc ? sc.name : c.name}</a>${!live.on && !c.seen && html` <span class="badge warn">New</span>`}</td>
           <td class="mono muted">${live.on ? c.to : c.from ? `${c.from} → ${c.to}` : '1'}</td>
           <td class="wrap">${c.text}${c.compare && html` <span class="link mk-cmp">${ex ? 'Hide' : 'Compare'}</span>`}</td>
