@@ -16,7 +16,8 @@ const KIND_FROM_ROUTE = { questions: 'question', approvals: 'approval' };
 // The stage of a request is the stage of the sprint its task belongs to, else the project's.
 function stageOf(s, r) {
   const t = r.task && byId(s.tasks, r.task); const sp = t && byId(s.sprints, t.sprint);
-  return sp ? sp.phase : projectOf(s, r.project).stage;
+  const linked = r.sprint && byId(s.sprints, r.sprint);
+  return linked ? linked.phase : sp ? sp.phase : projectOf(s, r.project).stage;
 }
 const COLS = [
   { id: 'title', label: 'Title', key: (s, r) => r.title.toLowerCase() },

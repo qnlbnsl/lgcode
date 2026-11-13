@@ -1,6 +1,6 @@
 // Pure adapters for Home, agent conversations, and the roster. The JavaScript screens
 // receive these functions from live.ts; the standalone mock never loads this module.
-import type { ClientRequest, EventEnvelope, RosterEntry, ContextUsage, AgentChoices, AgentConfiguration, ContextReference } from "@lgtm/contracts"
+import type { ClientRequest, EventEnvelope, ContextUsage, AgentChoices, AgentConfiguration, ContextReference } from "@lgtm/contracts"
 import { groupThreadItems, toolText } from "@lgtm/contracts/thread"
 import { mapRequest, type StoreAgent } from "./mapping.ts"
 
@@ -15,6 +15,7 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
   const input = permission?.toolInput
   const command = input && typeof input === "object" && "command" in input && typeof input.command === "string" ? input.command : null
   return { ...base, sourceSequence: row.sourceSequence, status: row.status, canAnswer: row.canAnswer,
+    sprint: row.sprintId ?? question?.sprintId ?? permission?.sprintId ?? null,
     project: row.projectId ?? base.project, task: row.taskId ?? base.task,
     title: question?.title ?? base.title, body: question?.text ?? permission?.description ?? base.body,
     recommendation: question?.recommendation ?? base.recommendation, command,
@@ -40,10 +41,12 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string) 
   let pending = false
   let delivery: string | undefined
   let lastOutputAt: number | null = null
+  let runMode: string | null = null
   const rows: Array<Record<string, unknown>> = []
   for (const item of groupThreadItems(items)) {
     const e = item.event
     if (!("agentId" in e) || e.agentId !== agentId) continue
+    if (e._tag === "AgentStarted") runMode = e.runMode
     const base = { id: String(item.sequence), ts: item.occurredAt }
     if (e._tag === "DeliverySent") { pending = true; delivery = e.deliveryId }
     if (e._tag === "StateChanged" && e.state._tag !== "working"
@@ -65,17 +68,21 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string) 
   }
   // The first delta owns the display identity, but the last delta owns the output time.
   for (const item of items) if (item.event._tag === "ThreadItem" && item.event.agentId === agentId) lastOutputAt = Math.max(lastOutputAt ?? 0, item.occurredAt)
-  return { items: rows, pending, lastOutputAt }
+  return { items: rows, pending, lastOutputAt, runMode }
 }
 
 export function mapAgentDetails(reply: { context?: ContextUsage; configuration?: AgentConfiguration; models?: AgentChoices["models"]; efforts?: AgentChoices["efforts"] }) {
-  return { context: reply.context?._tag === "available" ? reply.context.percent : null,
+  return { ...reply.configuration?.desired, context: reply.context?._tag === "available" ? reply.context.percent : null,
     contextReason: reply.context?._tag === "unavailable" ? reply.context.reason : null,
     configuration: reply.configuration ?? null, models: reply.models?.options ?? [], efforts: reply.efforts?.options ?? [] }
 }
 
 export function mapRosterDetails(agent: StoreAgent, tasks: ReadonlyArray<{ owner: string; label: string; state: string }>, actions: ReadonlyArray<{ _tag: string; agentId: string; sequence: number }>) {
   const stall = actions.filter((a) => a.agentId === agent.id && ["roles.StallSeen", "roles.StallEnded"].includes(a._tag)).sort((a, b) => b.sequence - a.sequence)[0]
-  return { task: tasks.find((t) => t.owner === agent.id && !["done", "cancelled"].includes(t.state))?.label ?? null,
+  return { workState: agent.state === "idle" ? "ready" : agent.workState, task: tasks.find((t) => t.owner === agent.id && !["done", "cancelled"].includes(t.state))?.label ?? null,
     stalled: stall?._tag === "roles.StallSeen" }
+}
+
+export function mapPhoneOffer(settings: { carrier: { _tag: string }; pushPromptDismissed?: boolean }) {
+  return { phoneOffer: settings.pushPromptDismissed || settings.carrier._tag !== "none" ? "declined" : "open" }
 }

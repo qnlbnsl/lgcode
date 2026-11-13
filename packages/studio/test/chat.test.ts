@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ClientRequest, EventEnvelope } from "@lgtm/contracts"
-import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel } from "../src/chat.ts"
+import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer } from "../src/chat.ts"
 import { mapSnapshot } from "../src/mapping.ts"
 import { engineSnapshot } from "./fixtures.ts"
 
@@ -73,6 +73,12 @@ it("maps per-agent choices and context without fabricating unavailable values", 
 it("maps task ownership and the most recent stall decision", () => {
   const agent = agents.find((a) => a.id === "ag-worker")!
   const actions = [{ agentId: agent.id, sequence: 20, _tag: "roles.StallSeen" }, { agentId: agent.id, sequence: 22, _tag: "roles.StallEnded" }]
-  expect(mapRosterDetails(agent, [{ owner: agent.id, label: "HR-11", state: "active" }], actions)).toEqual({ task: "HR-11", stalled: false })
-  expect(mapRosterDetails(agent, [], actions.slice(0, 1))).toEqual({ task: null, stalled: true })
+  expect(mapRosterDetails(agent, [{ owner: agent.id, label: "HR-11", state: "active" }], actions)).toMatchObject({ task: "HR-11", stalled: false })
+  expect(mapRosterDetails(agent, [], actions.slice(0, 1))).toMatchObject({ task: null, stalled: true })
+})
+
+it("shows the phone offer only when the engine says it has not been dismissed or configured", () => {
+  expect(mapPhoneOffer({ carrier: { _tag: "none" } })).toEqual({ phoneOffer: "open" })
+  expect(mapPhoneOffer({ carrier: { _tag: "ntfy" } })).toEqual({ phoneOffer: "declined" })
+  expect(mapPhoneOffer({ carrier: { _tag: "none" }, pushPromptDismissed: true })).toEqual({ phoneOffer: "declined" })
 })

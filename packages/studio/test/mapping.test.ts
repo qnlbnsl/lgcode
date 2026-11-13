@@ -113,7 +113,7 @@ describe("requests", () => {
   it("maps a permission request as an approval with its options", () => {
     expect(mapRequest(engineSnapshot.requests[0]!, "approval", agents)).toEqual({
       sourceSequence: 30, id: "perm-1", kind: "approval", agent: "ag-worker", project: "pj-orchard", task: null, title: "Run the orchard checks",
-      body: "Run the orchard checks\nnpm test", command: null, folder: "", tool: "execute", recommendation: null,
+      body: "Run the orchard checks\nnpm test", command: null, folder: "/srv/repos/orchard", tool: "execute", recommendation: null,
       options: [{ id: "allow", label: "Allow once", primary: true }, { id: "deny", label: "Deny" }],
       createdAt: 1_700_000_100_000, status: "open", heldBy: null
     })

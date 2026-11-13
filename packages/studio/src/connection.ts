@@ -85,6 +85,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   const timing: Timing = {}
 
   let write: Write = () => {}
+  let activeClient: Client | undefined
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
@@ -109,7 +110,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     } catch { return undefined }
   }
 
-  const stop = () => { controller?.abort(); controller = undefined }
+  const stop = () => { activeClient = undefined; controller?.abort(); controller = undefined }
 
   // Reads the snapshot, then follows the stream, until the session ends or the page closes.
   const follow = () => {
@@ -121,13 +122,14 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     let failures = 0
     const publish = (snapshot: ClientSnapshot) => {
       current = snapshot
-      after = snapshot.sequence
       if (!signal.aborted) write(mapSnapshot(snapshot, now()))
     }
     const program = Effect.gen(function* () {
       while (!ended && !signal.aborted) {
         yield* Effect.scoped(Effect.gen(function* () {
           const client: Client = yield* open({ url })
+          activeClient = client
+          yield* Effect.addFinalizer(() => Effect.sync(() => { if (activeClient === client) activeClient = undefined }))
           const refresh = (minimum = 0) => Effect.gen(function* () {
             for (;;) {
               const started = clock()
@@ -141,7 +143,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
               yield* Effect.sleep(25)
             }
           })
-          if (current === undefined) yield* refresh()
+          if (current === undefined) {
+            yield* refresh()
+            after = (current as ClientSnapshot | undefined)?.sequence ?? after
+          }
           if (!signal.aborted) setConn("live")
           // The owner's name is the one saved in the engine's settings, or else Git's
           // user.name, read once for each connection. The current page reads it the same way.
@@ -179,7 +184,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     // A pushed event either changes one agent's state in place or asks for a fresh snapshot.
     const apply = (item: ClientEnvelope, refresh: (minimum?: number) => Effect.Effect<void, unknown>) => Effect.gen(function* () {
       const event = item.event
-      if (event._tag === "StateChanged" && current !== undefined) {
+      if (event._tag === "StateChanged" && current !== undefined && item.sequence > current.sequence) {
         publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => agent.agentId === event.agentId ? { ...agent, state: event.state } : agent) })
       } else if (needsRefresh(event._tag)) yield* refresh(item.sequence)
     })
@@ -200,11 +205,11 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     // Sending changes to the engine is step 2 of the plan. Until then the website refuses
     // each action before it reaches this point.
     async request(tag, payload) {
-      if (closed || controller === undefined || controller.signal.aborted) throw new Error("The service is not connected.")
+      if (closed || activeClient === undefined || controller === undefined || controller.signal.aborted) throw new Error("The service is not connected.")
       const signal = controller.signal
+      const client = activeClient
       try {
         return await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-          const client = yield* open({ url })
           const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, { reason?: string }>>)[tag]
           if (typeof method !== "function") return yield* Effect.fail(new Error(`Unknown request: ${tag}`))
           return yield* method({ ...payload, requestId: requestId() }).pipe(Effect.mapError((error) => new Error(error.reason ?? String(error))))

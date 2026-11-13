@@ -224,6 +224,7 @@ function BriefCard({ s, r, openThread, who }) {
     <${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
       items=${[{ label: always, why, onSelect: () => answer(o === 'deny' ? 'never' : 'always') }]} width=${280} /></span>`;
   const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
+  if (liveMode.on && r.status === 'open' && r.heldBy) return html`<section class="req qc" id=${'req-' + r.id}><b>${r.title}</b><p>${r.body}</p><p class="muted">Waiting on ${agentOf(s, r.heldBy).name}</p></section>`;
   if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
     <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
     <p class="qc-answer">${r.answer}</p></section>`;
@@ -253,7 +254,7 @@ function BriefCard({ s, r, openThread, who }) {
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
     <div class="req-actions qc-actions">
-      ${!isQ && liveMode.on && opts.map((o) => html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" disabled=${chatLive.busy('request:' + r.id)} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`) }
+      ${!isQ && liveMode.on && opts.map((o) => html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`) }
       ${rec && !declined && html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
       ${!isQ && !liveMode.on && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
@@ -409,7 +410,7 @@ export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
     <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-label=${'Thread with ' + a.name}>
       ${items.length === 0 && html`<div class="empty" data-empty><strong>No messages yet</strong></div>`}
       ${items.map((it) => {
-        const d = dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
+        const d = it.ts == null ? null : dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
         let body;
         if (it.type === 'user' && !it.from) {
           body = html`<div class="msg mine" key=${it.id}>
@@ -568,7 +569,7 @@ export function Composer({ s, agentId, center }) {
   const addCtx = (k) => { setCtx((c) => (c.some((x) => (x.k || x) === (k.k || k)) ? c : [...c, k])); setPicking(false); act.setDraft(key, draft.replace(/@$/, '')); bump((n) => n + 1); ta.current?.focus(); };
   const h = HARNESSES[a.harness];
   const subs = s.subscriptions.filter((x) => x.harness === a.harness);
-  const busyLine = pending ? 'Working on your message' : (a.state === 'working' || a.state === 'waiting') && a.activity ? a.activity : null;
+  const busyLine = liveMode.on && a.configuration?.status === 'pending' ? 'Model and effort apply from the next turn' : liveMode.on && ['refused', 'unsupported', 'unavailable'].includes(a.configuration?.status) ? a.configuration.status + ': ' + (a.configuration.reason || '') : pending ? 'Working on your message' : (a.state === 'working' || a.state === 'waiting') && a.activity ? a.activity : null;
   const canStop = a.state === 'working' || a.state === 'waiting';
 
   if (a.state === 'failed') {
@@ -581,13 +582,13 @@ export function Composer({ s, agentId, center }) {
   if (a.state === 'stopped') {
     return html`<div class=${cx('composer-wrap', center && 'center')}><div class="composer-state">
       <${Icon} name="circle-stop" class="muted" /><div class="txt"><b>${a.name} is stopped.</b><small>${draft ? 'Your draft is kept. ' : ''}Resume continues from its last turn.</small></div>
-      <button type="button" class="btn primary" onClick=${() => act.resumeAgent(a.id)}><${Icon} name="play" size=${13} />Resume</button>
+      <button type="button" disabled=${liveMode.on && chatLive.busy('agent:' + a.id)} class="btn primary" onClick=${() => act.resumeAgent(a.id)}><${Icon} name="play" size=${13} />Resume</button>
     </div></div>`;
   }
   return html`<div class=${cx('composer-wrap', center && 'center')}>
     ${(busyLine || canStop) && html`<div class="statusline">
       ${busyLine && html`<i class=${cx('dot', st.dot)}></i><span class="truncate">${busyLine}</span>`}
-      ${canStop && html`<button type="button" class="btn sm" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${11} />Stop agent</button>`}
+      ${canStop && html`<button type="button" disabled=${liveMode.on && chatLive.busy('agent:' + a.id)} class="btn sm" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${11} />Stop agent</button>`}
     </div>`}
     <div class=${cx('composer', over && 'drop')} style="position:relative" ...${dropOn}>
       ${over && html`<div class="drop-note" aria-hidden="true"><${Icon} name="upload" size=${16} />Drop to attach</div>`}

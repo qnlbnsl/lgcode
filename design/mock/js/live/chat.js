@@ -1,10 +1,12 @@
 // Live actions and on-demand reads. Domain records only change from replies or events.
 import { live, store, update, engineWrite, refuse } from '../lib.js';
 import * as engine from '../engine.js';
+import { confirm } from '../actions.js';
 
 let mapping;
 export function setMapping(value) { mapping = value; }
 let generation = 0;
+const oversized = new Map();
 const histories = new Map(), details = new Map(), sources = new Map();
 let actions = [], readers = 0, loadingRequests = null, requestVersion = 0;
 const S = () => store.state;
@@ -19,12 +21,14 @@ async function attempt(key, fn) {
   finally { if (epoch === generation) update((s) => { delete s.ui.chatBusy[key]; }); }
 }
 export function reset() {
-  generation++; histories.clear(); details.clear(); sources.clear(); actions = []; loadingRequests = null; requestVersion++;
+  generation++; oversized.clear(); histories.clear(); details.clear(); sources.clear(); actions = []; loadingRequests = null; requestVersion++;
+  if (S()?.ui) { S().ui.chatBusy = {}; S().drafts = {}; }
 }
 export function enrich(patch) {
   if (!mapping) return patch;
   if (patch.agents) patch.agents = patch.agents.map((a) => ({ ...a,
     context: null, ...mapping.mapRosterDetails(a, patch.tasks || S().tasks, actions), ...(details.get(a.id) || {}),
+    runMode: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id).runMode : null,
     lastOutputAt: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id).lastOutputAt : null }));
   if (patch.requests || patch.agents) {
     const previous = new Map(S().requests.map((r) => [r.id, r]));
@@ -32,6 +36,7 @@ export function enrich(patch) {
       const old = previous.get(r.id);
       return old?.sourceSequence === r.sourceSequence ? { ...r, body: old.body, command: old.command, options: old.options } : r;
     });
+    for (const old of previous.values()) if (old.kind !== 'failed' && old.status !== 'open' && !patch.requests.some((r) => r.id === old.id)) patch.requests.push(old);
     patch.requests.push(...(patch.agents || S().agents).flatMap((a) => mapping.mapFailedStart(a) || []));
   }
   return patch;
@@ -44,12 +49,13 @@ function put(envelope) {
     if (sources.size > 64) sources.delete(sources.keys().next().value);
   }
   if ('agentId' in e && histories.has(e.agentId)) {
+    oversized.get(e.agentId)?.delete(envelope.sequence);
     histories.get(e.agentId).set(envelope.sequence, envelope); publishThread(e.agentId);
   }
 }
 function publishThread(agentId) {
   const mapped = mapping.mapThread([...histories.get(agentId).values()], agentId);
-  engineWrite({ threads: { ...S().threads, [agentId]: mapped.items }, pending: { ...S().pending, [agentId]: mapped.pending },
+  engineWrite({ threads: { ...S().threads, [agentId]: [...mapped.items, ...[...(oversized.get(agentId)?.values() || [])]].sort((a, b) => Number(a.id) - Number(b.id)) }, pending: { ...S().pending, [agentId]: mapped.pending },
     agents: S().agents.map((a) => a.id === agentId ? { ...a, lastOutputAt: mapped.lastOutputAt } : a) });
 }
 export function receive(item) {
@@ -61,14 +67,15 @@ export function receive(item) {
     }
     if (readers && /Question|Permission|AgentStart|AgentStopped/.test(item.event._tag)) void readRequests();
     if ('agentId' in item.event && histories.has(item.event.agentId)
-      && ['TurnEnded', 'SessionOpened'].includes(item.event._tag)) void readDetails(item.event.agentId);
+      && (['TurnEnded', 'SessionOpened'].includes(item.event._tag) || item.event._tag.startsWith('AgentConfiguration'))) void readDetails(item.event.agentId);
   } else if (item._tag === 'client.Oversized') {
     const epoch = generation;
     // Content stays an explicit placeholder until the owner loads it.
     if (item.tag === 'ThreadItem' && histories.has(item.agentId)) {
-      const rows = S().threads[item.agentId] || [];
-      engineWrite({ threads: { ...S().threads, [item.agentId]: [...rows, { id: String(item.sequence), ts: item.occurredAt,
-        type: 'large', title: item.tag, size: `${item.bytes} B`, sequence: item.sequence }] } });
+      if (!oversized.has(item.agentId)) oversized.set(item.agentId, new Map());
+      oversized.get(item.agentId).set(item.sequence, { id: String(item.sequence), ts: null,
+        type: 'large', title: item.tag, size: `${item.bytes} B`, sequence: item.sequence });
+      publishThread(item.agentId);
     } else engine.request('client.event', { sequence: item.sequence }).then((reply) => {
       if (epoch === generation && reply.envelope) receive(reply.envelope);
     }).catch((e) => { if (epoch === generation) notice(e.message); });
@@ -110,14 +117,14 @@ async function readRequests() {
       if (version !== requestVersion) continue;
       const requests = rows.flatMap((r) => mapping.mapHomeRequest(r, S().agents, sources.get(r.sourceSequence)) || []);
       requests.push(...S().agents.flatMap((a) => mapping.mapFailedStart(a) || []));
-      engineWrite({ requests });
+      engineWrite({ requests: requests.map((r) => ({ ...r, blocks: S().tasks.find((t) => t.id === r.task)?.label || null })) });
     } while (version !== requestVersion);
   })().catch((e) => { if (epoch === generation) notice(e.message); }).finally(() => { if (epoch === generation) loadingRequests = null; });
   return loadingRequests;
 }
 export function watchHome() {
   if (!live.on || !mapping) return;
-  readers++; void readRequests();
+  readers++; void readRequests(); void readPhoneOffer();
   return () => { readers--; };
 }
 export function watchThread(agentId) {
@@ -145,7 +152,7 @@ export function watchThread(agentId) {
     }
     await readRequests();
   });
-  void readDetails(agentId);
+  void readDetails(agentId); void readAgentActions(agentId);
   const timer = setInterval(() => { void readDetails(agentId); }, 5000);
   return () => { readers--; clearInterval(timer); };
 }
@@ -177,7 +184,7 @@ export function watchRoster(projectId) {
       await Promise.all(S().agents.filter((a) => a.project === projectId).map(async (a) => {
         await readDetails(a.id);
         if (!histories.has(a.id)) histories.set(a.id, new Map());
-        let cursor = 0;
+        let cursor = Math.max(0, ...histories.get(a.id).keys());
         for (;;) {
           const reply = await engine.request('client.thread', { agentId: a.id, after: cursor, limit: 100 });
           if (!active || epoch !== generation) return;
@@ -203,7 +210,15 @@ export async function sendMessage(agentId, text, context = [], files = []) {
   });
 }
 export function stopReply(agentId) { return attempt('agent:' + agentId, () => engine.request('cancel-reply', { agentId })); }
-export function stopAgent(agentId) { return attempt('agent:' + agentId, () => engine.request('stop', { agentId })); }
+export function stopAgent(agentId) {
+  const agent = S().agents.find((a) => a.id === agentId);
+  const approvals = S().requests.filter((r) => r.agent === agentId && r.kind === 'approval' && r.status === 'open');
+  const send = () => attempt('agent:' + agentId, () => engine.request('stop', { agentId }));
+  if (agent?.state === 'working' || approvals.length) return confirm({ title: `Stop ${agent.name}?`,
+    body: 'The agent stops where it is. Resume continues from its last turn.',
+    lost: approvals.length ? [`${approvals.length} waiting approvals will be cancelled`] : [], action: 'Stop agent', onConfirm: send });
+  return send();
+}
 export function resumeAgent(agentId) { return attempt('agent:' + agentId, () => engine.request('resume', { agentId })); }
 export function compact(agentId) { return attempt('agent:' + agentId, () => engine.request('compact', { agentId })); }
 export function setAgentConfig(agentId, patch) {
@@ -230,7 +245,9 @@ export async function searchContext(agent, query) {
 }
 export function loadLarge(item) {
   return attempt('large:' + item.sequence, async () => {
+    const epoch = generation;
     const reply = await engine.request('client.event', { sequence: item.sequence });
+    if (epoch !== generation) return;
     if (!reply.envelope) throw new Error('The event is unavailable.');
     put(reply.envelope);
   });
@@ -239,4 +256,35 @@ export function loadLarge(item) {
 export function nudge(agentId) {
   return attempt('agent:' + agentId, () => engine.request('board.post', { direct: { _tag: 'agent', agentId },
     text: 'Status check: what are you on, and is anything in your way?', to: [{ _tag: 'agent', agentId }], reply: 'any' }));
+}
+
+async function readPhoneOffer() {
+  const epoch = generation;
+  try {
+    const reply = await engine.request('client.alerts.settings', {});
+    if (epoch === generation) engineWrite(mapping.mapPhoneOffer(reply));
+  } catch (e) { if (epoch === generation) notice(e.message); }
+}
+export function declinePhoneOffer() {
+  return attempt('phone-offer', async () => { await engine.request('client.alerts.prompt.dismiss', {}); await readPhoneOffer(); });
+}
+
+export function connected() { if (mapping && readers) void readRequests(); }
+
+async function readAgentActions(agentId) {
+  const epoch = generation;
+  try {
+    let after;
+    const rows = [];
+    for (;;) {
+      const reply = await engine.request('roles.actions.list', { agentId, ...(after === undefined ? {} : { after }), limit: 100 });
+      if (epoch !== generation) return;
+      rows.push(...reply.items);
+      if (reply.next === undefined) break;
+      if (after !== undefined && reply.next >= after) throw new Error('The actions cursor did not advance.');
+      after = reply.next;
+    }
+    const bySequence = new Map([...rows, ...actions].map((a) => [a.sequence, a]));
+    actions = [...bySequence.values()]; engineWrite(enrich({ agents: S().agents }));
+  } catch (e) { if (epoch === generation) notice(e.message); }
 }

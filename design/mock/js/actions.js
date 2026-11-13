@@ -209,7 +209,7 @@ export function answerRequest(requestId, optionId, text) {
     threadOf(st, ag.id).push(message);
   }), 1400);
 }
-export function declinePhoneOffer() { update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
+export function declinePhoneOffer() { if (live.on) return chat.declinePhoneOffer(); update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
 
 // ---- projects ------------------------------------------------------------------
 export function slug(name) { return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'; }

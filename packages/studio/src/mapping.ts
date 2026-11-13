@@ -51,6 +51,7 @@ export type StoreAgentState = "starting" | "working" | "waiting" | "idle" | "pau
 export interface StoreAgent {
   readonly id: string; readonly project: string; readonly team: string | null; readonly role: string; readonly name: string
   readonly harness: string; readonly subscription: string; readonly model: string; readonly effort: string | null
+  readonly folder?: string
   readonly permission: string; readonly state: StoreAgentState; readonly activity: string; readonly task: string | null
   readonly context: number; readonly turns: number; readonly tokens: number; readonly workState: string
   readonly stalled: boolean; readonly startedAt: number; readonly lastOutputAt: number
@@ -217,7 +218,7 @@ export function mapAgent(agent: EngineAgent, section: Pick<ProjectSection, "proj
   return {
     id: agent.agentId, project: projectId, team: led !== undefined ? null : team?.teamId ?? null,
     role: mapRole(agent.role, led !== undefined), name: agent.name, harness: agent.harness, subscription: agent.account,
-    model: agent.model ?? "", effort: agent.effort ?? null, permission: mapPermission(agent.permission), state,
+    folder: agent.folder, model: agent.model ?? "", effort: agent.effort ?? null, permission: mapPermission(agent.permission), state,
     activity: quiet ? "" : agent.displayedState, task: null, context: 0, turns: 0, tokens: 0, workState: WORK_STATE[state],
     stalled: false, startedAt: agent.startedAt, lastOutputAt: agent.startedAt,
     failure: agent.startFailure === undefined ? null : { reason: startFailureText(agent.startFailure) }
@@ -264,13 +265,13 @@ export function mapRequest(row: EngineRow, kind: "approval" | "question", agents
   const preview = display?.preview ?? ""
   const firstLine = preview.split("\n").find((line) => line.trim() !== "")?.trim() ?? ""
   const title = display?.title ?? (firstLine || (kind === "approval" ? "Permission request" : "Question"))
-  const options: StoreOption[] = (display?.options ?? []).map((option, index) => ({
-    id: option.id, label: option.name, ...(index === 0 ? { primary: true } : {})
+  const options: StoreOption[] = (display?.options ?? []).map((option) => ({
+    id: option.id, label: option.name, ...(option.kind === "allow_once" ? { primary: true } : {})
   }))
   return {
     sourceSequence: row.sourceSequence,
     id: row.id, kind, agent: row.agentId, project, task: display?.taskId ?? null, title, body: preview,
-    command: null, folder: "", tool: display?.toolKind ?? null, recommendation: display?.recommendation ?? null,
+    command: null, folder: agent?.folder ?? "", tool: display?.toolKind ?? null, recommendation: display?.recommendation ?? null,
     options, createdAt: row.openedAt ?? 0, status: "open", heldBy: row.holder._tag === "agent" ? row.holder.agentId : null
   }
 }

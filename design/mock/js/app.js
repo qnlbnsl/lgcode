@@ -412,6 +412,7 @@ function mountLive(el) {
       if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
     }
     engineWrite(patch);
+    if (patch.conn?.status === 'live') chat.connected();
     // The sidebar opens each repository the first time the engine names it, as the sample does.
     if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
   });

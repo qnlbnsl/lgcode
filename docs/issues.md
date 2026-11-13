@@ -11081,3 +11081,19 @@ The browser test answers a permission with a harness-specific identifier.
 The mock's thread reader created an empty thread when none existed.
 Live threads are engine records, so that read now returns an empty list without writing.
 The live connection clears thread records when the owner session ends.
+
+## s2-chat-3. A snapshot refresh could skip queued conversation events.
+
+The live connection advanced its stream cursor when it published a refreshed snapshot.
+A lifecycle event could trigger a snapshot that already included later prompt and reply events.
+Those events were then skipped when they arrived on the stream.
+The connection now advances the stream cursor only after processing each stream item.
+The first snapshot still anchors the initial subscription.
+The browser test verifies that a sent prompt appears before any reload.
+
+## s2-chat-4. A fast session check could leave the page on its loading screen.
+
+The store subscribed its rendering listener in a delayed effect.
+A fast session check and snapshot could publish before that listener existed.
+The store now subscribes in a layout effect, before browser responses can arrive.
+The browser journey checks a signed-in reload after live actions.
