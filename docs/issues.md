@@ -11513,3 +11513,11 @@ The plain title names the program and not the agent's intent, because no harness
 The command and the folder under "Details" now sit in code boxes with a copy button.
 A long command scrolls inside its box, which is at most 260 pixels high.
 The folder now comes from the tool's own working folder when the harness reports one.
+
+## 669. A tool row in a live thread grew to the size of its command.
+
+The owner reported this on 2026-11-13.
+The grey row that shows an agent's tool call used the whole command as its one-line label.
+A long script filled the page, and its output had no limit either.
+The closed row now shows the first line of the command, cut with an ellipsis.
+The full command and the output open inside the row, in code boxes that scroll and can be copied.

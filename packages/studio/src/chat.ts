@@ -90,8 +90,15 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, 
       lastOutputAt = Math.max(lastOutputAt ?? 0, item.occurredAt)
       const c = e.content
       if (c._tag === "text") rows.push({ ...base, type: "agent", text: c.text })
-      else if (c._tag === "tool-call") rows.push({ ...base, type: "tools", summary: c.title,
-        lines: [{ verb: c.status ?? "", arg: c.input ? toolText(c.input) : "", res: c.output ? toolText(c.output) : "" }] })
+      else if (c._tag === "tool-call") {
+        // The closed row shows one line. A long command and its output open in boxes that scroll.
+        const firstLine = c.title.split("\n").find((line) => line.trim() !== "")?.trim() ?? c.title
+        const output = c.output ? toolText(c.output) : ""
+        const short = output.length <= 60 && !output.includes("\n")
+        rows.push({ ...base, type: "tools", summary: firstLine,
+          lines: [{ verb: c.status ?? "", arg: c.input ? toolText(c.input) : "", res: short ? output : "" }],
+          ...(c.title.trim() !== firstLine || firstLine.length > 80 ? { full: c.title } : {}), ...(output && !short ? { output } : {}) })
+      }
       else if (c._tag === "plan") rows.push({ ...base, type: "agent", text: c.entries.map((p) => `${p.status}: ${p.content}`).join("\n") })
       else rows.push({ ...base, type: "agent", text: `${c.path}\n\n${c.diff}` })
     } else if (e._tag === "QuestionAsked" || e._tag === "PermissionRequested") rows.push({ ...base, type: "request", requestId: e._tag === "QuestionAsked" ? e.questionId : e.permissionRequestId })

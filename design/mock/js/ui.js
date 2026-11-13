@@ -429,6 +429,8 @@ function ToolGroup({ item }) {
   return html`<details class="tools">
     <summary><${Icon} name="wrench" size=${13} /><span>${item.summary}</span><${Icon} name="chevron-right" size=${14} class="chev" /></summary>
     ${item.lines.map((l, i) => html`<div class="tool-line" key=${i}><span class="verb">${l.verb}</span><span class="arg">${l.arg}</span><span class="res">${l.res}</span></div>`)}
+    ${item.full && html`<div class="tool-box"><h5>Command</h5><${CodeBox} text=${item.full} label="command" /></div>`}
+    ${item.output && html`<div class="tool-box"><h5>Output</h5><${CodeBox} text=${item.output} label="output" /></div>`}
   </details>`;
 }
 function LargeItem({ item }) {
