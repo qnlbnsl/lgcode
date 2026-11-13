@@ -38,12 +38,14 @@ export interface StoreSubscription {
 }
 export type StoreStage = "Design" | "Plan" | "Build" | "Review" | "Hand over"
 export interface StoreProject {
+  readonly worktree?: string
   readonly id: string; readonly repo: string; readonly name: string; readonly prefix: string; readonly goal: string
   readonly stage: StoreStage | ""; readonly phase: string; readonly branch: string; readonly folder: string
   readonly machine: string; readonly lead: string; readonly shell: string; readonly createdAt: number | null
   readonly archived: boolean; readonly hasMocks: boolean; readonly tests: "on" | "off"; readonly agentReview: "on" | "off"
 }
 export interface StoreTeam {
+  readonly worktree?: string
   readonly id: string; readonly project: string; readonly name: string; readonly stage: StoreStage | ""
   readonly area: string | null; readonly branch: string; readonly needToKnow: boolean
 }
@@ -167,7 +169,7 @@ export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<Engi
 export function mapProject(project: EngineProject, workspaces: ReadonlyArray<EngineWorkspace>): StoreProject {
   const workspace = workspaces.find((row) => row.worktreeId === project.worktreeId)
   return {
-    id: project.projectId, repo: project.repoId, name: project.name, prefix: prefixOf(project.name), goal: project.goal,
+    worktree: project.worktreeId, id: project.projectId, repo: project.repoId, name: project.name, prefix: prefixOf(project.name), goal: project.goal,
     stage: mapStage(project.stage), phase: project.stage ?? "", branch: workspace?.branch ?? "", folder: workspace?.path ?? "",
     machine: project.machineId, lead: project.leadAgentId, shell: project.shell ?? "", createdAt: null,
     archived: project.archivedAt !== undefined, hasMocks: false, tests: "on", agentReview: "on"
@@ -176,7 +178,7 @@ export function mapProject(project: EngineProject, workspaces: ReadonlyArray<Eng
 
 export function mapTeam(team: EngineTeam, workspaces: ReadonlyArray<EngineWorkspace>): StoreTeam {
   return {
-    id: team.teamId, project: team.projectId, name: team.name, stage: mapStage(team.stage), area: team.area ?? null,
+    worktree: team.worktreeId, id: team.teamId, project: team.projectId, name: team.name, stage: mapStage(team.stage), area: team.area ?? null,
     branch: workspaces.find((row) => row.worktreeId === team.worktreeId)?.branch ?? "", needToKnow: false
   }
 }

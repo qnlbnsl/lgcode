@@ -231,7 +231,7 @@ function BriefCard({ s, r, openThread, who }) {
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
-  return html`<section aria-busy=${liveMode.on && chatLive.busy('request:' + r.id)} class=${cx('req qc', r.kind, open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${(isQ ? 'Question: ' : 'Approval: ') + brief}>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req qc', r.kind, open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${(isQ ? 'Question: ' : 'Approval: ') + brief}>
     <div class="qc-top"><b class="qc-q">${brief}</b><span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span></div>
     ${summary && html`<p class="qc-sum">${summary}</p>`}
     ${recShort && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
@@ -246,16 +246,16 @@ function BriefCard({ s, r, openThread, who }) {
       ${(others.length > 0 || isQ) && html`<section class="qc-part"><h5>Other answers</h5>
         <ul class="qc-opts">
           ${others.map((o) => html`<li key=${o.id}><div><b>${o.label}</b>${o.note && html`<p>${o.note}</p>`}</div>
-            <button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button></li>`)}
+            <button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button></li>`)}
           ${isQ && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
             <input ref=${own} class="input" placeholder="Your own answer" aria-label="Your own answer" value=${text} onInput=${(e) => setText(e.target.value)} />
-            <button type="submit" class="btn sm" disabled=${!text.trim() || (liveMode.on && chatLive.busy('request:' + r.id))}>Send</button></form></li>`}
+            <button type="submit" class="btn sm" disabled=${!text.trim() || (liveMode.on && chatLive.requestBusy(r))}>Send</button></form></li>`}
         </ul></section>`}
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
     <div class="req-actions qc-actions">
-      ${!isQ && liveMode.on && opts.map((o) => html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`) }
-      ${rec && !declined && html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
+      ${!isQ && liveMode.on && opts.map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`) }
+      ${rec && !declined && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
       ${!isQ && !liveMode.on && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
       ${!isQ && !liveMode.on && split('Deny', 'x', 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
@@ -287,7 +287,7 @@ function MergeBrief({ s, r, openThread }) {
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
   const send = (e) => { e.preventDefault(); if (why.trim()) act.answerRequest(r.id, 'decline', why.trim()); };
-  return html`<section aria-busy=${liveMode.on && chatLive.busy('request:' + r.id)} class=${cx('req mg', !live && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Merge: ' + r.title}>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req mg', !live && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Merge: ' + r.title}>
     <p class="mg-brief">${r.brief || r.body}</p>
     ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
     <${MergeFacts} s=${s} r=${r} />
@@ -320,7 +320,7 @@ export function RequestBlock({ s, request: r, variant = 'card', openThread = nul
   const rec = r.kind === 'question' && (r.recommendation || liveMode.on) ? opts.find((o) => o.primary) : null;
   const sub = a.failure && subOf(s, a.failure.subscription);
   const fixed = r.kind === 'failed' && sub && sub.signedIn;
-  return html`<section aria-busy=${liveMode.on && chatLive.busy('request:' + r.id)} class=${cx('req', variant, r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req', variant, r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
     ${variant === 'card' && html`<div class="req-head">
       <span class=${cx('kind', open ? r.kind : 'closed')}>${KIND_LABEL[r.kind]}</span>
       ${who && html`<span class="req-who"><${Avatar} agent=${a} s=${s} size="sm" status=${false} />${agentLabel(s, a, { withTeam: true })}</span>`}
@@ -338,24 +338,24 @@ export function RequestBlock({ s, request: r, variant = 'card', openThread = nul
       <div class="ev"><${Icon} name="git-commit-horizontal" size=${14} class="muted" /><span class="mono">${r.source}</span><${Icon} name="arrow-right" size=${12} class="muted" /><span class="mono">${r.target}</span><span class="muted">${r.evidence.commits} commits · ${r.evidence.files} files</span></div>
     </div>`}
     ${open && r.kind === 'question' && html`<div class="req-actions">
-      ${rec && html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept recommendation</button>`}
-      ${opts.filter((o) => o !== rec).map((o) => html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
-      <form aria-busy=${liveMode.on && chatLive.busy('request:' + r.id)} class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+      ${rec && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept recommendation</button>`}
+      ${opts.filter((o) => o !== rec).map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      <form aria-busy=${liveMode.on && chatLive.requestBusy(r)} class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
         <input class="input" placeholder="Another answer" aria-label="Another answer" value=${text} onInput=${(e) => setText(e.target.value)} />
-        ${text.trim() && html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} class="btn" type="submit">Send</button>`}
+        ${text.trim() && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} class="btn" type="submit">Send</button>`}
       </form>
       ${thread}
     </div>`}
     ${open && r.kind === 'approval' && html`<div class="req-actions">
-      ${opts.map((o) => html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} key=${o.id} type="button" class=${cx(fill(o.primary && !r.blind), o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      ${opts.map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} key=${o.id} type="button" class=${cx(fill(o.primary && !r.blind), o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
       ${thread}</div>`}
     ${open && r.kind === 'merge' && html`<div class="req-actions">
       <button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'merge-review', requestId: r.id })}>Review and merge</button>
-      <button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
+      <button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
       ${thread}</div>`}
     ${open && r.kind === 'failed' && html`<div class="req-actions">
       ${liveMode.on || fixed
-        ? html`<button disabled=${liveMode.on && chatLive.busy('request:' + r.id)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, 'resume')}><${Icon} name="play" size=${13} />Resume</button>`
+        ? html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, 'resume')}><${Icon} name="play" size=${13} />Resume</button>`
         : html`<button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'signin', subscription: a.failure?.subscription || a.subscription, then: r.id })}>Sign in on ${machineOf(s, a.failure?.machine || p.machine).name}</button>`}
       ${thread}</div>`}
     ${!open && variant === 'detail' && html`<div class="answer"><${Icon} name="check" size=${14} /><span>${r.answer} at ${clock(r.answeredAt)}</span></div>`}
@@ -401,14 +401,14 @@ export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
     if (focusReq) { const t = el.querySelector('#req-' + focusReq); if (t) { t.scrollIntoView({ block: 'center' }); t.focus?.({ preventScroll: true }); el.style.scrollBehavior = ''; return; } }
     el.scrollTop = el.scrollHeight; el.style.scrollBehavior = '';
   }, [agentId, focusReq]);
-  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current && !focusReq) el.scrollTop = el.scrollHeight; }, [count]);
+  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current && !focusReq) el.scrollTop = el.scrollHeight; }, [count, items]);
   const onScroll = (e) => { const el = e.currentTarget; atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; setAway(!atEnd.current); };
   const below = away ? openRequests(s, { agent: agentId }).length : 0;
   const opener = (r) => (r.agent === agentId ? null : onOpenThread ? () => onOpenThread(r.agent, r.id) : routeForRequest(s, r));
   let lastDay = null;
   return html`<div style="position:relative;display:flex;flex-direction:column;flex:1;min-height:0">
-    <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-label=${'Thread with ' + a.name}>
-      ${items.length === 0 && html`<div class="empty" data-empty><strong>No messages yet</strong></div>`}
+    <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-busy=${liveMode.on && chatLive.busy('thread:' + agentId)} aria-label=${'Thread with ' + a.name}>
+      ${items.length === 0 && html`<div class="empty" data-empty><strong>${liveMode.on && chatLive.busy('thread:' + agentId) ? 'Loading thread…' : 'No messages yet'}</strong></div>`}
       ${items.map((it) => {
         const d = it.ts == null ? null : dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
         let body;

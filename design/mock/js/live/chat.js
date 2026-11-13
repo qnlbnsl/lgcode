@@ -1,7 +1,7 @@
 // Live actions and on-demand reads. Domain records only change from replies or events.
 import { live, store, update, engineWrite, refuse } from '../lib.js';
 import * as engine from '../engine.js';
-import { confirm } from '../actions.js';
+import { confirm, toast } from '../actions.js';
 
 let mapping;
 export function setMapping(value) { mapping = value; }
@@ -11,7 +11,8 @@ const histories = new Map(), details = new Map(), sources = new Map();
 let actions = [], readers = 0, loadingRequests = null, requestVersion = 0;
 const S = () => store.state;
 export const busy = (key) => !!S()?.ui?.chatBusy?.[key];
-function notice(text) { update((s) => { s.toasts.push({ id: 'chat-' + Math.random(), text, tone: 'error' }); }); }
+export const requestBusy = (row) => busy('request:' + row.id) || row.kind === 'failed' && busy('agent:' + row.agent);
+function notice(text) { toast(text, 'error'); }
 async function attempt(key, fn) {
   if (busy(key)) return false;
   const epoch = generation;
@@ -124,7 +125,7 @@ async function readRequests() {
 }
 export function watchHome() {
   if (!live.on || !mapping) return;
-  readers++; void readRequests(); void readPhoneOffer();
+  readers++; if (S().conn.status === 'live') { void readRequests(); void readPhoneOffer(); }
   return () => { readers--; };
 }
 export function watchThread(agentId) {
@@ -238,10 +239,11 @@ export function answerRequest(id, optionId, text) {
 }
 export async function searchContext(agent, query) {
   const project = S().projects.find((p) => p.id === agent.project);
-  const worktree = S().worktrees.find((w) => w.project === agent.project && (!agent.team || w.team === agent.team));
+  const team = S().teams.find((t) => t.id === agent.team);
+  const worktree = S().worktrees.find((w) => w.id === (team?.worktree || project.worktree));
   if (!worktree) return [];
   const reply = await engine.request('project.context.search', { projectId: project.id, worktreeId: worktree.id, query, limit: 12 });
-  return reply.items.map((x) => ({ ...x, k: JSON.stringify(x.reference), icon: x.reference._tag === 'task' ? 'list-checks' : 'file-code' }));
+  return mapping.mapContextSearch(reply.result);
 }
 export function loadLarge(item) {
   return attempt('large:' + item.sequence, async () => {
@@ -269,7 +271,7 @@ export function declinePhoneOffer() {
   return attempt('phone-offer', async () => { await engine.request('client.alerts.prompt.dismiss', {}); await readPhoneOffer(); });
 }
 
-export function connected() { if (mapping && readers) void readRequests(); }
+export function connected() { if (mapping && readers) { void readRequests(); void readPhoneOffer(); } }
 
 async function readAgentActions(agentId) {
   const epoch = generation;

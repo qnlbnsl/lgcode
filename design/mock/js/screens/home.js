@@ -1,4 +1,4 @@
-import { watchHome, loadRequest } from '../live/chat.js';
+import { watchHome, loadRequest, busy } from '../live/chat.js';
 // Home is one triage table: everything that needs the owner, across every project.
 // Project navigation lives in the sidebar and on the All projects page, not here.
 import { html, useState, useEffect, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
@@ -31,10 +31,10 @@ const COLS = [
 
 function PhoneOffer({ s }) {
   if (s.phoneOffer !== 'open' || s.settings.ntfyServer) return null;
-  return html`<div class="phone-offer" role="note">
+  return html`<div class="phone-offer" role="note" aria-busy=${busy('phone-offer')}>
     <${Icon} name="smartphone" size=${14} /><span>Phone notifications are off</span>
     <a class="btn sm" href=${href('/notifications')}>Set up</a>
-    <button type="button" class="btn sm ghost" onClick=${act.declinePhoneOffer}>Not now</button>
+    <button type="button" class="btn sm ghost" disabled=${busy('phone-offer')} onClick=${act.declinePhoneOffer}>Not now</button>
   </div>`;
 }
 
@@ -92,7 +92,7 @@ export function Home({ s, route }) {
   const col = COLS.find((c) => c.id === sort.col);
   const cmp = (a, b) => { const x = col.key(s, a), y = col.key(s, b); return (x < y ? -1 : x > y ? 1 : 0) * (sort.dir === 'asc' ? 1 : -1); };
   const rows = all.filter((r) => inScope(r)).sort(cmp);
-  const done = answered ? s.requests.filter((r) => r.status === 'answered' && inScope(r)).sort((a, b) => b.answeredAt - a.answeredAt) : [];
+  const done = answered ? s.requests.filter((r) => (r.status === 'answered' || r.status === 'cancelled') && inScope(r)).sort((a, b) => b.answeredAt - a.answeredAt) : [];
   const anyFilter = kind || f.repo || f.project || q;
   const clickSort = (c) => setSort(sort.col === c.id ? { col: c.id, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { col: c.id, dir: c.num ? 'desc' : 'asc' });
 
@@ -121,7 +121,7 @@ export function Home({ s, route }) {
         <tbody>
           ${rows.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => { if (openId !== r.id) void loadRequest(r.id); setOpenId(openId === r.id ? null : r.id); }} />`)}
           ${rows.length === 0 && html`<tr class="rq-none"><td colspan=${COLS.length} data-empty>${anyFilter ? html`No open request matches. <button type="button" class="link" onClick=${() => { setF({ repo: null, project: null }); setQ(''); setKind(null); }}>Clear the filters</button>` : 'Nothing needs you.'}</td></tr>`}
-          ${done.length > 0 && html`<tr class="rq-group"><td colspan=${COLS.length}>Answered<span class="count">${done.length}</span></td></tr>`}
+          ${done.length > 0 && html`<tr class="rq-group"><td colspan=${COLS.length}>${done.some((r) => r.status === 'cancelled') ? 'Answered or cancelled' : 'Answered'}<span class="count">${done.length}</span></td></tr>`}
           ${done.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => { if (openId !== r.id) void loadRequest(r.id); setOpenId(openId === r.id ? null : r.id); }} />`)}
         </tbody>
       </table>

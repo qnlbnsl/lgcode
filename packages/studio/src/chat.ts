@@ -22,7 +22,7 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
     blind: row.display?.inputAvailable === false || row.display?.inputRedacted === true,
     options: row.kind === "question" ? (proposed ? [{ id: "proposed", label: proposed, primary: true }] : [])
       : options.map((o) => ({ id: o.id, label: o.name, primary: o.kind === "allow_once" })),
-    answer: row.answer ?? options.find((o) => o.id === row.optionId)?.name ?? row.optionId ?? row.reason ?? "",
+    answer: row.answer ?? options.find((o) => o.id === row.optionId)?.name ?? row.optionId ?? row.reason ?? (row.status === "cancelled" ? "Cancelled" : ""),
     answeredAt: row.answeredAt ?? null }
 }
 
@@ -85,4 +85,8 @@ export function mapRosterDetails(agent: StoreAgent, tasks: ReadonlyArray<{ owner
 
 export function mapPhoneOffer(settings: { carrier: { _tag: string }; pushPromptDismissed?: boolean }) {
   return { phoneOffer: settings.pushPromptDismissed || settings.carrier._tag !== "none" ? "declined" : "open" }
+}
+
+export function mapContextSearch(result: { items: ReadonlyArray<{ reference: ContextReference; label: string }> }) {
+  return result.items.map((item) => ({ ...item, k: JSON.stringify(item.reference), icon: item.reference._tag === "task" ? "list-checks" : "file-code" }))
 }

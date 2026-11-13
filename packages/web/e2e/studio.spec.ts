@@ -1,6 +1,7 @@
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"
+import { execFileSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -48,6 +49,10 @@ test("live website: signs in through the engine, shows its real records, and kee
     })
   })
   try {
+    execFileSync('git', ['init', '-b', 'topic'], { cwd: rig.work, stdio: 'ignore' })
+    writeFileSync(join(rig.work, 'reference.txt'), 'Context file body stays on disk.\n')
+    execFileSync('git', ['add', 'reference.txt'], { cwd: rig.work })
+    execFileSync('git', ['-c', 'user.name=Test owner', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Fixture'], { cwd: rig.work, stdio: 'ignore' })
     const studioRoot = await buildStudio(join(rig.root, "studio"))
     const port = await unusedPort()
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
@@ -59,6 +64,13 @@ test("live website: signs in through the engine, shows its real records, and kee
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
         yield* completedSetup(project.projectId)
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "sh" } }))
+        yield* appendSetup([
+          eventOf({ _tag: 'project.RepositoryAdded', repoId: project.repoId, name: 'Repository', path: rig.work }),
+          eventOf({ _tag: 'project.RepositoryLocated', repoId: project.repoId, machineId: 'local', path: rig.work }),
+          eventOf({ _tag: 'project.WorktreeCreated', repoId: project.repoId, worktreeId: project.worktreeId, branch: 'topic', path: rig.work, machineId: 'local', checkout: 'main' }),
+        ])
+        const contextTask = success(yield* call(ownerCredential, 'project.task.create', { ...project.task, label: 'TASK-1', title: 'Use selected context' })).taskId
         runner.script("choices", () => Effect.succeed({ models: { source: "negotiated", options: [{ id: "test-model", label: "Test model" }, { id: "other-model", label: "Other model" }] }, efforts: { source: "negotiated", options: [{ id: "high", label: "High" }, { id: "low", label: "Low" }] } }))
         runner.script("context", () => Effect.succeed({ _tag: "available", used: 25, window: 100, percent: 25, reportedAt: Date.now() }))
         runner.script("cancel", (input) => runner.emitRaw({ _tag: "turnEnded", ...input, stopped: true,
@@ -89,6 +101,10 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
           for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
 
+          await expect(page.getByRole('button', { name: 'Not now', exact: true })).toBeVisible()
+          await page.getByRole('button', { name: 'Not now', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Not now', exact: true })).toHaveCount(0)
+
           // Home answers real questions and harness permissions, including full input.
           await expect(page.locator('.rq-table')).toContainText('Choose the release branch')
           await page.getByRole('button', { name: 'Show Choose the release branch', exact: true }).click()
@@ -110,15 +126,28 @@ test("live website: signs in through the engine, shows its real records, and kee
           await thread.getByRole('button', { name: 'Stop this reply', exact: true }).click()
           await expect.poll(() => runner.callsOf('cancel').length).toBe(1)
           await expect(thread.getByRole('button', { name: 'Send', exact: true })).toBeVisible()
+          await thread.getByRole('button', { name: 'Context', exact: true }).click()
+          await thread.getByPlaceholder('Search tasks and files').fill('TASK-1')
+          await thread.getByRole('button', { name: /TASK-1 · Use selected context/ }).click()
+          await thread.getByRole('button', { name: 'Context', exact: true }).click()
+          await thread.getByPlaceholder('Search tasks and files').fill('reference.txt')
+          await thread.getByRole('button', { name: 'reference.txt', exact: true }).click()
           await composer.fill('Build the requested screen')
           await thread.getByRole('button', { name: 'Send', exact: true }).click()
           await expect(composer).toHaveValue('')
           await expect.poll(() => runner.callsOf('prompt').filter((c) => c.input.agentId === project.workerId).length).toBe(1)
           const current = runner.callsOf('prompt').find((c) => c.input.agentId === project.workerId)!.input
+          expect(current.delivery.content).toMatchObject({ _tag: 'prompt', context: [{ _tag: 'task', projectId: project.projectId, taskId: contextTask }, { _tag: 'file', projectId: project.projectId, repoId: project.repoId, worktreeId: project.worktreeId, path: 'reference.txt' }] })
+          expect(JSON.stringify(current.delivery.content)).not.toContain('Context file body stays on disk.')
           await expect(thread.locator('.thread')).toContainText('Build the requested screen')
           await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-reply', content: { _tag: 'text', text: 'Screen ' }, text: 'Screen ' }))
           await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-reply', content: { _tag: 'text', text: 'implemented.' }, text: 'implemented.' }))
           await expect(thread.locator('.thread')).toContainText('Screen implemented.')
+          const largeText = Array.from({ length: 12_000 }, (_, i) => `Trace ${i}: <b>literal output</b>`).join('\n') + '\nEND-OF-STUDIO-TRACE'
+          await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-large', content: { _tag: 'text', text: largeText }, text: largeText }))
+          await thread.getByRole('button', { name: 'Load', exact: true }).click()
+          await expect(thread.locator('.thread')).toContainText('END-OF-STUDIO-TRACE')
+          await expect(thread.locator('.thread b')).toHaveCount(0)
           // Requests rejected by the engine retain its reason in a notice.
           await thread.getByRole('button', { name: 'Agent actions', exact: true }).click()
           await page.getByRole('menuitem', { name: 'Compact context', exact: true }).click()
@@ -154,18 +183,14 @@ test("live website: signs in through the engine, shows its real records, and kee
         })
 
         // A worker question passes through its lead and is answered inside its thread.
-        console.log("studio: chat actions complete")
         const resumedToken = Redacted.value(runner.callsOf("load").at(-1)!.input.token)
         const workerQuestion = success(yield* call(agentCredential(resumedToken), "ask", { title: "Choose a worker approach", text: "Use the existing adapter?", proposedAnswer: "Keep the adapter", recommendation: "Preserve the interface" })).questionId
-        console.log("studio: worker question created")
         success(yield* call(project.leadCredential, "pass-up", { subject: { _tag: "question", id: workerQuestion } }))
-        console.log("studio: worker question passed up")
         yield* appendSetup([eventOf({ _tag: "PermissionRequested", agentId: project.workerId, permissionRequestId: "studio-thread-permission", holder: { _tag: "owner" }, deliveryId: "thread-permission-delivery", toolCallId: "thread-tool", description: "Check the thread options", options: Array.from({ length: 10 }, (_, i) => ({ id: `thread-option-${i}`, name: i === 9 ? "Harness persistent allow" : `Harness option ${i}`, kind: i === 9 ? "allow_always" : "reject_once", level: i === 9 ? "ask" : "read-only", persistent: i === 9 })), settingsWrite: false, toolInput: { command: "pnpm test thread" } })])
         yield* Effect.promise(async () => {
           const origin = `http://127.0.0.1:${port}`
           await page.goto(`${origin}/studio/#/p/${project.projectId}/chat/${project.workerId}`)
           const thread = page.locator('.chat-main')
-          console.log('studio: worker thread opened')
           // The compact card renders the full source, with a proposed answer from the engine.
           await expect(thread.locator(`#req-${workerQuestion}`)).toContainText('Use the existing adapter?')
           await thread.locator(`#req-${workerQuestion}`).getByRole('button', { name: 'Accept', exact: true }).click()
@@ -175,6 +200,55 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(permission).toContainText('pnpm test thread')
           await permission.getByRole('button', { name: 'Harness persistent allow', exact: true }).click()
           await expect.poll(() => runner.callsOf('answerPermission').filter((c) => c.input.requestId === 'studio-thread-permission').length).toBe(1)
+        })
+
+        yield* appendSetup([eventOf({ _tag: 'roles.StallSeen', agentId: project.workerId, noticeRecipient: 'owner', triggerSequence: 1, sourceSequence: 1, occurrence: 1, notice: 'sent' })])
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/agents`)
+          await expect(page.getByRole('region', { name: 'Blocked', exact: true })).toContainText('name-one-worker')
+          await expect(page.locator('.ag-row').filter({ hasText: 'name-one-worker' })).toContainText('TASK-1')
+          await expect(page.locator('.ag-row').filter({ hasText: 'name-one-worker' }).locator('.ctx')).toContainText('25%')
+          await page.getByRole('button', { name: 'Table', exact: true }).click()
+          const row = page.locator('.ag-table tbody tr').filter({ hasText: 'name-one-worker' })
+          await expect(row).toContainText('TASK-1')
+          await expect(row).toContainText('other-model')
+          await row.getByRole('button', { name: 'More for name-one-worker', exact: true }).click()
+          await page.getByRole('menuitem', { name: /^Nudge/ }).click()
+          await row.getByRole('button', { name: 'Stop name-one-worker', exact: true }).click()
+          await page.getByRole('dialog').getByRole('button', { name: 'Stop agent', exact: true }).click()
+          await expect(row.getByRole('button', { name: 'Resume name-one-worker', exact: true })).toBeVisible()
+          await row.getByRole('button', { name: 'Resume name-one-worker', exact: true }).click()
+          await expect(row.getByRole('button', { name: 'Stop name-one-worker', exact: true })).toBeVisible()
+          await row.getByRole('button', { name: 'More for name-one-worker', exact: true }).click()
+          await page.getByRole('menuitemradio', { name: 'Test model', exact: true }).click()
+          await expect(row).toContainText('test-model')
+          // The docked lead panel reads the same engine-backed thread component.
+          await expect(page.locator('.panel .thread')).toContainText('Choose the release branch')
+        })
+        yield* appendSetup([eventOf({ _tag: 'roles.StallEnded', agentId: project.workerId, noticeRecipient: 'owner', triggerSequence: 1, sourceSequence: 1, occurrence: 1, notice: 'sent' })])
+        yield* Effect.promise(async () => {
+          await expect(page.locator('.ag-totals > div').filter({ hasText: 'May be stuck' }).locator('b')).toHaveText('0')
+        })
+        const channels = success(yield* call(ownerCredential, 'board.channels', {}))
+        const direct = channels.items.find((c: { kind: string; members: Array<{ _tag: string; agentId?: string }> }) => c.kind === 'direct' && c.members.some((m) => m.agentId === project.workerId))
+        expect(direct).toBeDefined()
+        const posts = success(yield* call(ownerCredential, 'board.read', { channelId: direct.channelId }))
+        expect(posts.items).toEqual(expect.arrayContaining([expect.objectContaining({ text: 'Status check: what are you on, and is anything in your way?', reply: 'any' })]))
+        const alertSettings = success(yield* call(ownerCredential, 'client.alerts.settings', {}))
+        expect(alertSettings.pushPromptDismissed).toBe(true)
+        // A failed start is a roster record and produces a Home row, without a merge request.
+        yield* appendSetup([eventOf({ _tag: 'AgentStartFailed', agentId: project.workerId, reason: 'not-signed-in' })])
+        yield* Effect.promise(async () => {
+          await page.goto(`http://127.0.0.1:${port}/studio/#/home`)
+          await expect(page.locator('.rq-table')).toContainText('name-one-worker failed to start')
+          await page.getByRole('button', { name: 'Show name-one-worker failed to start', exact: true }).click()
+          await expect(page.locator('.rq-detail')).toContainText('Not signed in')
+          await expect(page.locator('.rq-detail').getByRole('button', { name: 'Resume', exact: true })).toBeVisible()
+          await expect(page.locator('.rq-table .kind.merge')).toHaveCount(0)
+          await page.locator('.bell').click()
+          await expect(page.getByRole('menuitem', { name: /name-one-worker failed to start/ })).toBeVisible()
+          await page.getByRole('menuitem', { name: 'Open Home', exact: true }).click()
         })
 
         const answered = success(yield* call(ownerCredential, "client.requests", { after: 0, limit: 100 }))
@@ -241,7 +315,7 @@ test("design mock: still opens on its sample data with no console error", async 
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     await expect(page.locator(".sidebar")).toContainText("lgtm-studio")
     await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(1)
-    for (const route of ["/p/console/board", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
+    for (const route of ["/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
       await page.goto(`${origin}/mock/#${route}`)
       await expect(page.locator(".main")).toBeVisible()
     }

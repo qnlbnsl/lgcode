@@ -179,6 +179,35 @@ describe("the live website", () => {
     expect(element.querySelector(".toasts")!.textContent).toContain("not connected to the service yet")
   })
 
+  it("keeps domain records unchanged during a pending prompt, preserves a newer draft, and shows the engine refusal", async () => {
+    const actions = await import("../../../design/mock/js/actions.js" as string) as {
+      setDraft(key: string, text: string): void; sendMessage(agent: string, text: string): Promise<boolean>
+    }
+    const original = fake.connection.request
+    let resolve!: (reply: unknown) => void
+    let reject!: (reason: Error) => void
+    fake.connection.request = () => new Promise((yes, no) => { resolve = yes; reject = no })
+    const before = JSON.stringify({ agents: store.state["agents"], threads: store.state["threads"] })
+    try {
+      actions.setDraft("thread:ag-lead", "Sent message")
+      const first = actions.sendMessage("ag-lead", "Sent message")
+      expect((store.state["ui"] as { chatBusy: Record<string, boolean> }).chatBusy["agent:ag-lead"]).toBe(true)
+      expect(JSON.stringify({ agents: store.state["agents"], threads: store.state["threads"] })).toBe(before)
+      actions.setDraft("thread:ag-lead", "Newer unsent message")
+      resolve({})
+      expect(await first).toBe(true)
+      expect((store.state["drafts"] as Record<string, string>)["thread:ag-lead"]).toBe("Newer unsent message")
+      expect(JSON.stringify({ agents: store.state["agents"], threads: store.state["threads"] })).toBe(before)
+      const second = actions.sendMessage("ag-lead", "Newer unsent message")
+      reject(new Error("The harness refused this prompt."))
+      expect(await second).toBe(false)
+      await settle()
+      expect(element.querySelector(".toasts")!.textContent).toContain("The harness refused this prompt.")
+      expect((store.state["ui"] as { chatBusy: Record<string, boolean> }).chatBusy["agent:ag-lead"]).toBeUndefined()
+      expect((store.state["drafts"] as Record<string, string>)["thread:ag-lead"]).toBe("Newer unsent message")
+    } finally { fake.connection.request = original }
+  })
+
   it("refuses a screen's own write to a record, and keeps the rest of that turn from changing", async () => {
     const lib = await import("../../../design/mock/js/lib.js" as string) as { update(fn: (s: Record<string, unknown>) => void): void }
     await new Promise((resolve) => setTimeout(resolve, 5))

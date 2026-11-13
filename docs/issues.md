@@ -11097,3 +11097,16 @@ The store subscribed its rendering listener in a delayed effect.
 A fast session check and snapshot could publish before that listener existed.
 The store now subscribes in a layout effect, before browser responses can arrive.
 The browser journey checks a signed-in reload after live actions.
+
+## s2-chat-5. Context selection needs the registered worktree identity.
+
+A team's worktree can also be the project's registered checkout.
+The live context picker now uses the engine's worktree identifiers from the project and team records.
+It maps the search reply's result before displaying tasks and files.
+The browser test attaches a task identity to a real prompt in a temporary Git repository.
+
+## s2-chat-6. Reads could start before the live connection was ready.
+
+Home could try its request and phone-offer reads before the transport became available.
+Home now starts those reads when the connection reports that it is live.
+A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.

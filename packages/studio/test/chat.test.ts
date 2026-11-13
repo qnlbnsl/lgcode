@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ClientRequest, EventEnvelope } from "@lgtm/contracts"
-import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer } from "../src/chat.ts"
+import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer, mapContextSearch } from "../src/chat.ts"
 import { mapSnapshot } from "../src/mapping.ts"
 import { engineSnapshot } from "./fixtures.ts"
 
@@ -57,6 +57,7 @@ describe("thread mapping", () => {
     const result = mapThread(items, "ag-worker")
     expect(result.items).toMatchObject([{ type: "user", text: "hi" }, { type: "user", from: "ag-lead" }, { type: "request", requestId: "q1" }, { type: "agent", text: "pending: Build" }, { text: "src/a.ts\n\n<script>data</script>" }])
     expect(mapThread(items, "other").items).toEqual([])
+    expect(mapThread([envelope(1, { _tag: "AgentStarted", agentId: "ag-worker", runMode: "interactive" })], "ag-worker").runMode).toBe("interactive")
     expect(contextLabel({ _tag: "task", projectId: "p" as never, taskId: "t" as never })).toBe("t")
   })
   it("stops pending when a delivery is held or an agent becomes idle", () => {
@@ -81,4 +82,11 @@ it("shows the phone offer only when the engine says it has not been dismissed or
   expect(mapPhoneOffer({ carrier: { _tag: "none" } })).toEqual({ phoneOffer: "open" })
   expect(mapPhoneOffer({ carrier: { _tag: "ntfy" } })).toEqual({ phoneOffer: "declined" })
   expect(mapPhoneOffer({ carrier: { _tag: "none" }, pushPromptDismissed: true })).toEqual({ phoneOffer: "declined" })
+})
+
+it("preserves context identities separately from their labels", () => {
+  const reference = { _tag: "file", projectId: "p", repoId: "r", worktreeId: "w", path: "src/main.ts" } as const
+  const result = mapContextSearch({ items: [{ reference: reference as never, label: "Main source" }] })
+  expect(result[0]).toMatchObject({ label: "Main source", reference, icon: "file-code" })
+  expect(contextLabel(reference as never)).toBe("src/main.ts")
 })
