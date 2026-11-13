@@ -12290,3 +12290,61 @@ It kept The service is not connected after the connection became live.
 The page now waits for the live connection before its first list request.
 It preserves an already loaded draft when the connection recovers.
 A deterministic Studio unit test covers startup and reconnection.
+
+## s6-settings-1. Service updates remain manual.
+
+The service settings page does not download or execute an update.
+An update replaces the program that holds the owner's credentials and runs agents.
+The page shows the terminal commands for the owner to inspect and run.
+Its update button retains the explicit refusal.
+The version check uses a fixed Git argument list and permits only HTTPS transport.
+A different remote head is reported as different, because it does not prove that the remote commit is newer than a local worker branch.
+
+## s6-settings-2. Reviewer defaults have no automatic selector yet.
+
+The engine stores the default reviewer count and the different-vendor rule in project settings.
+The page says that these values are saved for future reviewer assignment.
+No engine code currently selects reviewers.
+The defaults therefore do not yet assign a reviewer or enforce a vendor choice.
+The first reviewer selector must read these defaults.
+
+## s6-settings-3. Several service controls still lack their execution paths.
+
+The need-to-know default has no team-creation privacy setting to consume it.
+Removing agent credits would need a defined commit-rewriting policy before the approved Git heads change.
+The Git message model has no service-owned message-generation request to consume it.
+The tests-first default, agent-review default, and review-round limit have no workflow executor to consume them.
+These controls retain the notice that they are not connected and change nothing.
+Standing permission rules still await the owner's harness recordings, as AGENTS.md requires.
+The existing standing-rules setting is outside this implementation and still does not enforce permission rules.
+
+## s6-settings-4. Stall timers currently follow idle board obligations.
+
+The existing stall rule watches idle agents with unanswered board work.
+It deliberately excludes a working turn, queued delivery, account hold, and open dependency.
+The assigned timer applies before the first recorded turn.
+The worker and lead timers apply to subsequent eligible stall episodes.
+These settings do not detect a silent active turn.
+The separate runaway turn timer still governs long active turns.
+The live page explains the idle-obligation scope so that the owner does not mistake the values for active-turn output deadlines.
+
+## s6-settings-5. The parity fixture depended on generated mock output.
+
+The command parity fixture read the workflow sample from a generated design file.
+A fresh remote copy did not contain that file before a website build.
+Several command tests then timed out after their fake engine threw while preparing replies.
+The fixture now reads the canonical engine workflow file.
+This removes the build-order dependency.
+
+## s6-settings-6. The settings live check passed 17 of 23 stages.
+
+The settings worker ran the required live check with private temporary state.
+The run passed 17 stages out of 23.
+Claude did not attempt the removed-variables, state-read, always-allow, or permission-kinds probes.
+The token scan found agent tokens in process arguments.
+Recording was skipped because earlier stages failed.
+The final event, reply, and output scan passed.
+The reload and token-revocation probes passed for both harnesses.
+These results have the execution-context limitation described in issue 526.
+The token exposure remains the previously reported issue 240.
+This run does not establish the known 19-of-23 baseline.

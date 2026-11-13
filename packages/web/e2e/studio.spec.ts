@@ -1,3 +1,4 @@
+import { exerciseStudioSettings } from './support/studioSettings.ts'
 import { exerciseStudioGit } from './support/studioGit.ts'
 import { exerciseStudioService } from './support/studioService.ts'
 // The live website from packages/studio, served by the real engine at /studio/, on a real
@@ -1110,3 +1111,5 @@ test('workflows: sees default phases, clones, edits and saves across reload with
     await expect(page.getByRole('button', { name: 'Sample loop', exact: true })).toHaveCount(0)
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 })
+
+test("live service settings: timers, nudges, workflow folder, review defaults and upkeep", { timeout: 90_000 }, async ({ page }) => exerciseStudioSettings(page))
