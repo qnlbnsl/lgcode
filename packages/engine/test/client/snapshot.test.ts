@@ -160,3 +160,9 @@ it("3.1 a service snapshot has the owner's engine wait state and reloadable flag
   expect(reply.agents[0]).toMatchObject({ agentId: "agent-a", reloadable: false });
   expect(reply.accounts).toEqual(expect.any(Array));
 })));
+
+it("3.1a the owner's snapshot can be read when an account was added without an enabled flag (breaks if the row's enabled value is left unset)", async () => run(Effect.gen(function* () {
+  yield* appendSetup([event({ _tag: "AccountChanged", accountId: "plain", account: { id: "plain", harness: "first" } })]);
+  const reply = yield* read("client.snapshot", {}, owner);
+  expect(reply.accounts).toContainEqual({ id: "plain", status: "available", enabled: true, environment: [] });
+})));

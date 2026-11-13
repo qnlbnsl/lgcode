@@ -11345,3 +11345,26 @@ The area board mapping replaced each worker's engine name with its role label.
 The chat roster needs the engine name to identify a worker and its controls.
 The merged mapping keeps worker names and retains the area's project lead and team lead labels.
 The browser journey checks the same worker in the blocked lane and the table.
+
+## 654. The snapshot could not be read once an account was added without an enabled flag
+
+Found: 2026-11-13, while setting up the first real project on LGTM Studio itself.
+State: fixed in the same change.
+
+An account added with `lgtm accounts` and no `enabled` field is stored without that field.
+The `client.snapshot` reply requires a true or false value for each account.
+The engine sent the unset value, so the reply could not be encoded and every snapshot failed.
+The current website and the live website both stayed on "Reconnecting", with no error shown.
+The engine now reports such an account as enabled, which is how account picking already treats it.
+The test is case 3.1a in `packages/engine/test/client/snapshot.test.ts`.
+
+## 655. The live website stays on "Reconnecting" when the snapshot fails, and says nothing
+
+Found: 2026-11-13, in the same check as issue 654.
+State: open.
+
+When `client.snapshot` fails for a reason other than a lost connection, the live website retries without end.
+It shows "Reconnecting" and gives the owner no reason.
+The connection in `packages/studio/src/connection.ts` drops the error.
+The owner should see that the service answered and what it said.
+
