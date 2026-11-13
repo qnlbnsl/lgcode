@@ -8,6 +8,7 @@ export function setMapping(value) { mapping = value; }
 let generation = 0;
 const oversized = new Map();
 const histories = new Map(), details = new Map(), sources = new Map();
+let accountNames = [], accountRead = null;
 let actions = [], readers = 0, loadingRequests = null, requestVersion = 0;
 const S = () => store.state;
 export const busy = (key) => !!S()?.ui?.chatBusy?.[key];
@@ -22,15 +23,16 @@ async function attempt(key, fn) {
   finally { if (epoch === generation) update((s) => { delete s.ui.chatBusy[key]; }); }
 }
 export function reset() {
-  generation++; oversized.clear(); histories.clear(); details.clear(); sources.clear(); actions = []; loadingRequests = null; requestVersion++;
+  generation++; accountNames = []; accountRead = null; oversized.clear(); histories.clear(); details.clear(); sources.clear(); actions = []; loadingRequests = null; requestVersion++;
   if (S()?.ui) { S().ui.chatBusy = {}; S().drafts = {}; }
 }
 export function enrich(patch) {
   if (!mapping) return patch;
+  if (patch.subscriptions) patch.subscriptions = mapping.mapSubscriptionNames(patch.subscriptions, accountNames);
   if (patch.agents) patch.agents = patch.agents.map((a) => ({ ...a,
     context: null, ...mapping.mapRosterDetails(a, patch.tasks || S().tasks, actions), ...(details.get(a.id) || {}),
-    runMode: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id).runMode : null,
-    lastOutputAt: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id).lastOutputAt : null }));
+    runMode: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id, patch.tasks || S().tasks).runMode : null,
+    lastOutputAt: histories.has(a.id) ? mapping.mapThread([...histories.get(a.id).values()], a.id, patch.tasks || S().tasks).lastOutputAt : null }));
   if (patch.requests || patch.agents) {
     const previous = new Map(S().requests.map((r) => [r.id, r]));
     patch.requests = (patch.requests || S().requests).filter((r) => r.kind !== 'failed').map((r) => {
@@ -55,7 +57,7 @@ function put(envelope) {
   }
 }
 function publishThread(agentId) {
-  const mapped = mapping.mapThread([...histories.get(agentId).values()], agentId);
+  const mapped = mapping.mapThread([...histories.get(agentId).values()], agentId, S().tasks);
   engineWrite({ threads: { ...S().threads, [agentId]: [...mapped.items, ...[...(oversized.get(agentId)?.values() || [])]].sort((a, b) => Number(a.id) - Number(b.id)) }, pending: { ...S().pending, [agentId]: mapped.pending },
     agents: S().agents.map((a) => a.id === agentId ? { ...a, lastOutputAt: mapped.lastOutputAt } : a) });
 }
@@ -63,6 +65,8 @@ export function receive(item) {
   if (!mapping || !item) return;
   if ('event' in item) {
     put(item);
+    if (readers && ['client.AlertPromptDismissed', 'client.AlertCarrierChanged'].includes(item.event._tag)) void readPhoneOffer();
+    if (readers && item.event._tag.startsWith('Account')) void readAccountNames();
     if (item.event._tag.startsWith('roles.')) {
       actions.push({ ...item.event, sequence: item.sequence }); engineWrite(enrich({ agents: S().agents }));
     }
@@ -125,7 +129,7 @@ async function readRequests() {
 }
 export function watchHome() {
   if (!live.on || !mapping) return;
-  readers++; if (S().conn.status === 'live') { void readRequests(); void readPhoneOffer(); }
+  readers++; if (S().conn.status === 'live') { void readRequests(); void readPhoneOffer(); void readAccountNames(); }
   return () => { readers--; };
 }
 export function watchThread(agentId) {
@@ -158,6 +162,7 @@ export function watchThread(agentId) {
   return () => { readers--; clearInterval(timer); };
 }
 async function readDetails(agentId) {
+  void readAccountNames();
   const epoch = generation;
   try {
     const [configuration, context] = await Promise.all([engine.request('client.agent.configuration', { agentId }), engine.request('client.agent.context', { agentId })]);
@@ -271,7 +276,7 @@ export function declinePhoneOffer() {
   return attempt('phone-offer', async () => { await engine.request('client.alerts.prompt.dismiss', {}); await readPhoneOffer(); });
 }
 
-export function connected() { if (mapping && readers) { void readRequests(); void readPhoneOffer(); } }
+export function connected() { if (mapping && readers) { void readRequests(); void readPhoneOffer(); void readAccountNames(); } }
 
 async function readAgentActions(agentId) {
   const epoch = generation;
@@ -289,4 +294,16 @@ async function readAgentActions(agentId) {
     const bySequence = new Map([...rows, ...actions].map((a) => [a.sequence, a]));
     actions = [...bySequence.values()]; engineWrite(enrich({ agents: S().agents }));
   } catch (e) { if (epoch === generation) notice(e.message); }
+}
+
+async function readAccountNames() {
+  if (accountRead) return accountRead;
+  const epoch = generation;
+  accountRead = engine.request('accounts', { operation: 'list' }).then((reply) => {
+    if (epoch !== generation) return;
+    // Retain display fields only, never account environment or secret references.
+    accountNames = reply.accounts.map(({ id, harness, displayName }) => ({ id, harness, ...(displayName ? { displayName } : {}) }));
+    engineWrite({ subscriptions: mapping.mapSubscriptionNames(S().subscriptions, accountNames) });
+  }).catch((e) => { if (epoch === generation) notice(e.message); }).finally(() => { if (epoch === generation) accountRead = null; });
+  return accountRead;
 }

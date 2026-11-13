@@ -11110,3 +11110,11 @@ The browser test attaches a task identity to a real prompt in a temporary Git re
 Home could try its request and phone-offer reads before the transport became available.
 Home now starts those reads when the connection reports that it is live.
 A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.
+
+## s2-chat-7. Some supplied labels were still shown as identifiers.
+
+The live composer showed an account identifier instead of its display name.
+Prompt context showed a task identifier instead of its available label.
+The roster did not distinguish an agent whose task was under review.
+The open screens now read account names and map task labels and the Reviewing state.
+The account reader retains only the identifier, harness, and display name.

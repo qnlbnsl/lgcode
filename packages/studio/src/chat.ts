@@ -2,7 +2,7 @@
 // receive these functions from live.ts; the standalone mock never loads this module.
 import type { ClientRequest, EventEnvelope, ContextUsage, AgentChoices, AgentConfiguration, ContextReference } from "@lgtm/contracts"
 import { groupThreadItems, toolText } from "@lgtm/contracts/thread"
-import { mapRequest, type StoreAgent } from "./mapping.ts"
+import { mapRequest, type StoreAgent, type StoreSubscription } from "./mapping.ts"
 
 export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAgent>, source?: EventEnvelope) {
   const base = mapRequest(row, row.kind === "permission" ? "approval" : "question", agents)
@@ -33,11 +33,11 @@ export function mapFailedStart(agent: StoreAgent) {
     status: "open", heldBy: null, options: [], command: null, folder: "", tool: null, recommendation: null }
 }
 
-export function contextLabel(reference: ContextReference): string {
-  return reference._tag === "file" ? reference.path : reference.taskId
+export function contextLabel(reference: ContextReference, tasks: ReadonlyArray<{ id: string; label: string }> = []): string {
+  return reference._tag === "file" ? reference.path : tasks.find((task) => task.id === reference.taskId)?.label ?? reference.taskId
 }
 
-export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string) {
+export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, tasks: ReadonlyArray<{ id: string; label: string }> = []) {
   let pending = false
   let delivery: string | undefined
   let lastOutputAt: number | null = null
@@ -53,7 +53,7 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string) 
       || ["TurnEnded", "AgentStopped", "AgentInterrupted", "AgentCrashed", "AgentReloadFailed"].includes(e._tag)
       || (e._tag === "DeliveryReturned" || e._tag === "DeliveryRequeued" || e._tag === "DeliveryHeld") && e.deliveryId === delivery) pending = false
     if (e._tag === "PromptSent") rows.push({ ...base, type: "user", text: e.text,
-      ...(e.sender._tag === "agent" ? { from: e.sender.agentId } : {}), context: e.context?.map(contextLabel) ?? [] })
+      ...(e.sender._tag === "agent" ? { from: e.sender.agentId } : {}), context: e.context?.map((ref) => contextLabel(ref, tasks)) ?? [] })
     else if (e._tag === "ThreadItem") {
       lastOutputAt = Math.max(lastOutputAt ?? 0, item.occurredAt)
       const c = e.content
@@ -79,7 +79,10 @@ export function mapAgentDetails(reply: { context?: ContextUsage; configuration?:
 
 export function mapRosterDetails(agent: StoreAgent, tasks: ReadonlyArray<{ owner: string; label: string; state: string }>, actions: ReadonlyArray<{ _tag: string; agentId: string; sequence: number }>) {
   const stall = actions.filter((a) => a.agentId === agent.id && ["roles.StallSeen", "roles.StallEnded"].includes(a._tag)).sort((a, b) => b.sequence - a.sequence)[0]
-  return { workState: agent.state === "idle" ? "ready" : agent.workState, task: tasks.find((t) => t.owner === agent.id && !["done", "cancelled"].includes(t.state))?.label ?? null,
+  const owned = tasks.filter((task) => task.owner === agent.id)
+  const workState = ["idle", "working"].includes(agent.state) ? owned.some((task) => task.state === "review") ? "reviewing"
+    : agent.state === "working" || owned.some((task) => task.state === "active") ? "working" : "ready" : agent.workState
+  return { workState, task: owned.find((t) => !["done", "cancelled"].includes(t.state))?.label ?? null,
     stalled: stall?._tag === "roles.StallSeen" }
 }
 
@@ -89,4 +92,9 @@ export function mapPhoneOffer(settings: { carrier: { _tag: string }; pushPromptD
 
 export function mapContextSearch(result: { items: ReadonlyArray<{ reference: ContextReference; label: string }> }) {
   return result.items.map((item) => ({ ...item, k: JSON.stringify(item.reference), icon: item.reference._tag === "task" ? "list-checks" : "file-code" }))
+}
+
+export function mapSubscriptionNames(subscriptions: ReadonlyArray<StoreSubscription>, accounts: ReadonlyArray<{ id: string; harness: string; displayName?: string }>) {
+  return subscriptions.map((subscription) => ({ ...subscription,
+    name: accounts.find((account) => account.id === subscription.id && account.harness === subscription.harness)?.displayName ?? subscription.id }))
 }

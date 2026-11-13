@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ClientRequest, EventEnvelope } from "@lgtm/contracts"
-import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer, mapContextSearch } from "../src/chat.ts"
+import { mapAgentDetails, mapFailedStart, mapHomeRequest, mapRosterDetails, mapThread, contextLabel, mapPhoneOffer, mapContextSearch, mapSubscriptionNames } from "../src/chat.ts"
 import { mapSnapshot } from "../src/mapping.ts"
 import { engineSnapshot } from "./fixtures.ts"
 
@@ -76,6 +76,7 @@ it("maps task ownership and the most recent stall decision", () => {
   const actions = [{ agentId: agent.id, sequence: 20, _tag: "roles.StallSeen" }, { agentId: agent.id, sequence: 22, _tag: "roles.StallEnded" }]
   expect(mapRosterDetails(agent, [{ owner: agent.id, label: "HR-11", state: "active" }], actions)).toMatchObject({ task: "HR-11", stalled: false })
   expect(mapRosterDetails(agent, [], actions.slice(0, 1))).toMatchObject({ task: null, stalled: true })
+  expect(mapRosterDetails({ ...agent, state: "idle" }, [{ owner: agent.id, label: "TASK-1", state: "review" }], [])).toMatchObject({ workState: "reviewing" })
 })
 
 it("shows the phone offer only when the engine says it has not been dismissed or configured", () => {
@@ -89,4 +90,11 @@ it("preserves context identities separately from their labels", () => {
   const result = mapContextSearch({ items: [{ reference: reference as never, label: "Main source" }] })
   expect(result[0]).toMatchObject({ label: "Main source", reference, icon: "file-code" })
   expect(contextLabel(reference as never)).toBe("src/main.ts")
+})
+
+it("joins subscription display names by both account and harness", () => {
+  const subscriptions = mapSnapshot(engineSnapshot, 1).subscriptions
+  expect(mapSubscriptionNames(subscriptions, [{ id: "acct-main", harness: "claude", displayName: "Build account" }])[0]?.name).toBe("Build account")
+  expect(mapSubscriptionNames(subscriptions, [{ id: "acct-main", harness: "codex", displayName: "Other account" }])[0]?.name).toBe("acct-main")
+  expect(contextLabel({ _tag: "task", projectId: "p", taskId: "t" } as never, [{ id: "t", label: "TASK-1" }])).toBe("TASK-1")
 })

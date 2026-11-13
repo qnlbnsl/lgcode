@@ -24,7 +24,7 @@ const POST_KINDS = {
   note: { label: 'Note', icon: 'message-square' },
 };
 const KIND_ORDER = ['question', 'blocked', 'handoff', 'done', 'decision', 'note'];
-const WORK_STATES = { ready: 'Ready', off: 'Off', assigned: 'Assigned', working: 'Working', waiting: 'Waiting', done: 'Done' };
+const WORK_STATES = { ready: 'Ready', reviewing: 'Reviewing', off: 'Off', assigned: 'Assigned', working: 'Working', waiting: 'Waiting', done: 'Done' };
 const STALL_AFTER = 10 * MIN;
 const CANNED = {
   question: 'Short answer: yes. I put the detail on the task and I am carrying on.',
