@@ -11142,8 +11142,10 @@ The page was still refreshing its coherent state when that assertion expired.
 The test now waits for the stage acknowledgment and the completed refresh before checking the count.
 The component document returned 200 before the style assertion expired with its stylesheet still pending.
 The test now observes the exact issued document response before checking its separately authorized assets.
-It also loads the second component document before changing its source for the stale-evidence check.
-These are test ordering faults.
+It also finishes each reopened component document and its assets before changing its source or closing it.
+Those waits correct test ordering faults.
+The same investigation found repeated engine workspace validation on every component request.
+Issue web-flaky-1 records that product performance fault and its correction.
 The same correction separates the synchronization command acknowledgments from their subsequent counts.
 
 ## 635. A failed logout claimed that the engine had ended the session.
@@ -11378,3 +11380,26 @@ The area board mapping replaced each worker's engine name with its role label.
 The chat roster needs the engine name to identify a worker and its controls.
 The merged mapping keeps worker names and retains the area's project lead and team lead labels.
 The browser journey checks the same worker in the blocked lane and the table.
+
+
+## web-flaky-1. A component preview repeated its Git workspace validation for every artifact.
+
+Found: 2026-11-13, while reproducing issues 634 and 643.
+State: corrected, with the full verification in progress.
+
+The component display read verified the design file, its tokens, and every registered component independently.
+Each artifact verification repeated the same repository and workspace Git checks.
+The selected component then repeated those checks once more.
+The browser repeated this work for the document and every authorized asset request.
+A real two-component registration started 60 Git processes for one component read.
+The browser trace showed pending document and asset reads while its assertion deadlines expired.
+Separating the browser's document and asset waits exposed the journey's unchanged 60-second limit.
+This was a product performance fault as well as a test ordering fault.
+
+The engine now verifies the workspace once within the request's Git gate.
+It still checks every artifact's current bounded bytes, path, and registered fingerprint.
+It still checks the selected component's private data and dedicated folder.
+It retains no verification across requests.
+The regression test rejects changed design bytes, tokens, sibling components, selected components, branches, symbolic links, and agent access on subsequent reads.
+That test fails against the old engine at 60 Git processes and passes with the correction.
+No timeout, retry, authentication rule, or display authority was changed.

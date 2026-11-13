@@ -563,12 +563,16 @@ test("registered component View renders its own styles and image inertly, denies
       await preview.getByRole("button", { name: "View component", exact: true }).click()
       await expect.poll(() => issuedStatus).toBe(200)
       const iframe = preview.locator("iframe"), frame = preview.frameLocator("iframe")
-      await documentLoaded(iframe)
-      await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toHaveCSS("color", "rgb(18, 52, 86)")
-      await expect(frame.locator("body")).toHaveAttribute("data-loaded", "yes")
-      await expect(frame.locator("body")).toHaveAttribute("data-opaque", "yes")
-      await expect(frame.locator("body")).toHaveAttribute("inert", "")
-      await expect.poll(() => frame.getByAltText("Owned component mark").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth === 64)).toBe(true)
+      const componentReady = async () => {
+        const url = await documentLoaded(iframe)
+        await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toHaveCSS("color", "rgb(18, 52, 86)")
+        await expect(frame.locator("body")).toHaveAttribute("data-loaded", "yes")
+        await expect(frame.locator("body")).toHaveAttribute("data-opaque", "yes")
+        await expect(frame.locator("body")).toHaveAttribute("inert", "")
+        await expect.poll(() => frame.getByAltText("Owned component mark").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth === 64)).toBe(true)
+        return url
+      }
+      await componentReady()
       expect(await iframe.getAttribute("sandbox")).toBe("allow-scripts")
       expect(await iframe.getAttribute("tabindex")).toBe("-1")
       expect(await page.locator("body").getAttribute("data-escaped")).toBeNull()
@@ -596,14 +600,16 @@ test("registered component View renders its own styles and image inertly, denies
         expect((await open(data)).ok()).toBe(false)
       }
       await preview.getByRole("button", { name: "View component", exact: true }).click()
-      const staleUrl = await documentLoaded(iframe)
+      // Finish each real document's asset checks before mutating its evidence
+      // or closing it. A heading can precede both asset requests finishing.
+      const staleUrl = await componentReady()
       writeFileSync(join(folder, "design/components/card.html"), "Changed registered component")
       expect((await page.request.get(staleUrl!)).status()).toBe(404)
       expect((await open(selection)).ok()).toBe(false)
       writeFileSync(join(folder, "design/components/card.html"), component)
       await close.click()
       await preview.getByRole("button", { name: "View component", exact: true }).click()
-      await documentLoaded(iframe)
+      await componentReady()
       await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toBeVisible()
       // Component inertness must not disable the existing active mock path.
       await close.click()

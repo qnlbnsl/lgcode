@@ -23,6 +23,7 @@ import { LogWriteFailed } from "../../src/log/EventLog.ts"
 import type { Fakes } from "../support/handlerRig.ts"
 import { freePort, http, login, post, withWeb } from "../support/webRig.ts"
 import { provideRestart, recover } from "../support/restartRig.ts"
+import * as GitProcess from "../../src/project/git/process.ts"
 
 // Match creation-recovery.test.ts: the restart fixture supplies its services
 // at runtime but retains an open environment in its generic test signature.
@@ -51,6 +52,51 @@ const open = () => Effect.gen(function* () {
     headers: { Authorization: `Bearer ${bearer}`, ...ancestryHeaders() }
   }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructorWS)) })
 })
+
+it.live("validates a component workspace once per read and rechecks every design artifact and branch on the next read", () => Effect.gen(function* () {
+  const { CommandHandler } = yield* Effect.promise(() => import("../../src/commands/CommandHandler.ts"))
+  const { componentDisplay } = yield* Effect.promise(() => import("../../src/project/display.ts"))
+  const { projectView } = yield* Effect.promise(() => import("../../src/project/view.ts"))
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    yield* configured()
+    const repoId = success(yield* call(owner, "project.repository.add", { name: "Components", path: rig.work, machineId: "local" })).repoId
+    const { projectId } = success(yield* call(owner, "project.create", { name: "Components", goal: "", machineId: "local", repository: { _tag: "existing", repoId }, useWorktree: true }))
+    const handler = yield* CommandHandler, view = projectView((yield* handler.input({ _tag: "owner" })).snapshot)
+    const project = view.projects[projectId]!, workspace = view.workspaces[project.worktreeId]!
+    const files = { "actual.pen": "Registered design", "tokens.json": JSON.stringify({ tokens: [{ name: "ink", value: "#123456" }] }),
+      "card.html": "<h1>Registered card</h1>", "other.html": "<h1>Registered sibling</h1>" }
+    mkdirSync(join(workspace.path, "design"))
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(workspace.path, "design", name), text)
+    const revision = success(yield* call(owner, "project.design.record", { projectId, design: { repoId, worktreeId: workspace.worktreeId,
+      file: "design/actual.pen", tokensPath: "design/tokens.json", components: [
+        { componentId: "card", name: "Card", reference: "design/card.html", fingerprint: hash(files["card.html"]) },
+        { componentId: "other", name: "Other", reference: "design/other.html", fingerprint: hash(files["other.html"]) }
+      ] } }))
+    const input = yield* handler.input({ _tag: "owner" }), selection = { repoId, revisionId: revision.revisionId, componentId: "card" }
+    const process = vi.spyOn(GitProcess, "gitProcess")
+    try {
+      expect((yield* componentDisplay(input, selection)).text).toBe(files["card.html"])
+      // Repeated registration/state probes previously launched 60 Git
+      // children for this single read. Keep its work bounded independently of
+      // how many sibling artifacts the registered revision contains.
+      expect(process.mock.calls.length).toBeLessThan(30)
+      for (const [name, text] of Object.entries(files)) {
+        writeFileSync(join(workspace.path, "design", name), "Changed evidence")
+        expect((yield* componentDisplay(input, selection).pipe(Effect.result))._tag).toBe("Failure")
+        writeFileSync(join(workspace.path, "design", name), text)
+        expect((yield* componentDisplay(input, selection)).text).toBe(files["card.html"])
+      }
+      execFileSync("git", ["-C", workspace.path, "branch", "-m", "changed-branch"])
+      expect((yield* componentDisplay(input, selection).pipe(Effect.result))._tag).toBe("Failure")
+      execFileSync("git", ["-C", workspace.path, "branch", "-m", workspace.branch])
+      unlinkSync(join(workspace.path, "design/card.html"))
+      symlinkSync(join(workspace.path, "design/other.html"), join(workspace.path, "design/card.html"))
+      expect((yield* componentDisplay(input, selection).pipe(Effect.result))._tag).toBe("Failure")
+      expect((yield* componentDisplay({ ...input, actor: { _tag: "agent", agentId: project.leadAgentId } }, selection).pipe(Effect.result))._tag).toBe("Failure")
+    } finally { process.mockRestore() }
+  }))
+}))
 
 it.live("uses setup page helpers over authenticated RPC and retains durable completion after archiving its real created project", () => Effect.gen(function* () {
   const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
