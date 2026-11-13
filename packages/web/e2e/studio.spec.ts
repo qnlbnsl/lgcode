@@ -984,3 +984,9 @@ test('live website: email save, test delivery and secret protection', async ({ p
   const { exerciseStudioNotifications } = await import('./support/studioNotifications.ts')
   await exerciseStudioNotifications(page)
 })
+
+test('live website: Service settings discovers models when the default harness changes and explains a missing account', async ({ page }) => {
+  test.setTimeout(90_000)
+  const { exerciseStudioModels } = await import('./support/studioModels.ts')
+  await exerciseStudioModels(page)
+})

@@ -63,6 +63,7 @@ type Step = DiagnosticStep | StepDiagnostic
   // `exec:<exit code>`. The child's stdio is ignored; a caller script reports through its own file.
   | { step: "exec"; argv: string[]; strip?: string[] }
 interface Script {
+  legacyModels?: { currentModelId: string; availableModels: Array<{ modelId: string; name: string }> }
   protocolVersion?: 1 | 2
   // Unit 6d: advertise a peer that cannot reload, without starting a real adapter.
   sessionError?: string
@@ -83,6 +84,7 @@ interface Script {
   outliveStdin?: boolean
   // Unit 7a tests: session/load does not reply until this file exists, so a test can hold the
   // engine's restart recovery inside its reload step.
+  initializeGate?: string
   loadGate?: string
 }
 
@@ -193,7 +195,8 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
       if (script.reportVersion === false) delete frame.result.info.version
       if (script.protocolVersion === 1) frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: script.reloadable !== false }, authMethods: [] }
     }
-    if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/load") {
+    if (script.legacyModels && frame.result && methods.get(frame.id) === "session/new") frame.result.models = script.legacyModels
+    if (script.protocolVersion === 1 && frame.result && ["session/load", "session/new"].includes(methods.get(frame.id) ?? "")) {
       frame.result.configOptions = (frame.result.configOptions ?? []).map(({ configId, ...option }: { configId: string }) => ({ ...option, id: configId }))
     }
     if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/prompt") frame.result.stopReason = [...stops.values()].at(-1) ?? "end_turn"
@@ -232,7 +235,10 @@ const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
   const sessions = new Map<string, { turn: number; options: AcpSchema.SessionConfigOption[]; cancel?: Deferred.Deferred<void> }>()
   let nextSession = 0
-  yield* agent.handleInitialize(() => Effect.succeed({ protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }))
+  yield* agent.handleInitialize(() => Effect.gen(function*() {
+    if (script.initializeGate !== undefined) yield* awaitGate(script.initializeGate)
+    return { protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }
+  }))
   yield* agent.handleCreateSession(() => script.sessionError !== undefined
     ? Effect.fail(new AcpRequestError({ code: -32000, errorMessage: script.sessionError }))
     : Effect.sync(() => {

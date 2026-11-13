@@ -337,7 +337,7 @@ export const failureOf = (outcome: Outcome): { readonly _tag: string; readonly r
   outcome._tag === "Failure" ? { _tag: outcome.failure._tag, reason: outcome.failure.reason } : undefined;
 
 export const harnessSettings = (id = "first", overrides: Record<string, unknown> = {}) => ({
-  id, runMode: "acp", adapterPath: "/opt/adapters/first", adapterArguments: ["--stdio"],
+  id, runMode: "acp", adapterPath: process.execPath, adapterArguments: ["--stdio"],
   permissionMapping: { "read-only": "plan", ask: "default", edit: "acceptEdits", full: "bypass" },
   reportedModes: [{ id: "plan", level: "read-only" }], defaultPermission: "ask",
   models: ["test-model"], efforts: ["high"], denyReadMechanism: { _tag: "none" },

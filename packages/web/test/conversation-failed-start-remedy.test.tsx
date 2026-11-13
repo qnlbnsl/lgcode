@@ -26,6 +26,11 @@ for (const axis of ["model", "effort"] as const) it(`issue 603: mounted ${axis}-
   try {
     await Effect.runPromise(provideBoard(rig, (runner) => Effect.gen(function* () {
       yield* registerRebuildCheck(); yield* seedAccount()
+      // This peer's report is independent of the owner's configured limits.
+      runner.script("discover", () => Effect.succeed({
+        models: { source: "negotiated", options: [{ id: "test-model", label: "test-model" }, { id: "valid-model", label: "valid-model" }] },
+        efforts: { source: "negotiated", options: [{ id: "high", label: "high" }, { id: "low", label: "low" }] },
+      }))
       yield* completedSetup()
       yield* appendSetup([eventOf({ _tag: "HarnessChanged", harness: harnessSettings("first", {
         models: ["test-model", "valid-model"], efforts: ["high", "low"],

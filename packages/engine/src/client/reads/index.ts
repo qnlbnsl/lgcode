@@ -1,3 +1,4 @@
+import { harnessChoices } from "./harnessChoices.ts";
 import { agentConfiguration, agentContext } from "./agentConfiguration.ts";
 import type { ClientFilter, ClientStreamItem } from "@lgtm/contracts";
 import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
@@ -61,6 +62,7 @@ const filtered: ReadHandler = (input, payload) => Stream.unwrap(Effect.gen(funct
 }));
 
 export const clientReads = {
+  "client.harness.choices": (input, payload) => harnessChoices(input, payload),
   "client.requests": requests,
   "client.agent.configuration": agentConfiguration,
   "client.agent.context": agentContext,

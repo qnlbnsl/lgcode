@@ -988,3 +988,27 @@ The build loop is shown in a "Workflows" tab.
 A user sees the default workflow as a picture.
 A user clones it and changes the copy in a visual editor.
 A user can also make a workflow from nothing.
+
+## Model choices before an agent starts
+
+The client application programming interface can discover a harness account's model choices.
+The engine opens a temporary Agent Client Protocol session without sending a prompt.
+The engine closes the harness before the request finishes.
+The result keeps the exact model identifiers and the reported labels.
+A separate reason explains an unavailable model list or effort list.
+The engine remembers successful results for five minutes in memory.
+A client can explicitly refresh a result.
+A client can request a model's effort choices.
+Reports remain separate for each account and selected model.
+The live website uses these reports for its model choices.
+
+Failures and empty reports are remembered for thirty seconds.
+Concurrent requests for one report share a discovery session.
+At most two discovery sessions run in the engine process at once.
+Service settings shows each harness's report as it arrives.
+
+## Discovery without persistent harness history
+
+A future harness-specific discovery mode could disable session persistence through supported harness interfaces.
+It must preserve the account's login and the owner's existing history.
+The investigation and its limits are recorded in issue `s4-models-15`.

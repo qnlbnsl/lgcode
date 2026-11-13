@@ -3,6 +3,7 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import { expect } from "vitest";
 
 export const clientCommands = [
+  "client.harness.choices",
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests",
   "client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",

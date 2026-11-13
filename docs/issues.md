@@ -11775,7 +11775,11 @@ The engine learns a harness's models only from a running agent, through `client.
 The page therefore has nothing to offer before an agent of that harness runs.
 The page also does not say why the list is empty.
 A fix needs the engine to ask a harness for its models without a running agent.
-This is not fixed.
+This is fixed by the s4-models change.
+The authenticated `client.harness.choices` request opens a temporary session on a registered account.
+The request returns the reported models and efforts before any persistent agent exists.
+The request closes its harness before it replies.
+The live website uses these reports and shows a plain reason when choices are unavailable.
 
 ## 685. The Messages tab shows no board on a project without teams.
 
@@ -12011,3 +12015,182 @@ The existing journey bodies and the conversation and Git implementations were un
 An isolated pass does not establish why the full run failed.
 The full gate therefore remains failed.
 The output is recorded in `.foundry/fixes-check.log` and `.foundry/fixes-browser-recheck.log` in the notification worktree.
+
+## 705. Legacy session model reports were not exposed as choices.
+
+The model-choice reader used only configuration selectors.
+Gemini reports its models through the legacy model list in the new-session reply.
+The engine now reads that list when there is no model configuration report.
+A scripted protocol-version-one test covers the complete discovery request.
+This is fixed in this change.
+
+## 706. The new discovery read exposed a module initialization cycle.
+
+The native Node.js alert-restart fixtures failed while importing the new read.
+The client read registry tried to read the handler before its module finished initializing.
+The registry now calls the handler through a deferred function.
+The alert-restart tests cover that import path.
+This is fixed in this change.
+
+## 707. The setup Git-message model selector has no write action.
+
+The first-run page calls the existing unavailable-action handler when its Git-message model changes.
+The service Git-message model setting has no persisted engine field either.
+This change supplies reported choices to those controls.
+It does not add a Git-message generator or a new stored setting.
+The New project dialog inherits the service lead defaults instead of offering a separate model selector.
+Those existing product limits remain.
+
+## 708. Effort discovery must follow the selected model.
+
+A model change can replace the harness's effort choices.
+A report for the default session model cannot describe every model's efforts.
+The discovery request now accepts a model identifier.
+The engine applies that identifier before reading choices.
+The cache separates reports by selected model.
+The service page requests efforts for its selected model.
+This is fixed in this change.
+
+## 709. Subscription model choices must belong to the named account.
+
+Two accounts on one harness can report different models.
+The subscription page now requests each account's choices.
+A row uses that account's report and unavailable reason.
+The default-harness report no longer supplies another account's choices.
+This is fixed in this change.
+
+## 710. A stopped agent needs reported choices to save a new configuration.
+
+The old command validated stopped-agent choices against configured harness lists.
+Those lists are empty for the built-in harnesses.
+The command now validates against the account's discovery report when the agent has no process.
+A model that is no longer reported does not hide the current model list.
+The stopped-agent regression checks the read and the saved choice.
+This is fixed in this change.
+
+## 711. A starting agent needs discovery until its model report arrives.
+
+The full check found that the failed-start remedy lost its model choices during startup.
+An unavailable live report was hiding the account's discovery result.
+The read now uses discovery while the agent is starting and has not reported models.
+The existing model-refused and effort-refused remedy tests cover this behavior.
+This is fixed in this change.
+
+## 712. A discovery failure must use one unavailable sentence.
+
+The initial generic discovery error had two sentences.
+The requested empty state allows one plain sentence.
+The error now uses one sentence.
+A session-failure regression checks that sentence and the child's cleanup.
+This is fixed in this change.
+
+## 713. Configuration discovery held the engine writer permit.
+
+A stopped agent's configuration planner could start discovery inside the single writer transaction.
+A hanging adapter therefore delayed unrelated event writes.
+The planner now uses only cached client reports and explicit configured lists.
+A regression holds a discovery open while configuration is refused and another write commits.
+An uncached caller without an explicit list must read the account's choices before saving them.
+
+## 714. Concurrent discovery and failed reports were unbounded.
+
+Concurrent requests for the same account and model could start duplicate adapters.
+Distinct keys now share two process permits in the engine process.
+Concurrent requests for the same key share one job, including explicit refreshes.
+The last waiting request closes the job's scope and waits for child cleanup.
+Successful reports expire after five minutes.
+Empty reports and failures expire after thirty seconds.
+The result cache retains at most 128 entries.
+Tests cover the deadline, cancellation, shared processes, refreshes, expiry, and eviction.
+
+## 715. Discovery left Cursor sessions and process identities behind.
+
+Cursor discovery created a persistent engine session directory for each temporary identifier.
+Discovery now removes that directory on success, failure, timeout, or cancellation.
+It also deletes its structured query language (SQL) process identity row after closing the child.
+The cleanup leaves ordinary agents' persistent sessions unchanged.
+A separate regression resolves a symbolic temporary directory before creating its folder grant.
+
+## 716. Configured lists and fake discovery reports were coupled.
+
+Stopped-agent discovery ignored a non-empty configured list when offering or accepting choices.
+The offline configuration path now intersects a non-empty report with the configured list.
+An unavailable report falls back to the owner's explicit list.
+The fake runner's discovered report is now an independent fixture that a test can replace.
+A test uses disjoint configured and discovered choices to prevent that fixture from masking the limit again.
+The original cancellation test also waited for a configuration gate without requesting a model change.
+The wait helper returned its last observation without asserting that the gate was entered.
+That test now proves both entry and a living child before interrupting the request.
+
+## 717. Settings waited for the slowest harness.
+
+The Service settings read waited for every harness and account report before rendering any choices.
+The page now renders a per-harness reading sentence as soon as its settings arrive.
+It publishes each report independently and rejects replies from an earlier page generation.
+The browser journey holds the first harness open while selecting the second harness's reported model.
+It also checks a signed-in account with an empty report and an account-free harness.
+The build now rejects every model-menu patch whose expected reference text is missing.
+
+## 718. Discovery notices must not enter the writer or an agent lane.
+
+The handler already checked the snapshot and the registered incarnation before writing runner events.
+An unregistered discovery identifier therefore could not create a permission request or change an agent mode.
+That check was inside the writer transaction.
+The handler now drops an absent roster identifier before requesting the writer or an agent lane.
+The inner checks remain in place for races and stale incarnations.
+A regression sends valid permission and mode notices for an absent discovery identifier.
+It verifies zero writer attempts, zero new events, and zero permission or mode calls.
+
+## 719. Account homes can retain discovery session history.
+
+The Agent Client Protocol (ACP) recordings show session identifiers and configuration replies.
+They do not record filesystem writes in account homes.
+A temporary working folder therefore does not prove that discovery leaves no persistent harness metadata.
+No real harness was started for this investigation.
+
+Claude Code documents transcripts under `~/.claude/projects/<encoded-working-directory>/<session-id>.jsonl`.
+Its directory documentation also lists per-session debug, tool-result, and memory data.
+The documentation establishes storage outside the working folder, but it does not establish whether a prompt-free ACP session always creates a transcript.
+The sources are [session storage](https://code.claude.com/docs/en/sessions#export-and-locate-session-data) and [the account directory](https://code.claude.com/docs/en/claude-directory).
+
+The Codex ACP adapter creates a Codex thread during `session/new`.
+Codex has a persistent rollout recorder and state index under its configured account home.
+The source distinguishes recorder creation from explicit persistence, so it does not prove that every prompt-free discovery produces a rollout file.
+LGTM Studio's named-account shadow home also shares entries from its source home.
+The sources are [the adapter's new-session implementation](https://raw.githubusercontent.com/zed-industries/codex-acp/main/src/codex_agent.rs), [the rollout recorder](https://raw.githubusercontent.com/openai/codex/main/codex-rs/rollout/src/recorder.rs), and `packages/engine/src/accounts/shadowHome.ts`.
+
+Gemini's ACP new-session handler initializes a chat before returning its model report.
+The chat initializes its recording service, which creates a chats directory and writes initial session metadata.
+Its documented session location is `~/.gemini/tmp/<project_hash>/chats/`.
+A distinct temporary project folder can therefore leave a distinct project history directory outside that folder.
+The sources are [the ACP session manager](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/cli/src/acp/acpSessionManager.ts), [chat initialization](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/core/client.ts), [the recording service](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/services/chatRecordingService.ts), and [session management](https://geminicli.com/docs/cli/session-management/).
+
+The installed Cursor runtime's `acp-storage.ts` stores its session database beneath `CURSOR_CONFIG_DIR/acp-sessions`.
+The existing `cursorMcp.ts` integration redirects that location into the engine's per-agent session folder.
+Discovery now removes both its disposable settings and its redirected session directory.
+The runtime evidence and version are recorded in `packages/engine/src/runner/cursorMcp.ts`.
+The recordings do not establish whether Cursor writes other account-wide session metadata.
+
+Cleaning arbitrary account-home history is not implemented in this change.
+Those stores can contain the owner's other sessions and use version-dependent layouts.
+The bounded cache reduces repeated discovery without deleting account data or altering login settings.
+A future harness-specific discovery mode could disable persistence where its supported interface permits it.
+
+## 720. A request could join a discovery that was already closing.
+
+The first shared-job implementation removed its key only after child cleanup finished.
+A new request arriving during the last waiter's cancellation could attach to that cancelled job.
+The final waiter now removes the key before closing the scope.
+A regression holds the old job's cleanup open and proves that a new request starts independently.
+The initial regression also held its cleanup gate across a failed assertion.
+Its release now runs in an immediate finalizer so a failing assertion cannot park the test.
+
+## 721. The model-recovery fixture depended on configured discovery.
+
+The full check found one remaining test that expected configured model names to become a fake peer report.
+The model-recovery conversation offered `valid-model` only through that coupling.
+It now scripts its peer's discovery report independently of the configured list.
+The model and effort recovery tests retain their real handler, lost reply, resume, and draft assertions.
+The matching first-run browser fixture had the same dependency.
+It now scripts the peer report separately as well.
+These are test-fixture corrections after separating discovery in review item 7.

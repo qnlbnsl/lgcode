@@ -649,6 +649,10 @@ test("registered component View renders its own styles and image inertly, denies
 
 for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal opens the existing lead remedy and completes only after real configure/resume`, async ({ page }) => {
   await fixture(page, (_rig, _gate, runner) => Effect.gen(function* () {
+    runner.script("discover", () => Effect.succeed({
+      models: { source: "negotiated", options: [{ id: "test-model", label: "test-model" }, { id: "valid-model", label: "valid-model" }] },
+      efforts: { source: "negotiated", options: [{ id: "high", label: "high" }, { id: "low", label: "low" }] },
+    }))
     success(yield* call(owner, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath,
       models: ["test-model", "valid-model"], efforts: ["high", "low"], reportedModes: [{ id: "default", level: "ask" }] }) }))
     runner.script("start", () => Effect.fail(new RunnerRejected({ reason: "controlled first-run refusal", startFailure: `${axis}-refused` })))

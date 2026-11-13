@@ -57,7 +57,7 @@ export function mapTaskDetails(history: ReadonlyArray<TaskHistoryEntry>, changes
     branch: workspace?.branch ?? "", folder: workspace?.path ?? "" }
 }
 export function mapAgentDetails(choices: AgentChoices, context?: ContextUsage) {
-  return { models: choices.models.options.map((o) => ({ id: o.id, label: o.label ?? o.id })), efforts: choices.efforts.options.map((o) => ({ id: o.id, label: o.label ?? o.id })),
+  return { ...(choices.models.reason ? { modelReason: choices.models.reason } : {}), ...(choices.efforts.reason ? { effortReason: choices.efforts.reason } : {}), models: choices.models.options.map((o) => ({ id: o.id, label: o.label ?? o.id })), efforts: choices.efforts.options.map((o) => ({ id: o.id, label: o.label ?? o.id })),
     context: context?._tag === "available" ? context.percent : null }
 }
 export function mapSetup(setup: SetupState, discovery: typeof Discovery.Type, settings?: ProjectSettings) {

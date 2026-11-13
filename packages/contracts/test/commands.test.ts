@@ -39,7 +39,7 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
-const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
+const clientReads = ["client.harness.choices", "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
@@ -51,7 +51,7 @@ const projectTools = ["project.context.search", "project.changes", "project.diff
 const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
-const expectedOwnerOnly = ["configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
+const expectedOwnerOnly = ["client.harness.choices", "configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",

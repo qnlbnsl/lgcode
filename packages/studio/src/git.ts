@@ -1,17 +1,27 @@
 // Pure mapping for the Git tab and the service pages. Missing engine fields stay empty.
-import type { Account, ClientRequest, ClientSnapshot, HarnessSettings, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
+import type { Account, ClientRequest, ClientSnapshot, HarnessSettings, HarnessChoices, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
 import { mapPermission } from "./mapping.ts"
 
-export function mapHarnesses(rows: ReadonlyArray<HarnessSettings>) {
-  return Object.fromEntries(rows.map((h) => [h.id, { name: h.id, models: [...h.models], efforts: [...h.efforts], noEffort: [], runMode: h.runMode.toUpperCase() }]))
+export function mapHarnesses(rows: ReadonlyArray<HarnessSettings>, reports?: ReadonlyArray<HarnessChoices>) {
+  return Object.fromEntries(rows.map((h) => {
+    const report = reports?.find((r) => r.harnessId === h.id)
+    return [h.id, { name: h.id, models: report ? report.models.options.map((o) => o.id) : [...h.models],
+      efforts: report ? report.efforts.options.map((o) => o.id) : [...h.efforts], noEffort: [], runMode: h.runMode.toUpperCase(),
+      ...(report ? { reason: report.reason, effortReason: report.effortReason,
+        modelLabels: Object.fromEntries(report.models.options.map((o) => [o.id, o.label ?? o.id])),
+        effortLabels: Object.fromEntries(report.efforts.options.map((o) => [o.id, o.label ?? o.id])) } : {}) }]
+  }))
 }
 
-export function mapAccounts(accounts: ReadonlyArray<Account>, statuses: ClientSnapshot["accounts"], harnesses: ReadonlyArray<HarnessSettings>, settings?: ProjectSettings) {
+export function mapAccounts(accounts: ReadonlyArray<Account>, statuses: ClientSnapshot["accounts"], harnesses: ReadonlyArray<HarnessSettings>, settings?: ProjectSettings, reports?: ReadonlyArray<HarnessChoices>) {
   return accounts.map((a) => {
     const status = statuses?.find((s) => s.id === a.id)?.status
+    const report = reports?.find((r) => r.harnessId === a.harness && r.accountId === a.id)
     return { id: a.id, name: a.displayName ?? a.id, harness: a.harness, machine: "", enabled: a.enabled !== false,
       signedIn: status !== "needs-sign-in", status: status ?? "", useForNew: settings?.lead?.account._tag === "named" && settings.lead.account.accountId === a.id,
-      model: harnesses.find((h) => h.id === a.harness)?.defaultModel ?? "", account: null, usage: null, window: null }
+      model: harnesses.find((h) => h.id === a.harness)?.defaultModel ?? "", account: null, usage: null, window: null,
+      ...(reports ? { models: report?.models.options.map((o) => o.id) ?? [], reason: report?.reason ?? "This harness did not report model choices.",
+        modelLabels: Object.fromEntries(report?.models.options.map((o) => [o.id, o.label ?? o.id]) ?? []) } : {}) }
   })
 }
 

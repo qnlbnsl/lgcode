@@ -121,7 +121,8 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, 
 export function mapAgentDetails(reply: { context?: ContextUsage; configuration?: AgentConfiguration; models?: AgentChoices["models"]; efforts?: AgentChoices["efforts"] }) {
   return { ...reply.configuration?.desired, context: reply.context?._tag === "available" ? Math.round(reply.context.percent) : null,
     contextReason: reply.context?._tag === "unavailable" ? reply.context.reason : null,
-    configuration: reply.configuration ?? null, models: reply.models?.options ?? [], efforts: reply.efforts?.options ?? [] }
+    configuration: reply.configuration ?? null,
+    ...(reply.models?.reason ? { modelReason: reply.models.reason } : {}), ...(reply.efforts?.reason ? { effortReason: reply.efforts.reason } : {}), models: reply.models?.options ?? [], efforts: reply.efforts?.options ?? [] }
 }
 
 export function mapRosterDetails(agent: StoreAgent, tasks: ReadonlyArray<{ owner: string; label: string; state: string }>, actions: ReadonlyArray<{ _tag: string; agentId: string; sequence: number }>) {

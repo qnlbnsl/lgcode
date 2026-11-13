@@ -127,6 +127,9 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
       const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
       if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
       const event = decoded.success;
+      // Temporary discovery sessions have no roster entry or registered token.
+      // Drop their notices before acquiring either the writer or an agent lane.
+      if ((yield* views.snapshot).agents[event.agentId] === undefined) return;
       const consume = Effect.gen(function* () {
         let resetMode = false;
         yield* log.transact((append) => Effect.gen(function* () {

@@ -1,4 +1,6 @@
-import { AgentChoices, AgentConfiguration, ContextUsage } from "../agentConfiguration.ts"
+import { HarnessChoices } from "../harnessChoices.ts"
+import { HarnessId, AccountId } from "../ids.ts"
+import { AgentChoices, AgentConfiguration, ChoiceId, ContextUsage } from "../agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -22,6 +24,10 @@ export const EventReply = Schema.Struct({ ...request, envelope: EventEnvelope })
 // Definitions only. A unit installs its subset into CommandsRpcGroup when it
 // supplies the handlers, so the running service never advertises a stub.
 export const ClientRpcGroup = RpcGroup.make(
+  Rpc.make("harness.choices", {
+    payload: { ...request, harnessId: HarnessId, accountId: Schema.optionalKey(AccountId), model: Schema.optionalKey(ChoiceId), refresh: Schema.optionalKey(Schema.Boolean) },
+    success: Schema.Struct({ ...request, ...HarnessChoices.fields }), error: Refused
+  }),
   Rpc.make("agent.configuration", {
     payload: { ...request, agentId: AgentId },
     success: Schema.Struct({ ...request, agentId: AgentId, configuration: AgentConfiguration, ...AgentChoices.fields }), error: Refused
@@ -83,6 +89,7 @@ export const ClientRpcGroup = RpcGroup.make(
 ).prefix("client.")
 
 export const clientCommandAccess = {
+  "client.harness.choices": ["owner"],
   "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": ["owner", "agent", "service"], "client.roster": ["owner", "agent", "service"],
   "client.thread": ["owner", "agent", "service"], "client.subscribe": ["owner", "agent", "service"],
@@ -96,6 +103,7 @@ export const clientCommandAccess = {
 
 // The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
+  "client.harness.choices",
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context",
   "client.web.settings", "client.web.settings.set"
 )

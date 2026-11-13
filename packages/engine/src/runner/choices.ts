@@ -47,10 +47,21 @@ export const configuredChoices = (models: ReadonlyArray<string>, efforts: Readon
   });
   return Effect.gen(function* () { return { models: yield* list(models), efforts: yield* list(efforts) }; });
 };
-export const negotiatedChoices = (options: ReadonlyArray<ConfigOption>, clean: (value: string) => Effect.Effect<string>): Effect.Effect<AgentChoices> => {
+export const negotiatedChoices = (options: ReadonlyArray<ConfigOption>, clean: (value: string) => Effect.Effect<string>, legacyModels?: unknown): Effect.Effect<AgentChoices> => {
   const list = (category: string): Effect.Effect<ChoiceList> => Effect.gen(function* () {
     const result: Array<{ id: string; label?: string }> = [];
-    for (const item of selectValues(selector(options, category))) {
+    let option = selector(options, category);
+    // ACP v1 also has a session-level model list. Gemini uses this surface
+    // without a model config selector. Never let it override a config report.
+    if (category === "model" && !options.some((o) => o.category === "model")
+      && typeof legacyModels === "object" && legacyModels !== null && "availableModels" in legacyModels
+      && Array.isArray(legacyModels.availableModels)) {
+      option = { type: "select", options: legacyModels.availableModels.slice(0, 128).flatMap((model: unknown) => {
+        if (typeof model !== "object" || model === null || !("modelId" in model)) return [];
+        return [{ value: model.modelId, ...("name" in model ? { name: model.name } : {}) }];
+      }) };
+    }
+    for (const item of selectValues(option)) {
       // IDs must survive redaction unchanged, since the adapter needs the exact ID.
       if ((yield* clean(item.id)) !== item.id) continue;
       const label = item.label === undefined ? undefined : (yield* clean(item.label)).replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 256);
