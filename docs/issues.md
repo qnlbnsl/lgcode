@@ -9923,7 +9923,7 @@ The original browser cases for conversation history and phone thread answering s
 The replacement shell keeps its closed phone navigation inert.
 The agent links also include their displayed state in their accessible name.
 The original Alerts and Settings layout cases waited for regions named Alerts and Settings.
-The actual service regions are named Phone notifications and Service settings.
+The actual service regions are named Notifications and Service settings.
 All four original browser failures and their complete contexts remain preserved.
 
 The two agent cases now open the actual navigation with its existing helper and click the named agent inside the Projects navigation.
@@ -11046,7 +11046,7 @@ The gap table is `.plans/plans/connect-mock/gap-table.md`.
 ## 623. The live website shows the page's default settings, not the engine's
 
 Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
-State: fixed for Service settings and Phone notifications in step 2.
+State: fixed for Service settings and Notifications in step 2.
 
 These pages now read their settings from the engine when opened.
 The Home notification offer reads the same carrier and dismissal settings.
@@ -11881,3 +11881,133 @@ The failing snapshots and command output are retained in the worker's local foun
 Both failing journeys passed when rerun serially without changing their test or production code.
 The focused rerun reported two passes in 3.1 minutes.
 The cause remains open.
+
+## 694. Notification forms appeared before their live settings finished loading.
+
+Found: 2026-11-13, while adding email notifications.
+State: fixed in this change.
+
+The email browser journey could type into an empty form before the first settings reply arrived.
+The reply then replaced the form and discarded the input.
+The live page now waits for the notification settings before mounting its carrier and quiet-hours forms.
+The email browser journey covers saving and reloading the settings.
+
+## 695. Merge notifications needed to end when their owner review was decided.
+
+Found: 2026-11-13, while adding the merge alert kind.
+State: fixed in this change.
+
+An alert raised from an opened merge review needed a matching close condition.
+The alert now clears when its review is decided or replaced.
+An existing open review enters the first alert baseline without a new push.
+The lifecycle test covers an opened and then refused review.
+
+
+## 696. A service-page read can show a connection notice during reload.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: open.
+
+The live page can briefly show "The service is not connected" after a reload.
+The settings then load and the controls work.
+The service-page reader starts when the session is signed in, before the transport necessarily reports a live connection.
+Issue 650 fixed the same ordering for Home reads.
+The notification browser journey verifies that saved settings survive this reload.
+The captured live screenshot preserves the temporary notice.
+
+## 697. Some notification kinds still use their contract identifiers as labels.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: fixed after the review.
+
+The existing live page uses friendly labels for its five original sample kinds.
+Other engine kinds fall back to identifiers such as `board.post` and `roles.stall`.
+Their switches work through the client application programming interface.
+Every existing kind now has a plain label in the same voice as the sample kinds.
+The notification browser journey checks those labels.
+
+
+## 698. Saving carrier settings changed its enabled state and repeated delivered alerts.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+Saving email settings enabled the carrier and reset every delivery mark.
+Saving ntfy settings also reset its enabled state.
+The reducer now preserves enabled state and delivery identity for an unchanged destination.
+A sender-only email change preserves completed deliveries.
+A destination change makes open alerts eligible again.
+Regression tests cover each destination field and an alert raised while a carrier is off.
+
+## 699. Quiet hours held account problems and the web server security signal.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The override recognized only agent failures.
+The lead ruled that account problems and a web server outage must also pass through.
+One named engine list now defines the three urgent kinds.
+The page and notification guide describe all three.
+Regression tests exercise every urgent kind with the override on and off.
+
+## 700. Changing email credentials could silently retire a password and leave email on.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The page now requires a replacement password before saving a different credential destination.
+Its hint explains that the stored password would be cleared.
+The engine disables email when its password association is cleared.
+The save reply reports whether a password is required.
+A new enable request is refused until a password is stored.
+The browser journey and engine regression tests cover the changed destination.
+Older destination events retain their implied activation during replay.
+New setup requests record an explicit disabled state until a password is installed.
+
+## 701. The terminal could not store an email password, and email settings could not be removed.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The terminal accepts the email carrier name and reads its password only from standard input.
+The confirmation shows the actual mail destination.
+An owner request and page control now remove carrier settings and retire the password.
+The command-line tests reject secret values supplied as arguments.
+The engine and browser tests cover removal without changing ntfy.
+
+## 702. Alerts held by quiet hours looked unsent without an explanation.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The list reply now includes a computed held state for pending alerts.
+The page shows "Held until quiet hours end".
+Restart tests cover both held and failed email deliveries.
+The browser journey checks the held wording.
+
+## 703. Notification regression tests did not distinguish several wrong implementations.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The daylight-saving cases now require different offsets before and after both clock changes.
+An off-carrier case proves that an open alert sends once after enabling.
+Additional cases reject carriage returns and line feeds in email addresses.
+A retry case checks the quiet-hours refusal and real SMTP attempts after restart.
+The rejection assertions inspect an actual reply and captured logs rather than an event list that test sends never change.
+
+## 704. Three existing browser journeys failed in the full notification follow-up check.
+
+Found: 2026-11-13, during the full check after the notification review fixes.
+State: open, with isolated passes and no established cause.
+
+The full check passed all TypeScript checks and 8,118 unit tests.
+Its browser stage passed 48 journeys and failed three.
+The conversation journey could not find its composer after logging in again.
+The stale Git evidence journey still showed a submitting review when its merge assertion timed out.
+The Studio Git journey could not find the approval-without-evidence button.
+The three journeys and the expanded email journey then passed together with one browser worker.
+The existing journey bodies and the conversation and Git implementations were unchanged by these fixes.
+An isolated pass does not establish why the full run failed.
+The full gate therefore remains failed.
+The output is recorded in `.foundry/fixes-check.log` and `.foundry/fixes-browser-recheck.log` in the notification worktree.

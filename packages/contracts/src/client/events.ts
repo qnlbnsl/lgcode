@@ -1,19 +1,25 @@
 import * as Schema from "effect/Schema"
 import { AgentId, EventSequence } from "../ids.ts"
-import { AlertId, AlertKey, AlertKind, AlertSubject, CarrierSettings, CarrierTokenGeneration } from "./alerts.ts"
+import { AlertId, AlertKey, AlertKind, AlertSubject, CarrierSettings, CarrierTokenGeneration, CarrierName, QuietHours } from "./alerts.ts"
 import { WebSettings } from "./settings.ts"
 
 export const clientEventTags = [
+  "client.AlertDestinationChanged", "client.AlertDestinationTokenSet", "client.AlertDestinationTokenCleared", "client.AlertCarrierEnabled", "client.AlertQuietChanged",
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
   "client.WebServerDown", "client.WebServerUp"
 ] as const
 const attempt = {
-  alertId: AlertId, carrier: Schema.Literal("ntfy"), generation: EventSequence,
+  alertId: AlertId, carrier: CarrierName, generation: EventSequence,
   attempt: Schema.Int.check(Schema.isGreaterThan(0))
 }
 export const ClientEvent = Schema.Union([
+  Schema.TaggedStruct("client.AlertDestinationChanged", { name: CarrierName, carrier: CarrierSettings }),
+  Schema.TaggedStruct("client.AlertDestinationTokenSet", { name: CarrierName, origin: Schema.NonEmptyString, carrierGeneration: CarrierTokenGeneration }),
+  Schema.TaggedStruct("client.AlertDestinationTokenCleared", { name: CarrierName }),
+  Schema.TaggedStruct("client.AlertCarrierEnabled", { name: CarrierName, enabled: Schema.Boolean }),
+  Schema.TaggedStruct("client.AlertQuietChanged", { quiet: QuietHours }),
   Schema.TaggedStruct("client.AlertPromptDismissed", {}),
   Schema.TaggedStruct("client.AlertBaseline", { position: EventSequence }),
   Schema.TaggedStruct("client.AlertRaised", {

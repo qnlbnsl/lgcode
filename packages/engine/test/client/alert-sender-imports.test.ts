@@ -13,7 +13,7 @@ export const alertFiles = () => {
   walk(root); return files;
 };
 
-it("6.7 alert rules cannot import ntfy or another carrier, including through dynamic imports or re-exports", () => {
+it("6.7 alert rules cannot import concrete carriers; only carrier configuration can import the registry", () => {
   registerRebuildCheck({ noLog: true });
   expect(existsSync("packages/engine/src/client/alerts/AlertSender.ts"), "6b must introduce the carrier boundary").toBe(true);
   const bad: string[] = [];
@@ -22,6 +22,9 @@ it("6.7 alert rules cannot import ntfy or another carrier, including through dyn
       (token) => token.startsWith("//") || token.startsWith("/*") ? " " : token);
     const imports = source.matchAll(/(?:\b(?:import|export)\s+(?:[^;]*?\s+from\s*)?|\b(?:import|require)\s*\(\s*)["']([^"']+)["']/g);
     for (const match of imports) {
+      // Configuration validates destinations and binds secrets through the
+      // registry. Alert source and delivery rules still use AlertSender only.
+      if (file.endsWith("/alerts/token.ts") && match[1] === "./carriers/index.ts") continue;
       if (/(?:^|\/)(?:carriers|ntfy)(?:\/|\.|$)/.test(match[1]!)) bad.push(relative("packages/engine/src/client", file));
     }
   }

@@ -32,7 +32,7 @@ const exchange = (url: URL, method: string, headers: Record<string, string>, bod
 export const makeNtfy = (secrets: SecretStore["Service"]): AlertSender["Service"] => {
   const send = (id: string, destination: AlertDestination, payload?: AlertPayload) => Effect.gen(function* () {
     const carrier = destination.carrier;
-    if (carrier._tag === "none") return;
+    if (carrier._tag !== "ntfy") return;
     if (carrierOrigin(carrier.server) !== carrier.server || !/^[-_A-Za-z0-9]{1,64}$/.test(carrier.topic)) return yield* Effect.fail("invalid carrier destination");
     const headers: Record<string, string> = {};
     if (destination.token !== undefined) {
@@ -51,4 +51,14 @@ export const makeNtfy = (secrets: SecretStore["Service"]): AlertSender["Service"
         `Team: ${payload.team.join(", ")}`].join("\n"));
   });
   return AlertSender.of({ send: (payload, destination) => send(payload.alertId, destination, payload), clear: send });
+};
+
+export const ntfyCarrier: import("./index.ts").CarrierDefinition = {
+  make: makeNtfy,
+  normalize: (settings) => {
+    if (settings._tag !== "ntfy") return undefined;
+    const server = carrierOrigin(settings.server);
+    return server !== undefined && /^[-_A-Za-z0-9]{1,64}$/.test(settings.topic) ? { ...settings, server } : undefined;
+  },
+  origin: (settings) => settings._tag === "ntfy" ? settings.server : undefined,
 };

@@ -47,13 +47,13 @@ its own scroll position while the conversation scrolls.
 
 The redesign retains authentication states, connection status, permission
 requests, agent stop/resume, safe failed-start reasons, explicit large-item
-loading, tool calls, delivery history, Phone notifications, and Settings. Permission
+loading, tool calls, delivery history, Notifications, and Settings. Permission
 controls show the actual action input before answer buttons. Hidden input
 and unconfirmed answers have explicit states. Stop cancels permissions.
 Logout and expiry wipe entered secrets. Reconnecting preserves reading
 context but disables mutations. These remain sample flows in the mock.
 
-Phone notifications, Machines, Subscriptions, and Service settings belong to
+Notifications, Machines, Subscriptions, and Service settings belong to
 the service, so they sit in global navigation, as a row of icons at the foot of
 the sidebar. The project workspace has Board, Chat, Terminal, Git, and Project
 settings tabs, and a team adds Tasks. Git combines the repository worktree hierarchy, staged and unstaged files,
@@ -288,7 +288,7 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Failed start | A kind of attention: an agent could not start. It wears the error color. |
 | Uncommitted changes | Files changed in a worktree. "Working tree" is not used. |
 | Thread | One agent's conversation. Chat stays the name of the tab. |
-| Phone notifications | Notifications sent to the owner's phone. Its badge counts failed notifications only. It was named Alerts until 2026-11-08, which a first reader confused with the bell. |
+| Notifications | Notifications sent to the owner's phone. Its badge counts failed notifications only. It was named Alerts until 2026-11-08, which a first reader confused with the bell. |
 | Inspecting | The top bar's control for the worktree whose code you look at. It was named Viewing. |
 | Ours | The worktree's own version of a conflicting change. |
 | Theirs | The version being merged in: the project branch for a team, or main. |
@@ -296,7 +296,7 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Create a worktree | The New project check box that gives the project its own branch and folder. It was named Start work tree. |
 | Goal | What the owner wants from a new project. The lead turns it into sprints and teams. |
 | Lead subscription | The subscription the new project's lead runs on. It was named Lead runs on. |
-| Notification service | The ntfy server and topic that carry phone notifications. It was named Notification carrier. |
+| Notification service | The ntfy server and topic that carry notifications. It was named Notification carrier. |
 | Notification service token | The secret that lets LGTM Studio post to the notification service. It was named Carrier token. |
 | Check-in interval, in seconds | How often a connected page checks in with the web server. It was named Heartbeat seconds. |
 | Archive | Hides a finished project from the sidebar and Home. All projects still lists it, and Restore brings it back. |
@@ -304,7 +304,7 @@ that is the part that differs. All files stacks every changed file with a sticky
 ### One density rule for records
 
 Comparable records are tables with rows of 46 pixels or less: Machines, Project
-placement, Subscriptions, Phone notifications, All projects, the repository page, and
+placement, Subscriptions, Notifications, All projects, the repository page, and
 tasks. Requests are single-line rows
 that say how long they have waited and what they block. At 900 pixels and narrower, a request
 row has a second line that starts with its kind. Expanded rows do not repeat
@@ -388,14 +388,14 @@ job. The rules come from Ananke's onboarding specs and session reports, read on 
 Login still comes first, because the service has one password from its environment. The first run
 does not cover a computer that joins as a worker.
 
-- **Phone notifications are offered on the first waiting request, not in setup.** The owner chose
+- **Notifications are offered on the first waiting request, not in setup.** The owner chose
   this on 2026-11-08. The reason is plain once an agent waits, and setup stays at three pages. The
   offer sits at the foot of the oldest request that waits for the owner, in the thread and on
   Home. It shows only while no notification service is set.
 - **Not now is recorded.** Declining writes a record, so the offer never returns. Service
-  settings can still turn phone notifications on.
-- **Set up phone notifications opens the notification service.** Setting a service ends the offer.
-  A missing token is then the Phone notifications page's job.
+  settings can still turn notifications on.
+- **Set up notifications opens the notification service.** Setting a service ends the offer.
+  A missing token is then the Notifications page's job.
 - **The catch is the first request.** No phone notification goes out for it, because none is set
   up yet. The owner accepted this.
 
@@ -504,7 +504,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   character stands in for an icon, so there is no ×, ←, →, ↗, ⌘, ✓, or ＋ in a button.
 - **The shortcut matches the system.** The switcher shows the Command icon and K on Apple
   systems, and Ctrl K elsewhere.
-- **Phone notifications use a phone icon,** because they are sent to the owner's phone.
+- **Notifications use a phone icon,** because they are sent to the owner's phone.
 
 ### Motion, focus, tabs, and dialogs
 
@@ -559,7 +559,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 - **A project with no teams has no disclosure.** It draws no tree line either.
 - **The current row stays clear of the fade.** After each navigation, the tree scrolls so that
   the current row sits 8 pixels above the fade at its foot.
-- **Service pages are one row of 40 pixel icons.** Phone notifications, Machines,
+- **Service pages are one row of 40 pixel icons.** Notifications, Machines,
   Subscriptions, and Service settings sit in that row, with Design notes at its end. A
   red count on the phone icon says how many notifications failed.
 
@@ -923,7 +923,7 @@ New project.
   line. The other facts go on the second line in muted text. The rule follows the table's
   own width, so a 768 pixel window with the sidebar open stacks too.
 
-### Phone notifications
+### Notifications
 
 - **The columns are Notification, Time, About, and Delivery.** About names the agent and
   the project, and the agent's name opens its thread. The State column is gone.
@@ -1013,7 +1013,7 @@ or narrower.
 - **The board is one list.** Sprints that need the owner come first, then In progress, In
   review, Planned, and Done. Each card starts with its status. The column jump strip is gone.
 - **The status leads every phone row's second line.** All projects, the repository page,
-  task tables, Machines, Subscriptions, and Phone notifications put the name on the first
+  task tables, Machines, Subscriptions, and Notifications put the name on the first
   line and the status first on the second. All projects stacks below 620 pixels of table
   width, and a task table below 480, so a 768 pixel window stacks them too.
 - **A phone diff has one line-number gutter.** It shows the new line's number, or the old

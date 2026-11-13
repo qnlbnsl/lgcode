@@ -1,4 +1,4 @@
-/* Machines, Subscriptions, Phone notifications, Service settings and Project settings.
+/* Machines, Subscriptions, Notifications, Service settings and Project settings.
    Every colour is a token from tokens.css. */
 
 /* ---- shared parts --------------------------------------------------------- */
@@ -107,7 +107,7 @@
 .svc-sub-note .icon { margin-top: 1px; flex: none; }
 .svc-sub-agents { display: grid; padding: 4px var(--space-2) 8px 25px; background: var(--color-raised); border-top: 1px solid var(--color-line); }
 
-/* ---- phone notifications ---------------------------------------------------- */
+/* ---- notifications ---------------------------------------------------- */
 .svc-split { display: grid; grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); gap: var(--space-4) var(--space-10); align-items: start; }
 .svc-split .svc-section { max-width: none; }
 .svc-form { display: grid; gap: var(--space-3); padding-top: var(--space-2); }

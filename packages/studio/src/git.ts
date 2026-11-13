@@ -29,11 +29,14 @@ export function mapServiceSettings(project: ProjectSettings | undefined, harness
 export function mapAlertSettings(settings: AlertSettings) {
   return { ntfyServer: settings.carrier._tag === "ntfy" ? settings.carrier.server : "", ntfyTopic: settings.carrier._tag === "ntfy" ? settings.carrier.topic : "",
     ntfyToken: "", tokenSet: settings.tokenSet, notifyOn: Object.fromEntries(settings.kinds.map((k) => [k.kind === "failure" ? "failed" : k.kind, k.push])),
-    quiet: { on: null, from: "", to: "", failed: null } }
+    ...(settings.carriers ? { ntfyEnabled: settings.carriers.find((c) => c.name === "ntfy")?.enabled ?? false,
+      email: (() => { const entry = settings.carriers.find((c) => c.name === "email"); return { ...(entry?.carrier._tag === "email" ? entry.carrier : {}), enabled: entry?.enabled ?? false, tokenSet: entry?.tokenSet ?? false }; })() } : {}),
+    quiet: settings.quiet ? { on: settings.quiet.enabled, from: settings.quiet.start, to: settings.quiet.end, timeZone: settings.quiet.timeZone, failed: settings.quiet.failureOverride }
+      : { on: null, from: "", to: "", failed: null } }
 }
 
 export function mapPhoneOffer(settings: AlertSettings) {
-  return settings.pushPromptDismissed || settings.carrier._tag !== 'none' ? 'declined' : 'open'
+  return settings.pushPromptDismissed || settings.carriers?.some((c) => c.enabled) || settings.carrier._tag !== 'none' ? 'declined' : 'open'
 }
 
 export function mapAlerts(alerts: ReadonlyArray<Alert>, agents: ReadonlyArray<{ id: string; project: string }>, requests: ReadonlyArray<ClientRequest> = []) {
@@ -42,9 +45,11 @@ export function mapAlerts(alerts: ReadonlyArray<Alert>, agents: ReadonlyArray<{ 
     const row = requests.find((r) => r.id === request)
     const agent = agents.find((x) => x.id === (a.agentId ?? row?.agentId ?? (a.subject?._tag === "agent" ? a.subject.id : "")))
     const to = agent ? `/p/${encodeURIComponent(agent.project)}/chat/${encodeURIComponent(agent.id)}` : a.subject?._tag === "account" ? "/subscriptions" : null
+    const deliveries = a.deliveries ?? [];
+    const mark = deliveries.find((d) => d.status === "failed") ?? deliveries[0] ?? a.delivery;
     return { id: a.alertId, ts: a.raisedAt, kind: a.kind === "failure" ? "failed" : a.kind, title: a.title, agent: agent?.id ?? null, project: agent?.project ?? null,
-      request, to, answer: row?.status === 'answered' ? row.answer ?? '' : '', read: a.status === "cleared", delivery: a.delivery?.status === "delivered" ? "sent" : a.delivery?.status ?? "off",
-      error: a.delivery?.status === "failed" ? a.delivery.reason : null, generation: a.delivery?.generation, attempt: a.delivery?.attempt }
+      request, to, answer: row?.status === 'answered' ? row.answer ?? '' : '', read: a.status === "cleared", delivery: a.held ? "quiet" : mark?.status === "delivered" ? "sent" : mark?.status ?? "off",
+      error: mark?.status === "failed" && "reason" in mark ? mark.reason : null, generation: mark?.generation, attempt: mark?.attempt, carrier: deliveries.find((d) => d.status === "failed")?.carrier ?? deliveries[0]?.carrier, deliveries }
   }).sort((a, b) => b.ts - a.ts)
 }
 

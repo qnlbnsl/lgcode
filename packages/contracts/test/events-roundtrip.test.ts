@@ -66,6 +66,7 @@ const expectedEngineTags = [
 // The shared union has the engine inventory plus these client declarations.
 // Keep the expected list independent of the production event-tag inventory.
 const expectedClientTags = [
+  "client.AlertDestinationChanged", "client.AlertDestinationTokenSet", "client.AlertDestinationTokenCleared", "client.AlertCarrierEnabled", "client.AlertQuietChanged",
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",

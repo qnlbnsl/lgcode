@@ -330,7 +330,7 @@ These are on `.scratch/security/attack-todo.md` as what must hold.
 - [ ] Send on Enter and use Shift+Enter for a line break.
 - [ ] Open the context search with @ and preserve sent context references.
 - [ ] Offer subscription, model, effort, and honest context usage beside the composer.
-- [ ] Offer phone notifications at the first waiting request, outside setup.
+- [ ] Offer notifications at the first waiting request, outside setup.
 - [ ] Persist Not now so that the offer never returns.
 - [ ] Retry a failed notification and send a test notification through the real transport.
 - [ ] Show subscription usage/reset where the provider reports them and unavailable state otherwise.

@@ -2462,7 +2462,7 @@
         "column": 2,
         "predicate": "await page.locator('.push-prompt').count()===0&&!await page.evaluate(()=>pushPromptDue())"
       },
-      "label": "A service with a notification service set does not offer phone notifications",
+      "label": "A service with a notification service set does not offer notifications",
       "bindings": {},
       "groups": [
         "alerts"
@@ -3150,9 +3150,9 @@
         "suite": "design/operations-checks.mjs",
         "line": 74,
         "column": 45,
-        "predicate": "await text('#view-title').then(t=>t==='Phone notifications')"
+        "predicate": "await text('#view-title').then(t=>t==='Notifications')"
       },
-      "label": "Phone notifications is a first-class page",
+      "label": "Notifications is a first-class page",
       "bindings": {},
       "groups": [
         "alerts"
@@ -3168,7 +3168,7 @@
         "column": 2,
         "predicate": "await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('Token missing')&&t.includes('Still failing')&&t.includes('Carrier delivery failed'))"
       },
-      "label": "Phone notifications keep delivery attempts and failure reasons",
+      "label": "Notifications keep delivery attempts and failure reasons",
       "bindings": {},
       "groups": [
         "alerts"
@@ -3463,7 +3463,7 @@
         "suite": "design/operations-checks.mjs",
         "line": 99,
         "column": 2,
-        "predicate": "await page.locator('[data-settings-nav]').allTextContents().then(t=>t.join()==='Appearance,Phone notifications,Notification service,Web server')"
+        "predicate": "await page.locator('[data-settings-nav]').allTextContents().then(t=>t.join()==='Appearance,Notifications,Notification service,Web server')"
       },
       "label": "SET-1: a section list names every section",
       "bindings": {},
@@ -3721,7 +3721,7 @@
         "column": 2,
         "predicate": "await page.evaluate(()=>{findPushPrompt();return pushPromptDue()&&pushPromptFor.length>0})"
       },
-      "label": "With no notification service, the oldest waiting request offers phone notifications",
+      "label": "With no notification service, the oldest waiting request offers notifications",
       "bindings": {},
       "groups": [
         "alerts"
@@ -8942,9 +8942,9 @@
         "suite": "design/revision-checks.mjs",
         "line": 127,
         "column": 2,
-        "predicate": "await text('#alerts-count')==='2'&&(await page.locator('[data-system-page=\"alerts\"]').getAttribute('aria-label'))==='Phone notifications, 2 failed'&&await page.locator('.alert-list td.delivery-failed').count()===2"
+        "predicate": "await text('#alerts-count')==='2'&&(await page.locator('[data-system-page=\"alerts\"]').getAttribute('aria-label'))==='Notifications, 2 failed'&&await page.locator('.alert-list td.delivery-failed').count()===2"
       },
-      "label": "The phone notifications badge counts every failed notification it shows, not requests",
+      "label": "The notifications badge counts every failed notification it shows, not requests",
       "bindings": {},
       "groups": [
         "alerts"
@@ -11945,9 +11945,9 @@
         "suite": "design/revision-checks.mjs",
         "line": 440,
         "column": 2,
-        "predicate": "(await txt('#breadcrumb'))==='Phone notifications'&&(await at('[data-system-page=\"alerts\"]').getAttribute('aria-label')).startsWith('Phone notifications')&&!(await txt('#view-body')).includes('Alert')"
+        "predicate": "(await txt('#breadcrumb'))==='Notifications'&&(await at('[data-system-page=\"alerts\"]').getAttribute('aria-label')).startsWith('Notifications')&&!(await txt('#view-body')).includes('Alert')"
       },
-      "label": "Alerts are named Phone notifications everywhere",
+      "label": "Alerts are named Notifications everywhere",
       "bindings": {},
       "groups": [
         "alerts"
@@ -16549,7 +16549,7 @@
         "column": 2,
         "predicate": "await prompt.isVisible()&&(await prompt.textContent()).includes('Get a phone notification the next time an agent waits for you.')"
       },
-      "label": "The first waiting request offers phone notifications",
+      "label": "The first waiting request offers notifications",
       "bindings": {},
       "groups": [
         "setup"
@@ -16812,7 +16812,7 @@
         "column": 2,
         "predicate": "await page.evaluate(()=>state.view)==='settings'&&await page.evaluate(()=>document.activeElement.id)==='carrier-server'"
       },
-      "label": "Set up phone notifications opens the notification service",
+      "label": "Set up notifications opens the notification service",
       "bindings": {},
       "groups": [
         "setup"
@@ -16846,7 +16846,7 @@
         "column": 2,
         "predicate": "await page.locator('.push-prompt').count()===0"
       },
-      "label": "The request no longer offers phone notifications",
+      "label": "The request no longer offers notifications",
       "bindings": {},
       "groups": [
         "setup"

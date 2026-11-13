@@ -55,8 +55,8 @@ export function Alerts({ onSessionExpired }: { readonly onSessionExpired: () => 
 
   const failed = items?.filter((alert) => alert.status === "open" && alert.delivery?.status === "failed")
   const remedy = failed?.some((alert) => alert.delivery?.status === "failed" && ["token missing", "service missing"].includes(alert.delivery.reason))
-  return <section className="admin-page" aria-label="Phone notifications">
-    <div className="admin-page-top"><h2>Phone notifications</h2>
+  return <section className="admin-page" aria-label="Notifications">
+    <div className="admin-page-top"><h2>Notifications</h2>
       <button disabled={busy} onClick={() => { void load() }}>Refresh alerts</button>
     </div>
     {message && <p role="alert">{message}</p>}
@@ -65,7 +65,7 @@ export function Alerts({ onSessionExpired }: { readonly onSessionExpired: () => 
     {failed !== undefined && failed.length > 0 && <p className="admin-warning">{failed.length} failed {next === undefined ? "notifications" : "notifications on the loaded pages"}. {remedy && <a href={`${shellHref({ page: "service", service: "settings" })}?focus=token`}>Fix in Service settings</a>}</p>}
     {pending !== undefined && !busy && <div className="admin-actions"><p role="status">The retry result is uncertain. Retry this same notification to recover its receipt.</p>
       <button disabled={offline} onClick={() => { void retryDelivery() }}>Recover retry result</button></div>}
-    {items === undefined ? <p role="status">{busy ? "Loading alerts…" : "Alerts have not loaded."}</p> : items.length === 0 ? <p>No alerts.</p> : <div className="admin-table-wrap"><table className="admin-table admin-alert-table" aria-label="Phone notifications">
+    {items === undefined ? <p role="status">{busy ? "Loading alerts…" : "Alerts have not loaded."}</p> : items.length === 0 ? <p>No alerts.</p> : <div className="admin-table-wrap"><table className="admin-table admin-alert-table" aria-label="Notifications">
       <thead><tr><th>Notification</th><th>Time</th><th>About</th><th>Delivery</th><th>Actions</th></tr></thead>
       <tbody>{items.map((alert) => <tr key={alert.alertId}>
         <td className="admin-record-name"><span title={visibleText(alert.title)}>{visibleText(alert.title)}</span><small>Status: {alert.status} · Kind: {alert.kind}</small></td>

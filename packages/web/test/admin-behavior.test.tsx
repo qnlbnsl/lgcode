@@ -69,7 +69,7 @@ it("follows alert page cursors and refreshes without retaining removed rows", as
   expect(container.textContent).toContain("first")
   expect(list.mock.calls[1]![0]).toEqual(expect.objectContaining({ after: 12, limit: 100 }))
   expect(more()).toBeUndefined()
-  await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Phone notifications"] button')!.click() })
+  await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Notifications"] button')!.click() })
   await eventually(() => expect(container.textContent).toContain("No alerts."))
   expect(container.textContent).not.toContain("first")
 })

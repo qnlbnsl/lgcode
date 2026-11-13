@@ -36,7 +36,7 @@ const render = async () => {
 }
 
 const openAlerts = async (container: HTMLElement) => {
-  const link = container.querySelector<HTMLAnchorElement>('a[aria-label="Phone notifications"]')
+  const link = container.querySelector<HTMLAnchorElement>('a[aria-label="Notifications"]')
   expect(link, "the owner needs an Alerts link to reach the page").toBeTruthy()
   await act(async () => { link!.click() })
 }

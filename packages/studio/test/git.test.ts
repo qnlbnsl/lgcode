@@ -129,3 +129,14 @@ describe('Git mapping', () => {
     expect(mapMainReview(review, undefined, 'project-lead')).toMatchObject({ head: 'head', baseHead: 'base', status: 'open', notice: '', evidence: { tests: { ok: false, value: 'stale: passed' }, review: { ok: false, value: 'Missing' }, conflicts: null } })
   })
 })
+
+it('maps email and quiet hours without a stored mail secret', () => {
+  const settings = { carrier: { _tag: 'none' }, tokenSet: false, kinds: [], carriers: [{ name: 'email', enabled: true, tokenSet: true, carrier: { _tag: 'email', host: 'mail.example.test', port: 465, security: 'tls', username: 'owner', from: 'owner@example.test', to: 'owner@example.test' } }], quiet: { enabled: true, start: '22:00', end: '07:00', timeZone: 'America/Chicago', failureOverride: true } } as AlertSettings
+  expect(mapAlertSettings(settings)).toMatchObject({ email: { enabled: true, tokenSet: true, host: 'mail.example.test' }, quiet: { on: true, from: '22:00', to: '07:00', timeZone: 'America/Chicago', failed: true } })
+  expect(mapPhoneOffer(settings)).toBe('declined')
+})
+
+it('maps held notifications ahead of a failed carrier result', () => {
+  const alert = { alertId: 'held', kind: 'question', status: 'open', raisedAt: 1, held: true, deliveries: [{ carrier: 'email', status: 'failed', generation: 2, attempt: 1, reason: 'carrier delivery failed', final: false }] } as unknown as Alert
+  expect(mapAlerts([alert], [])[0]).toMatchObject({ delivery: 'quiet', carrier: 'email', generation: 2, attempt: 1 })
+})

@@ -39,6 +39,9 @@ const summaries: Record<CommandName, string> = {
   "project.conflict.choose": "Choose a canonical conflict hunk after checking its fingerprint.",
   "project.conflict.resolve": "Resolve canonical conflict hunks from current confirmed choices.",
 
+  "client.alerts.quiet.set": "Set quiet hours, their time zone and the failure override.",
+  "client.alerts.carrier.remove": "Remove one carrier configuration and its secret.",
+  "client.alerts.carrier.enabled.set": "Enable or disable one configured notification carrier.",
   "client.alerts.carrier.set": "Change the alert carrier.",
   "client.alerts.carrier.set-token": "Store the carrier token from standard input, after confirming the server.",
   "client.alerts.carrier.clear-token": "Clear the carrier token.",
@@ -173,8 +176,8 @@ export const helpText = (command: CommandName): string => {
     ].join("\n") + "\n"
   }
   if (command === "client.alerts.carrier.set-token") return [
-    "Usage: lgtm client alerts carrier set-token", "       lgtm client.alerts.carrier.set-token", "", summaries[command], callers,
-    "Takes no arguments. Type yes to confirm the displayed server, then supply the token on standard input.",
+    "Usage: lgtm client alerts carrier set-token [ntfy|email]", "       lgtm client.alerts.carrier.set-token [ntfy|email]", "", summaries[command], callers,
+    "Select ntfy (the default) or email. Type yes to confirm the displayed server, then supply its password or token on standard input.",
     "The token is never echoed or accepted in --input."
   ].join("\n") + "\n"
   const options = [

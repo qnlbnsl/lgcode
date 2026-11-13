@@ -66,7 +66,7 @@ const FLOWS = [
   ['Conversations', [F('Chat', null, '/p/console/chat'), F('Chat', 'Another agent', '/p/console/chat/shell-lead'), F('Messages', null, '/p/console/messages'), F('Messages', 'Waiting for a reply', '/p/console/messages/waiting'), F('Agents', null, '/p/console/agents')]],
   ['Code', [F('Terminal', null, '/p/console/terminal'), F('Git', 'Changes', '/p/console/git'), F('Git', 'History', null), F('Git', 'Conflicts', null), F('Merge review', null, null)]],
   ['Repository', [F('Repository', null, '/r/lgtm'), F('Repository design', null, '/r/lgtm/design/palette/colour')]],
-  ['Service', [F('Machines', null, '/machines'), F('Pair machine', null, null), F('Add repository', null, null), F('Subscriptions', null, '/subscriptions'), F('Add subscription', null, null), F('Phone notifications', null, '/notifications'), F('Service settings', null, '/settings')]],
+  ['Service', [F('Machines', null, '/machines'), F('Pair machine', null, null), F('Add repository', null, null), F('Subscriptions', null, '/subscriptions'), F('Add subscription', null, null), F('Notifications', null, '/notifications'), F('Service settings', null, '/settings')]],
 ];
 // Components by group. "file" marks the components that are in design/lgtm.fig today,
 // with their variants as rows by columns.

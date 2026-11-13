@@ -978,3 +978,9 @@ test("live messages: a new project has General and Leads and accepts an owner po
     removeRig(rig)
   }
 })
+
+// Keep this notification journey separate from the service settings journey.
+test('live website: email save, test delivery and secret protection', async ({ page }) => {
+  const { exerciseStudioNotifications } = await import('./support/studioNotifications.ts')
+  await exerciseStudioNotifications(page)
+})

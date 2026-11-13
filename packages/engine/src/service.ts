@@ -18,7 +18,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { makeCredentialRegistry } from "./accounts/credentialSource.ts";
 import * as SecretStore from "./accounts/SecretStore.ts";
 import { AlertSender } from "./client/alerts/AlertSender.ts";
-import { makeNtfy } from "./client/alerts/carriers/ntfy.ts";
+import { makeCarriers } from "./client/alerts/carriers/index.ts";
 import { SecretStore as SecretStoreService } from "./commands/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
@@ -60,7 +60,7 @@ const baseServices = (lists: EngineLists) => Layer.unwrap(Effect.gen(function* (
 const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(function* () {
   const recovery = yield* Effect.serviceOption(Restart.Restart);
   const customSender = yield* Effect.serviceOption(AlertSender);
-  const sender = Option.isSome(customSender) ? customSender.value : makeNtfy(yield* SecretStoreService);
+  const sender = Option.isSome(customSender) ? customSender.value : makeCarriers(yield* SecretStoreService);
   // Finish a removed batch before observing cancellation, so shutdown cannot
   // discard diagnostics between clearing the pending map and writing its logs.
   const drain = Effect.suspend(() => Effect.forEach(drainPieceErrors(), (entry) =>

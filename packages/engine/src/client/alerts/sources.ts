@@ -1,6 +1,7 @@
 import type { AlertSourceRequest, Event, EventEnvelope, PermissionRequestId, QuestionId } from "@lgtm/contracts";
 import type { Snapshot } from "../../commands/internal.ts";
 import { alertKeyPart } from "./keys.ts";
+import { projectView } from "../../project/view.ts";
 import { clientView } from "./view.ts";
 
 export const inactive = (snapshot: Snapshot, agentId: string): boolean => {
@@ -22,6 +23,10 @@ const agentRemedyClosed = (snapshot: Snapshot, agentId: string): boolean => {
 };
 export const subjectClosed = (source: AlertSourceRequest, snapshot: Snapshot): boolean => {
   const subject = source.subject;
+  if (source.kind === "merge" && subject?._tag === "piece") {
+    const review = Object.values(projectView(snapshot)?.gitReviews ?? {}).find((review) => review.reviewId === subject.id);
+    return review?.outcome !== "open";
+  }
   if (source.kind === "approval" && subject?._tag === "permission") {
     const row = snapshot.requests[subject.id];
     return row?.status !== "open" || inactive(snapshot, row.agentId);
@@ -47,7 +52,11 @@ export const subjectClosed = (source: AlertSourceRequest, snapshot: Snapshot): b
 export const engineSource = (envelope: EventEnvelope, snapshot: Snapshot): AlertSourceRequest | undefined => {
   const event = envelope.event;
   let source: AlertSourceRequest | undefined;
-  if (event._tag === "OwnerNeeded") {
+  if (event._tag === "project.SprintCompleted") {
+    source = { kind: "sprint", key: `sprint:${alertKeyPart(event.projectId)}:${alertKeyPart(event.sprintId)}`, subject: { _tag: "piece", namespace: "project", id: event.sprintId } };
+  } else if (event._tag === "project.MainReviewOpened" && event.review.outcome === "open") {
+    source = { kind: "merge", key: `merge:${alertKeyPart(event.review.reviewId)}`, subject: { _tag: "piece", namespace: "project", id: event.review.reviewId } };
+  } else if (event._tag === "OwnerNeeded") {
     const { agentId, subject, reason } = event;
     if (reason === "request needs the owner" && subject !== undefined) {
       if (!currentAgentRun(snapshot, agentId, envelope.sequence)) return undefined;
@@ -79,6 +88,10 @@ export const openQuestions = (snapshot: Snapshot, agentId?: string): ReadonlyArr
 
 export const engineOpenMatters = (snapshot: Snapshot): ReadonlyArray<AlertSourceRequest> => {
   const matters: AlertSourceRequest[] = [...openQuestions(snapshot)];
+  for (const review of Object.values(projectView(snapshot)?.gitReviews ?? {})) {
+    if (review.outcome === "open") matters.push({ kind: "merge", key: `merge:${alertKeyPart(review.reviewId)}`,
+      subject: { _tag: "piece", namespace: "project", id: review.reviewId } });
+  }
   for (const row of Object.values(snapshot.requests)) {
     if (row.status === "open" && row.holder._tag === "owner" && !inactive(snapshot, row.agentId)) matters.push({
       kind: "approval", key: `permission:${alertKeyPart(row.permissionRequestId)}`, agentId: row.agentId,
