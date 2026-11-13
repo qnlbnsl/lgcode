@@ -41,5 +41,12 @@ const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
   return { events: [{ _tag: "project.MockScreenApprovalSet", projectId: p.projectId, revisionId: p.revisionId, screenId: p.screenId,
     approved: p.approved, author: input.actor }], reply: () => ({ requestId: p.requestId }) }
 })
-export const mockScreenPlanners = { "project.mocks.comment": comment, "project.mocks.screen.approve": approve }
+const seen: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  if (input.actor._tag !== "owner") return yield* refused()
+  const p = raw as Payload<"project.mocks.seen">
+  // Historical versions may be marked explicitly. Their marks never apply to a new head.
+  yield* screenReview(input, p)
+  return { events: [{ _tag: "project.MockScreenSeen", projectId: p.projectId, revisionId: p.revisionId, screenId: p.screenId, author: input.actor }], reply: () => ({ requestId: p.requestId }) }
+})
+export const mockScreenPlanners = { "project.mocks.comment": comment, "project.mocks.screen.approve": approve, "project.mocks.seen": seen }
 export const mockScreenReads = { "project.mocks.screen.read": read }

@@ -76,6 +76,7 @@ export const ProjectMockRpcGroup = RpcGroup.make(
     Schema.Struct({ ...request, review: MockScreenReview }), Schema.Struct({ ...request, data: Schema.String })]), error }),
   Rpc.make("mocks.comment", { payload: { ...project, revisionId: RequestId, screenId: MockScreenId, text: Schema.String.check(Schema.isMaxLength(4096)) }, success: ack, error }),
   Rpc.make("mocks.screen.approve", { payload: { ...project, revisionId: RequestId, screenId: MockScreenId, approved: Schema.Boolean }, success: ack, error }),
+  Rpc.make("mocks.seen", { payload: { ...project, revisionId: RequestId, screenId: MockScreenId }, success: ack, error }),
   Rpc.make("mocks.artifact", { payload: { ...project, revisionId: RequestId, sourceId: MockSourceId }, success: Schema.Union([
     Schema.Struct({ ...request, result: Schema.Union([Schema.TaggedStruct("available", { text: Schema.String.check(Schema.isMaxCodePoints(96 * 1024)), fingerprint: Schema.String }),
       Schema.TaggedStruct("unavailable", { reason: Schema.Literal("artifact unavailable") })]) }), Schema.Struct({ ...request, data: Schema.String })]), error }),
@@ -84,8 +85,9 @@ export const ProjectMockRpcGroup = RpcGroup.make(
 const owner = ["owner"] as const, member = ["owner", "agent"] as const
 export const projectMockAccess = { "project.setup": owner, "project.setup.advance": owner, "project.setup.complete": owner,
   "project.setup.discover": owner, "project.mocks.record": member, "project.mocks.read": member, "project.mocks.artifact": member, "project.mocks.approve": owner,
-  "project.mocks.screen.read": member, "project.mocks.comment": owner, "project.mocks.screen.approve": owner }
+  "project.mocks.screen.read": member, "project.mocks.comment": owner, "project.mocks.screen.approve": owner, "project.mocks.seen": owner }
 export const ProjectMockEvent = Schema.Union([
+  Schema.TaggedStruct("project.MockScreenSeen", { projectId: ProjectId, revisionId: RequestId, screenId: MockScreenId, author: MockAuthor }),
   Schema.TaggedStruct("project.MockScreenApprovalSet", { projectId: ProjectId, revisionId: RequestId, screenId: MockScreenId, approved: Schema.Boolean, author: MockAuthor }),
   Schema.TaggedStruct("project.MockScreenCommented", { projectId: ProjectId, revisionId: RequestId, screenId: MockScreenId, commentId: RequestId, author: MockAuthor, text: Schema.String.check(Schema.isMaxLength(4096)) }),
   Schema.TaggedStruct("project.SetupAdvanced", { step: SetupStep }),

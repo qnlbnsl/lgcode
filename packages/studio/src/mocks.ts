@@ -14,12 +14,12 @@ export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockAppr
       const review = reviews.find((r) => r.projectId === head!.projectId && r.revisionId === head!.revisionId && r.screenId === s.screenId)
       return { id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
         status: (review?.approval?.approved ?? approvedAt !== null) ? "approved" : "draft", rev: head!.revisionId, updatedAt: head!.at,
-        approval: review?.approval ?? null,
+        approval: review?.approval ?? null, seen: review?.seen ?? null,
         comments: (review?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c), text: c.text, ts: c.at })),
         selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } }
     }),
-    changes: items.slice().reverse().map((r) => ({ id: r.revisionId, screen: null, name: r.bundle.screens.map((s) => s.name).join(", "),
-      from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: null, compare: false })),
+    changes: items.slice().reverse().flatMap((r) => r.bundle.screens.map((s) => ({ id: JSON.stringify([r.revisionId, s.screenId]), screen: s.screenId, name: s.name,
+      from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: reviews.some((v) => v.projectId === r.projectId && v.revisionId === r.revisionId && v.screenId === s.screenId && v.seen !== undefined), compare: false }))),
     data: (head?.comparisons ?? []).map((c) => ({ field: [c.field.entity, c.field.name].filter(Boolean).join("."),
       schema: c.status, on: names(c.field.screens).join(", "), sample: "", note: c.field.description })),
     components: (head?.bundle.components ?? []).map((c) => ({ name: c.name, real: c.provenance === "shared", on: names(c.screens), uses: null, note: "", demo: null })),

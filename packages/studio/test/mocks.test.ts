@@ -12,7 +12,7 @@ describe("mock records", () => {
     const mapped = mapMocks([revision], { revisionId: "revision-2", at: 140 } as MockApproval)
     expect(mapped.screens[0]).toMatchObject({ id: "requests", name: "Requests", rev: "revision-2", status: "approved", comments: [], updatedAt: 123, kind: null, note: "Actual summary" })
     expect(mapped.screens[0]!.selection).toEqual({ _tag: "mock", projectId: "project", revisionId: "revision-2", screenId: "requests" })
-    expect(mapped.changes[0]).toMatchObject({ to: "revision-2", from: null, text: "", seen: null, by: "designer" })
+    expect(mapped.changes[0]).toMatchObject({ to: "revision-2", from: null, text: "", seen: false, by: "designer" })
     expect(mapped.data[0]).toEqual({ field: "request.title", schema: "differs", on: "Requests", sample: "", note: "Actual field description" })
     expect(mapped.components[0]).toMatchObject({ real: true, uses: null, demo: null, on: ["Requests"] })
     expect(JSON.stringify(revision)).toBe(before)

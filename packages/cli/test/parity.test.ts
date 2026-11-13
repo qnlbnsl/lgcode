@@ -114,6 +114,7 @@ for (const { command, words, form } of invocations) {
       "project.placement.preview": { name: "Console", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "New" } },
       "project.mocks.comment": { projectId: "project", revisionId: "before", screenId: "home", text: "Use fewer columns." },
       "project.mocks.screen.approve": { projectId: "project", revisionId: "before", screenId: "home", approved: false },
+      "project.mocks.seen": { projectId: "project", revisionId: "before", screenId: "home" },
       "project.mocks.screen.read": { projectId: "project", revisionId: "before", screenId: "home" },
       "project.mocks.record": { projectId: "project", expectedRevision: "before", bundle: { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] } },
       "project.mocks.read": { projectId: "project", after: "before", limit: 1 },

@@ -36,3 +36,12 @@ it("shows only the exact screen version approval and preserves explicit withdraw
   expect(mapMocks([{ ...revision, revisionId: "v2" } as MockRevision], undefined, [review]).screens[0]?.status).toBe("draft")
   expect(mapMocks([revision], { revisionId: "v1", at: 2 } as never, [{ ...review, approval: { ...review.approval!, approved: false } }]).screens[0]?.status).toBe("draft")
 })
+
+it("keeps unseen changes per screen version when a new revision is recorded", () => {
+  const revision = { projectId: "project", revisionId: "v1", at: 1, author: { _tag: "owner" }, artifacts: [], comparisons: [],
+    bundle: { sources: [], screens: [{ screenId: "home", sourceId: "page", name: "Home", route: "/home", scenarioRoutes: [] }], scenarios: [], components: [], draftedFields: [] } } as unknown as MockRevision
+  const review = { projectId: "project", revisionId: "v1", screenId: "home", comments: [], seen: { author: { _tag: "owner" }, at: 3 } } as unknown as MockScreenReview
+  const mapped = mapMocks([revision, { ...revision, revisionId: "v2" } as MockRevision], undefined, [review])
+  expect(mapped.changes.map((c) => [c.screen, c.to, c.seen])).toEqual([["home", "v2", false], ["home", "v1", true]])
+  expect(mapped.screens[0]?.seen).toBeNull()
+})

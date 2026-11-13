@@ -115,6 +115,7 @@ const summaries: Record<CommandName, string> = {
   "project.placement.preview": "Preview actual project placement without reserving paths or creating files.",
   "project.mocks.comment": "Post a plain text owner comment on the current recorded mock screen.",
   "project.mocks.screen.approve": "Approve or withdraw owner approval of one recorded screen without advancing the project stage.",
+  "project.mocks.seen": "Record that the owner has seen exactly one recorded screen version.",
   "project.mocks.screen.read": "Read versioned comments, approval and seen marks on a screen in your project.",
   "project.mocks.record": "Record a project-scoped mock revision with actual artifact references.",
   "project.mocks.read": "Read bounded immutable mock revisions and current owner approval.",

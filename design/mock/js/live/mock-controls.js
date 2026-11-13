@@ -18,3 +18,12 @@ export function approve(project, screen) {
     return true;
   }, screen.status === 'approved' ? 'Approval withdrawn' : 'Screen approved');
 }
+export function markSeen(project, mocks) {
+  return run('mock-seen:' + project.id, async () => {
+    try {
+      for (const change of mocks.changes.filter((c) => !c.seen))
+        await engine.request('project.mocks.seen', { projectId: project.id, revisionId: change.to, screenId: change.screen });
+      return true;
+    } finally { await loadMocks(project.id); }
+  }, 'Changes marked seen');
+}

@@ -88,3 +88,22 @@ it.live("approves and withdraws one screen as the owner without moving the stage
   expect(success(yield* call(owner, "project.mocks.screen.read", { ...f.selection, revisionId: next.revisionId })).review.approval).toBeUndefined()
   expect(failureOf(yield* call(owner, "project.mocks.screen.approve", { ...f.selection, approved: true }))?.reason).toBe("mock revision changed; refresh and retry")
 })))
+
+it.live("stores seen marks at an exact version and keeps historical marks from clearing a new version", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* seedScreens(rig), requestId = freshRequest()
+  expect(failureOf(yield* call(agentCredential(f.designer.token), "project.mocks.seen", f.selection))?.reason).toBe("command refused")
+  success(yield* call(owner, "project.mocks.seen", { ...f.selection, requestId }))
+  const rows = yield* readLog
+  success(yield* call(owner, "project.mocks.seen", { ...f.selection, requestId }))
+  expect(yield* readLog).toEqual(rows)
+  const first = success(yield* call(owner, "project.mocks.screen.read", f.selection)).review
+  expect(first.seen).toMatchObject({ author: { _tag: "owner" }, at: expect.any(Number) })
+  const next = success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: f.revisionId, bundle: screenBundle() }))
+  expect(success(yield* call(owner, "project.mocks.screen.read", { ...f.selection, revisionId: next.revisionId })).review.seen).toBeUndefined()
+  success(yield* call(owner, "project.mocks.seen", f.selection))
+  expect(success(yield* call(owner, "project.mocks.screen.read", { ...f.selection, revisionId: next.revisionId })).review.seen).toBeUndefined()
+  for (const screenId of ['../../outside', '$(touch escaped)', '--upload-pack=evil', '`touch escaped`'])
+    expect(failureOf(yield* call(owner, "project.mocks.seen", { ...f.selection, screenId }))?.reason).toBe("mock screen is unavailable")
+  expect(existsSync(join(rig.work, "escaped"))).toBe(false)
+  expect(success(yield* call(agentCredential(f.designer.token), "project.mocks.screen.read", f.selection)).data).toContain('"seen":')
+})))
