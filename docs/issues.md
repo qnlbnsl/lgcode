@@ -11126,3 +11126,18 @@ The mock's fallback reason said "Nothing assigned" for that agent.
 The live lane now leaves the reason empty when the engine supplies no reason.
 The linked task remains visible.
 The standalone mock keeps its original wording.
+
+## s2-chat-9. The existing project-creation logout journey can time out.
+
+Found: 2026-11-13, during the full remote check of `8577d48`.
+State: open.
+
+The case at `packages/web/e2e/new-project.spec.ts:225` reached its unchanged 30-second limit.
+The other 45 browser cases passed.
+The captured page showed the Machines registration form with its default values after login.
+The snapshot does not establish which awaited operation exhausted the limit.
+The same case passed alone at the required baseline, `8f9f321`.
+A bounded five-run comparison at that baseline then produced four identical timeouts and one pass.
+The production web source, engine source, and affected test file are unchanged from that baseline.
+The cause remains unproved.
+The task result records the complete checks and baseline comparisons.
