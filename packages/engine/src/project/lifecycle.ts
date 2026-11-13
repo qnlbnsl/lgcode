@@ -1,3 +1,4 @@
+import { openDefaultProjectChannels } from "./defaultChannels.ts"
 import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
 import { ProjectCreation, ProjectId, RepositoryId, WorkspaceId, type Event } from "@lgtm/contracts"
@@ -114,6 +115,7 @@ const checkCreationBindings = (observed: Input, current: Input, plan: ProjectCre
     || !same(locations(before), locations(now)) || !same(workspaces(before), workspaces(now))) return yield* refused("project state changed; refresh and retry")
 })
 const admitCreation = (input: Input, plan: ProjectCreation) => Effect.gen(function* () {
+  if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled")
   yield* dedicatedCreation(plan)
   const view = projectView(input.snapshot)
   if (duplicateName(input, { repoId: plan.repository.repoId, machineId: plan.workspace.machineId, name: plan.name }, plan.projectId)
@@ -132,6 +134,7 @@ const admitCreation = (input: Input, plan: ProjectCreation) => Effect.gen(functi
 export const prepareProjectLifecycle = (input: Input, name: string, payload: Record<string, unknown>, bodyHash: string) => Effect.gen(function* () {
   const runtime = input.runtime
   if (name === "project.create") {
+    if (runtime.lists?.boardEnabled === false) return yield* refused("board disabled")
     const p = payload as Payload<"project.create">
     const existing = own(projectView(input.snapshot).creations, p.requestId)
     if (existing !== undefined && existing.bodyHash !== bodyHash) return yield* refused("request id reused")
@@ -261,6 +264,7 @@ const finishCreation = (observed: Input, observedPlan: ProjectCreation, mainBran
     ...launch.events,
     { _tag: "project.Created", projectId: plan.projectId, repoId: plan.repository.repoId, name: plan.name, goal: plan.goal,
       leadAgentId: started.agentId, worktreeId: plan.workspace.worktreeId, machineId: plan.workspace.machineId, shell: plan.shell, stage: "plan" },
+    ...openDefaultProjectChannels({ projectId: plan.projectId, leadAgentId: started.agentId }),
     { _tag: "project.CreationFinished", creationRequestId: p.requestId }
   ], reply: () => ({ requestId: p.requestId, projectId: plan.projectId }) }
 })

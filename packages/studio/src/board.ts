@@ -36,7 +36,8 @@ export function mapChannels(rows: ReadonlyArray<Channel>, records: Pick<EngineRe
     const team = records.teams.find((t) => (t as typeof t & { channelId?: string }).channelId === row.channelId)
     const members = row.members.map(authorId)
     if (row.group !== undefined) for (const a of records.agents) if (a.team === team?.id && !members.includes(a.id)) members.push(a.id)
-    const projects = team ? [team.project] : [...new Set(records.agents.filter((a) => members.includes(a.id) || a.id === row.anchorAgentId).map((a) => a.project))]
+    const anchorProject = records.projects.find((project) => project.lead === row.anchorAgentId)
+    const projects = team ? [team.project] : anchorProject ? [anchorProject.id] : [...new Set(records.agents.filter((a) => members.includes(a.id) || a.id === row.anchorAgentId).map((a) => a.project))]
     return projects.map((project) => ({ id: row.channelId, project, kind: row.kind === "direct" ? "dm" : team ? "team" : "plain",
       name: team?.name ?? row.name, team: team?.id ?? null, members }))
   })

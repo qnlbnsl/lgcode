@@ -903,3 +903,78 @@ test("live website: subscriptions, notifications and service settings persist th
 
 
 test('live website: Git changes, history, remotes, integration and owner approval', async ({ page }) => { test.setTimeout(360_000); await exerciseStudioGit(page) })
+
+test("live messages: a new project has General and Leads and accepts an owner post", async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  page.setDefaultTimeout(5_000)
+  const rig = makeRig(), previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
+  const password = randomBytes(32).toString("base64url"), errors: string[] = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  page.on("console", (message) => { if (message.type() === "error" && !/status of 401/.test(message.text())) errors.push(message.text()) })
+  try {
+    execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
+    execFileSync("git", ["-C", rig.work, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
+    const studioRoot = await buildStudio(join(rig.root, "studio")), staticRoot = join(rig.root, "old-page"), port = await unusedPort()
+    mkdirSync(staticRoot); writeFileSync(join(staticRoot, "index.html"), "<!doctype html><title>Old page</title>")
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const runner = yield* makeFakeRunner()
+      const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, {
+        redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text)
+      }))
+      yield* Effect.scoped(Effect.gen(function* () {
+        yield* registerRebuildCheck()
+        yield* seedAccount("setup-ready", "cursor")
+        success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", {
+          adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }]
+        }) }))
+        success(yield* call(ownerCredential, "accounts set-secret", { accountId: "setup-ready", name: "CURSOR_API_KEY", nonce: "studio-setup", value: Redacted.make("synthetic-studio-setup-key") }))
+        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
+          settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          await page.goto(`${origin}/studio/`)
+          await page.locator("#login-password").fill(password)
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Connect a subscription", exact: true })).toBeVisible()
+          await expect(page.locator(".auth-options")).toContainText("local-credential")
+          await expect(page.locator(".auth-options")).not.toContainText("WXKP-3QHD")
+          await page.getByRole("button", { name: "Skip setup", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await page.locator("#setup-workspace").fill(rig.root)
+          await page.locator("#setup-shell").fill("bash")
+          await page.locator("#setup-owner").fill("Setup Owner")
+          await page.getByRole("button", { name: "Continue", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Add a repository", exact: true })).toBeVisible()
+          await page.locator("#setup-path").fill(rig.work)
+          await page.getByRole("button", { name: "Continue", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Start the first project", exact: true })).toBeVisible()
+          await page.locator("#setup-goal").fill("Build a first board")
+          await page.getByRole("button", { name: "Create project", exact: true }).click()
+          await expect(page.locator(".topbar")).toContainText("First board")
+          await expect(page.locator(".sidebar")).toContainText("Setup Owner")
+          await page.getByRole("tab", { name: "Messages", exact: true }).click()
+          const channels = page.getByRole("navigation", { name: "Channels", exact: true })
+          await expect(channels.getByRole("link", { name: "General", exact: true })).toBeVisible()
+          await expect(channels.getByRole("link", { name: "Leads", exact: true })).toBeVisible()
+          await channels.getByRole("link", { name: "General", exact: true }).click()
+          await page.getByRole("textbox", { name: /^Post to General/ }).fill("Owner post in the project board")
+          await page.getByRole("textbox", { name: /^Post to General/ }).press("Enter")
+          await expect(page.locator(".mb-scroll[data-main]")).toContainText("Owner post in the project board")
+          await page.reload()
+          await expect(page.locator(".mb-scroll[data-main]")).toContainText("Owner post in the project board")
+        })
+        const setup = success(yield* call(ownerCredential, "project.setup", {})).setup
+        expect(setup.completedAt).toBeDefined()
+        expect(runner.calls.filter((row) => row.method === "start")).toHaveLength(1)
+        const settings = success(yield* call(ownerCredential, "project.settings", {})).settings
+        expect(settings).toMatchObject({ workspaceFolder: rig.root, shell: "bash", displayName: "Setup Owner" })
+      })).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
+    })).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<void, unknown, never>)
+    expect(errors).toEqual([])
+  } finally {
+    if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome
+    removeRig(rig)
+  }
+})

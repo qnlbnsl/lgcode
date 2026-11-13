@@ -1,3 +1,4 @@
+import { openDefaultProjectChannels } from "../project/defaultChannels.ts";
 import { randomUUID } from "node:crypto";
 import { eventEffect, pieceNamespaces, projectTeamGroup, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
@@ -27,7 +28,7 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
   // A project team and its group channel are one atomic record operation.
   // This exception permits only the matching channel, never arbitrary board writes.
   const teamChannel = (event: Event): boolean => {
-    if (namespace !== "project" || event._tag !== "board.ChannelOpened" || event.kind !== "group") return false;
+    if (lists.boardEnabled === false || namespace !== "project" || event._tag !== "board.ChannelOpened" || event.kind !== "group") return false;
     const team = batch.events.find((row) => row._tag === "project.TeamAdded" && row.channelId === event.channelId);
     if (team?._tag !== "project.TeamAdded") return false;
     const project = own(projectView(snapshot).projects, team.projectId);
@@ -39,7 +40,29 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
       && !Object.hasOwn((snapshot.board as import("@lgtm/contracts").BoardView).channels, event.channelId)
       && (caller?._tag === "owner" || caller?._tag === "agent" && caller.agentId === project.leadAgentId);
   };
-  if (batch.events.some((event) => !event._tag.startsWith(`${namespace}.`) && event._tag !== "DeliveryWithdrawn" && !teamChannel(event))) return yield* refused();
+  // Only an owner-created, absent project can carry its complete initial set.
+  // Match every field, reject duplicate ids, and leave all other board events
+  // subject to the existing namespace boundary.
+  const defaultChannels = new Set<Event>();
+  if (lists.boardEnabled !== false && namespace === "project" && caller?._tag === "owner") {
+    const created = batch.events.filter((event) => event._tag === "project.Created");
+    if (created.length === 1) {
+      const project = created[0]!;
+      if (own(projectView(snapshot).projects, project.projectId) === undefined) {
+        const expected = openDefaultProjectChannels(project);
+        const sameAuthor = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+        const matches = expected.map((wanted) => batch.events.filter((event) => event._tag === "board.ChannelOpened"
+          && event.channelId === wanted.channelId && event.name === wanted.name && event.kind === wanted.kind
+          && event.anchorAgentId === wanted.anchorAgentId && event.group === undefined
+          && sameAuthor(event.opener, wanted.opener) && sameAuthor(event.manager, wanted.manager)
+          && sameAuthor(event.members, wanted.members)
+          && !Object.hasOwn((snapshot.board as import("@lgtm/contracts").BoardView).channels, event.channelId)
+          && batch.events.filter((row) => row._tag === "board.ChannelOpened" && row.channelId === event.channelId).length === 1));
+        if (matches.every((rows) => rows.length === 1)) for (const rows of matches) defaultChannels.add(rows[0]!);
+      }
+    }
+  }
+  if (batch.events.some((event) => !event._tag.startsWith(`${namespace}.`) && event._tag !== "DeliveryWithdrawn" && !teamChannel(event) && !defaultChannels.has(event))) return yield* refused();
   const events: Array<Event> = [];
   let state = snapshot;
   for (const event of batch.events) {

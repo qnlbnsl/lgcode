@@ -11,6 +11,7 @@ import { definitions } from "./client/support.ts";
 import { maximalContent, maximalFile, maximalRoleFileEvent } from "./roles/maximalRoleFile.ts";
 
 interface Limits {
+  readonly channelMembers: number;
   readonly postCharacters: number;
   readonly addressees: number;
   readonly wakeBytes: number;
@@ -34,7 +35,7 @@ const eventBytes = (event: unknown) => {
 };
 
 it("1.11 declared limits keep the board's largest data within the API budgets", () => {
-  expect(limits()).toEqual({ postCharacters: 16_384, addressees: 16, wakeBytes: 256 * 1024, pageBytes: 512 * 1024, completionReplyIds: 17 });
+  expect(limits()).toEqual({ channelMembers: 64, postCharacters: 16_384, addressees: 16, wakeBytes: 256 * 1024, pageBytes: 512 * 1024, completionReplyIds: 17 });
 });
 it("1.11 a PostWritten of 16,384 four-byte characters and sixteen addressees stays below the marker threshold", () => {
   limits();
