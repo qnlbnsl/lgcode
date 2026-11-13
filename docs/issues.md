@@ -11015,3 +11015,15 @@ The fix points the profile at `http://127.0.0.1:4178/mock/#/home` and copies the
 The components are now Button, Status dot, Agent row, Connection status, Segmented control, Inline link, Count and Badge.
 The agent rows show role names, such as Builder 2, in place of the invented name Rowan.
 `design/lgtm.fig` was made again from the rebuilt mock, and 15 of its 32 variants match the browser within 3 percent.
+
+## 622. The Machines page counts capacity-held agents as agent slots
+
+Found: 2026-11-13, while writing the checked gap table for connecting the mock.
+State: open.
+
+The current website's Machines page shows a number of held agent slots (`packages/web/src/admin/machines.tsx:20-21`).
+It counts the agents whose `capacityHeld` flag is true.
+That flag means a delivery was held because the model provider was at capacity (`packages/engine/src/routing/deliveries.ts:246`).
+It does not mean a machine slot is in use, so the number is wrong.
+The engine has no agent-slot record for a machine.
+The gap table is `.plans/plans/connect-mock/gap-table.md`.
