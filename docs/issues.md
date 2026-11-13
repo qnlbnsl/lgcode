@@ -11865,3 +11865,19 @@ These automatic channels can repeat those names across projects.
 The board's manual open command still requires a unique name for each manager.
 The owner therefore cannot manually open another General channel or another Leads channel.
 The rule remains unchanged pending an owner decision.
+
+## 693. Two Git browser journeys failed intermittently during the channel review checks.
+
+Found on 2026-11-13 while verifying the default-channel review fixes.
+The complete browser run passed 49 cases and failed two Git cases.
+The fetch, pull, and push journey timed out after five seconds waiting for "push completed.".
+Its saved page still showed "push: Waiting for acknowledgment…".
+The Studio Git journey timed out clicking "Approve without evidence".
+Its saved page showed that button and a reconnecting connection.
+The page also reported that the engine socket could not be opened.
+The cause is not established.
+The review fixes did not change production Git behavior.
+The failing snapshots and command output are retained in the worker's local foundry logs.
+Both failing journeys passed when rerun serially without changing their test or production code.
+The focused rerun reported two passes in 3.1 minutes.
+The cause remains open.
