@@ -877,12 +877,15 @@ it.live("review 12: project-wide Git readers include other team builders, but ex
   const builder = yield* run(f.api, "project.workspace.register", { repoId: f.repoId, path: builderPath, branch: "access-builder", machineId: "local", checkout: "worktree", parentId: team.worktreeId });
   save(builderPath, "file.txt", "builder\n"); const head = commit(builderPath, "Builder");
   save(teamPath, "file.txt", "team\n"); commit(teamPath, "Team"); expect(() => git(builderPath, "merge", "access-team")).toThrow();
-  const sibling = yield* seedAgent({ id: "other-team-reader", parent, folder: f.source, groups: ["other-team"] });
+  const otherPath = join(rig.root, "other-team"); git(f.source, "worktree", "add", "-b", "other-team", otherPath);
+  const otherWorkspace = yield* run(f.api, "project.workspace.register", { repoId: f.repoId, path: otherPath, branch: "other-team", machineId: "local", checkout: "worktree", parentId: f.worktreeId });
+  const otherTeamRecord = yield* run(f.api, "project.team.create", { projectId: f.projectId, name: "Other", worktreeId: otherWorkspace.worktreeId });
+  const sibling = yield* seedAgent({ id: "other-team-reader", parent, folder: otherPath, groups: [otherTeamRecord.group] });
   const outsider = yield* seedAgent({ id: "outside-project" });
   const member = yield* client(f.socket, f.member.token), otherTeam = yield* client(f.socket, sibling.token), foreign = yield* client(f.socket, outsider.token);
   for (const [name, extra] of [["project.changes", {}], ["project.diff", { path: "file.txt" }], ["project.history", {}], ["project.commit.files", { commit: head }], ["project.git.state", {}], ["project.review", { base: "access-team" }], ["project.conflict", { path: "file.txt" }]] as const) {
     const p = { projectId: f.projectId, worktreeId: builder.worktreeId, ...extra };
-    expect((yield* run(f.api, name, p)).result).toBeDefined();
+    expect((yield* run(f.api, name, { worktreeId: builder.worktreeId, ...extra })).result).toBeDefined();
     expect((yield* run(member, name, p)).data).toBeTypeOf("string");
     expect((yield* run(otherTeam, name, p)).data).toBeTypeOf("string");
     expect(yield* refusal(run(foreign, name, p))).toBe("project is unavailable to this caller");
