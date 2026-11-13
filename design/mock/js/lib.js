@@ -95,7 +95,7 @@ export function refuse() {
 }
 export function useStore() {
   const [, bump] = useReducer((n) => n + 1, 0);
-  useEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
+  useLayoutEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
   return store.state;
 }
 

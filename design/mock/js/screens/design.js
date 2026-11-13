@@ -285,7 +285,7 @@ export function RepoDesign({ s, repoId, route }) {
       <span class="grow"></span>
       ${d && html`<span class="dz-file muted not-phone" title=${d.file}><span class="mono">${d.file}</span> · ${ago(d.changedAt, now) === 'now' ? 'just now' : ago(d.changedAt, now) + ' ago'}${by ? ` · ${by.name}` : ''}</span>`}
       <${DesignCanvasControls} key=${cat + item} />
-      ${d ? html`<button type="button" class="btn sm primary" onClick=${() => act.toast(`Opening ${page} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${13} /><span class="not-phone">Open in OpenPencil</span></button>`
+      ${d ? html`<button type="button" class="btn sm primary" onClick=${() => { if (act.refused()) return; act.toast(`Opening ${page} in OpenPencil`); }}><${Icon} name="pencil-ruler" size=${13} /><span class="not-phone">Open in OpenPencil</span></button>`
         : html`<button type="button" class="btn sm primary" onClick=${create}><${Icon} name="plus" size=${13} />Create design file</button>`}
     </div>
     <${DesignCanvas} key=${cat + item + (t ? 't' : '')} cat=${cat} item=${item} page=${page} flow=${flow} t=${t} hasFile=${hasFile} />

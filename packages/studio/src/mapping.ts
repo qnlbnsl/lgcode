@@ -304,20 +304,52 @@ export function mapSnapshot(snapshot: Pick<ClientSnapshot, "agents" | "requests"
     sequence: 0 as ProjectSection["sequence"], truncated: false,
     projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: []
   }
-  const projects = section.projects.map((p) => mapProject(p, section.workspaces))
-  const agents = snapshot.agents.flatMap((a) => mapAgent(a, section) ?? [])
+  // Each list is bounded independently. Keep children only with their required parents,
+  // and clear optional links when their target was omitted. Never invent a parent record.
+  const repos = section.repositories.map((r) => mapRepository(r, section.workspaces))
+  const projects = section.projects.filter((p) => repos.some((r) => r.id === p.repoId)).map((p) => mapProject(p, section.workspaces))
+  const projectExists = (id: string) => projects.some((p) => p.id === id)
+  const teams = section.teams.filter((t) => projectExists(t.projectId)).map((t) => mapTeam(t, section.workspaces))
+  const summaries = [...section.agents]
+  for (const agent of snapshot.agents) {
+    if (summaries.some((row) => row.agentId === agent.agentId)) continue
+    // Retained group membership, task ownership and request displays also prove project
+    // membership when the final agent summaries did not fit. Ambiguous evidence is omitted.
+    const candidates = new Set([
+      ...section.teams.filter((t) => t.group !== undefined && agent.groups.includes(t.group)).map((t) => t.projectId),
+      ...section.tasks.filter((t) => t.owner === agent.agentId).map((t) => t.projectId),
+      ...section.sprints.filter((sp) => sp.owner === agent.agentId).map((sp) => sp.projectId),
+      ...[...snapshot.requests, ...snapshot.questions].filter((r) => r.agentId === agent.agentId).flatMap((r) => r.display?.projectId ?? [])
+    ])
+    if (candidates.size === 1) summaries.push({ agentId: agent.agentId, projectId: [...candidates][0]!, status: "Ready" })
+  }
+  const agents = snapshot.agents.flatMap((a) => mapAgent(a, { ...section,
+    projects: section.projects.filter((p) => projectExists(p.projectId)), agents: summaries,
+    teams: section.teams.filter((t) => teams.some((mapped) => mapped.id === t.teamId))
+  }) ?? []).filter((a) => projectExists(a.project))
   for (const project of projects) if (!agents.some((a) => a.id === project.lead)) agents.push(placeholderLead(project))
+  const sprints = section.sprints.filter((sp) => projectExists(sp.projectId)).map((sp) => mapSprint(sp, section.tasks))
+  const tasks = section.tasks.map(mapTask).filter((t) => projectExists(t.project)
+    && sprints.some((sp) => sp.id === t.sprint && sp.project === t.project)
+    && teams.some((team) => team.id === t.team && team.project === t.project)
+    && agents.some((a) => a.id === t.owner && a.project === t.project))
   const requests = [
     ...snapshot.requests.flatMap((row) => mapRequest(row, "approval", agents) ?? []),
     ...snapshot.questions.flatMap((row) => mapRequest(row, "question", agents) ?? [])
-  ]
+  ].filter((r) => projectExists(r.project) && agents.some((a) => a.id === r.agent && a.project === r.project)
+    && (r.heldBy === null || agents.some((a) => a.id === r.heldBy)))
+    .map((r) => ({ ...r, task: tasks.some((t) => t.id === r.task && t.project === r.project) ? r.task : null }))
   const machines = mapMachines(section, now)
   return {
     machines, subscriptions: mapSubscriptions(snapshot.accounts, snapshot.agents, machines[0]?.id ?? ""),
-    repos: section.repositories.map((r) => mapRepository(r, section.workspaces)),
-    projects, teams: section.teams.map((t) => mapTeam(t, section.workspaces)), agents, requests,
-    worktrees: section.workspaces.map((w) => mapWorktree(w, section.workspaces, section.projects)),
-    sprints: section.sprints.map((s) => mapSprint(s, section.tasks)), tasks: section.tasks.map(mapTask)
+    repos, projects, teams, agents, requests,
+    worktrees: section.workspaces.filter((w) => repos.some((r) => r.id === w.repoId)
+      && (w.projectId === undefined || projectExists(w.projectId))
+      && (w.teamId === undefined || teams.some((t) => t.id === w.teamId)))
+      .map((w) => mapWorktree(w, section.workspaces, section.projects))
+      .map((w) => ({ ...w, owner: agents.some((a) => a.id === w.owner) ? w.owner : null })),
+    sprints: sprints.map((sp) => ({ ...sp, team: tasks.find((t) => t.sprint === sp.id)?.team ?? null,
+      dependsOn: sp.dependsOn.filter((id) => sprints.some((other) => other.id === id && other.project === sp.project)) })), tasks
   }
 }
 

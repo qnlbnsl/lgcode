@@ -11127,3 +11127,115 @@ The Git synchronization case retained "1 incoming" after Pull.
 The registered component preview case did not observe the expected document response.
 The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
 The result file records the baseline checks for these failures.
+
+## 635. A failed logout claimed that the engine had ended the session.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The connection treated every logout response as a confirmed session revocation.
+It now removes the records immediately and shows a persistent warning unless the engine confirms the logout.
+An older session probe could also restore the records after logout.
+Session attempts now invalidate older replies.
+
+## 636. Truncated snapshots left references to missing records.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The mapping retained requests whose agents were absent from the mapped roster.
+Other bounded lists could leave missing repositories, projects, teams, sprints, tasks, or request holders.
+The mapping now recovers agent membership from unambiguous retained evidence.
+It omits children with missing required parents and clears optional links to omitted records.
+It does not turn a missing request holder into an owner-held request.
+
+## 637. Account and configuration events left the website stale.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Four account and configuration event types advanced the subscription cursor without refreshing mapped records.
+Those events now request a fresh snapshot before advancing the cursor.
+Oversized event markers use the same refresh rule.
+
+## 638. Lifecycle updates kept the previous activity text.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+An agent could resume working while its activity still said that it was signed out.
+The connection now recomputes the display state with the contracts helper.
+
+## 639. Failed retries postponed the offline deadline.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Every failed attempt restarted the offline timer and claimed a new contact time.
+Retries now share one outage deadline.
+Only a successful connection or a received stream item updates the last contact time.
+
+## 640. Refused settings changes still displayed Saved.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The Saved indicator bypassed the store's refusal guard.
+Its write now passes through the guarded update function.
+
+## 641. Unconnected controls simulated successful service actions.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Reconnect now claimed success before the connection answered.
+Update checks, workflow checks, restarts, and harness scans also simulated successful work.
+The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
+Unconnected actions now show the required refusal notice before their simulation starts.
+Reconnect now leaves its status to the real connection.
+The standalone mock retains its simulation.
+
+## 642. The logout test supplied its own record cleanup.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The previous rendering test supplied an ended session and empty records itself.
+Its name now describes that limited assertion.
+New tests invoke the actual logout control through the real connection.
+They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## 643. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: open.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
+
+## 644. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.

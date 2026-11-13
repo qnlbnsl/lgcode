@@ -556,7 +556,7 @@ function Changes({ s, w, mode, phone }) {
   const can = staged.length > 0 && msg.trim().length > 0 && !w.merge;
   const commitNow = () => { if (!can) return; doCommit(w.id, msg.trim()); setUi({ message: '', file: null }); };
   const [writing, setWriting] = useState(false);
-  const generate = () => { if (!staged.length || writing) return; setWriting(true); setTimeout(() => { setWriting(false); setUi({ message: act.commitMessage(staged.map((f) => f.path)) }); }, 900); };
+  const generate = () => { if (!staged.length || writing) return; if (act.refused()) return; setWriting(true); setTimeout(() => { setWriting(false); setUi({ message: act.commitMessage(staged.map((f) => f.path)) }); }, 900); };
   const why = w.merge ? 'Finish or abort the merge first' : !staged.length ? 'Stage a file first' : !msg.trim() ? 'Write a message first' : '';
   if (!w.files.length) {
     return html`<div class="git-clean"><${Empty} title="Nothing to commit" icon="circle-check">
