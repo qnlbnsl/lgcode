@@ -256,6 +256,8 @@ export interface CredentialRegistry {
   // inspected. While it cannot, a token written there is unknown to the
   // redactor, so its process's output must be withheld (fix round 1, F3).
   readonly healthy: (source: CredentialSource) => boolean;
+  // A diagnostic subprocess may print any file-backed account token.
+  readonly healthyAll: () => boolean;
 }
 
 export const makeCredentialRegistry = (): CredentialRegistry => {
@@ -282,6 +284,15 @@ export const makeCredentialRegistry = (): CredentialRegistry => {
       const exit = Effect.runSyncExit((sources.get(JSON.stringify(source.paths)) ?? source).read);
       if (Exit.isSuccess(exit)) remember(exit.value);
       return Exit.isSuccess(exit);
+    },
+    healthyAll: () => {
+      let healthy = true;
+      for (const source of sources.values()) {
+        const exit = Effect.runSyncExit(source.read);
+        if (Exit.isSuccess(exit)) remember(exit.value);
+        else healthy = false;
+      }
+      return healthy;
     },
     secrets: () => {
       for (const source of sources.values()) {

@@ -25,7 +25,7 @@ export const EventReply = Schema.Struct({ ...request, envelope: EventEnvelope })
 // Definitions only. A unit installs its subset into CommandsRpcGroup when it
 // supplies the handlers, so the running service never advertises a stub.
 export const ClientRpcGroup = RpcGroup.make(
-  Rpc.make("harness.status", { payload: request,
+  Rpc.make("harness.status", { payload: { ...request, refresh: Schema.optionalKey(Schema.Boolean) },
     success: Schema.Struct({ ...request, harnesses: Schema.Array(HarnessInstallation) }), error: Refused }),
   Rpc.make("harness.recipe", { payload: { ...request, harnessId: HarnessId },
     success: Schema.Struct({ ...request, recipe: HarnessRecipe }), error: Refused }),

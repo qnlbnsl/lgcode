@@ -6,6 +6,7 @@ import { Redactor } from "../../src/log/Redactor.ts"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { makeHarnessPrograms, runRecipe } from "../../src/harnesses/programs.ts"
+import { fixtureHarnessPrograms } from "../support/fixtureHarnessPrograms.ts"
 import { installRecipes } from "../../src/harnesses/recipes.ts"
 import { makeRig, removeRig, provideRig, makeFakeSecrets, call, ownerCredential, success, harnessSettings, appendSetup, eventOf, seedAgent, agentCredential, readLog } from "../support/handlerRig.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
@@ -54,7 +55,7 @@ it.live("redacts the entire version before shortening it for the client", () => 
     redactor: Layer.succeed(Redactor, { redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text.replaceAll("synthetic-secret", "[REDACTED]")) }) }, Effect.gen(function* () {
     yield* registerRebuildCheck()
     yield* appendSetup([eventOf({ _tag: "HarnessChanged", harness: harnessSettings("first", { adapterPath: executable }) })])
-    const result = success(yield* call(ownerCredential, "client.harness.status", {}))
+    const result = success(yield* call(ownerCredential, "client.harness.status", { refresh: true }))
     expect(result.harnesses.find((h: any) => h.harnessId === "first").version).toBe("x".repeat(195) + "[REDA")
   }))
 }))
@@ -64,7 +65,7 @@ it.live("reads missing programs, shows an exact fake recipe, installs once, reda
   const executable = join(rig.root, "fake-harness")
   const script = join(rig.root, "install.cjs")
   writeFileSync(script, `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(executable)}, '#!/bin/sh\\necho 1.2.3\\n');fs.chmodSync(${JSON.stringify(executable)}, 0o700);process.stdout.write('synthetic-secret');`)
-  const programs = makeHarnessPrograms({ home: rig.home, path: "", recipes: [{ harnessId: "first", name: "Fixture", executable: "fake-harness", automatic: true, packages: ["fixture@1.2.3"], registry: "https://registry.npmjs.org", source: "https://example.test/install", signIn: ["fake-harness", "login"], steps: [{ executable: process.execPath, args: [script] }] }] })
+  const programs = fixtureHarnessPrograms({ home: rig.home, executable, script })
   const runner = yield* makeFakeRunner()
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs,
     redactor: Layer.succeed(Redactor, { redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text.replaceAll("synthetic-secret", "[REDACTED]")) }) }, Effect.gen(function* () {

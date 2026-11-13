@@ -18,7 +18,7 @@ export function mapInstalledHarnesses(bases: ReturnType<typeof mapHarnesses>, in
     const recipe = recipes.find((r) => r?.harnessId === row.harnessId)
     const base = bases[row.harnessId] ?? { name: row.harnessId, models: [], efforts: [], noEffort: [], runMode: "ACP" }
     const quote = (words: ReadonlyArray<string>) => words.map((word) => `'${word.replaceAll("'", "'\\''")}'`).join(" ")
-    return [row.harnessId, { ...base, ...row, ...(recipe ? { name: recipe.name, recipe,
+    return [row.harnessId, { ...base, ...row, installationReason: row.reason, reason: "reason" in base ? base.reason : undefined, ...(recipe ? { name: recipe.name, recipe,
       signInCommand: row.path ? quote([row.path, ...recipe.signInArguments]) : recipe.signInCommand } : {}),
       defaultModel: row.settings?.defaultModel ?? "", defaultEffort: row.settings?.defaultEffort ?? "" }]
   }))

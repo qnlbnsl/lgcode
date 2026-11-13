@@ -41,7 +41,7 @@ export function seedService(st) {
   for (const [id, h] of Object.entries(HARNESSES)) {
     const pkg = { claude: '@anthropic-ai/claude-code@2.1.325', codex: '@openai/codex@0.166.0', gemini: '@google/gemini-cli@0.68.0' }[id];
     Object.assign(h, { installed: ['claude', 'codex'].includes(id), version: more.studio.harnesses[id], defaultModel: h.models[0] || '', defaultEffort: h.efforts[1] || '' });
-    h.recipe = { automatic: id !== 'cursor', packages: pkg ? [pkg] : [], commands: [pkg ? `npm install --global --prefix '/home/maya/.local/share/lgtm/harnesses' --registry 'https://registry.npmjs.org' --no-audit --no-fund '${pkg}'` : 'curl https://cursor.com/install -fsS | bash'], source: { claude: 'https://code.claude.com/docs/en/setup', codex: 'https://learn.chatgpt.com/docs/codex/cli', gemini: 'https://geminicli.com/docs/get-started/installation/', cursor: 'https://cursor.com/docs/cli/installation' }[id], signInCommand: { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini', cursor: 'agent login' }[id], reason: id === 'cursor' ? 'Run the official installer in your terminal, then check again.' : '' };
+    h.recipe = { automatic: !['claude', 'cursor'].includes(id), packages: pkg ? [pkg] : [], commands: [id === 'claude' ? `npm install -g ${pkg}` : pkg ? `'/usr/local/bin/node' '/usr/local/lib/node_modules/npm/bin/npm-cli.js' 'ci' '--prefix' '/home/maya/.local/share/lgtm/harnesses/${id}' '--registry' 'https://registry.npmjs.org' '--ignore-scripts' '--no-audit' '--no-fund'` : 'curl https://cursor.com/install -fsS | bash'], source: { claude: 'https://code.claude.com/docs/en/setup', codex: 'https://learn.chatgpt.com/docs/changelog', gemini: 'https://geminicli.com/docs/get-started/installation/', cursor: 'https://cursor.com/docs/cli/installation' }[id], signInCommand: { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini', cursor: 'agent login' }[id], reason: ['claude', 'cursor'].includes(id) ? 'Run the official installer in your terminal, then check again.' : 'Install scripts are disabled. The committed lockfile fixes the dependency tree and integrity hashes.' };
   }
 
   // What the bell has shown, newest first, and whether each one reached the phone.
@@ -329,9 +329,11 @@ function SubRow({ s, x, now }) {
 export function Harnesses({ s }) {
   useEffect(() => liveGit.openScreen('harnesses'), []);
   const now = useNow(30_000);
+  const signed = s.subscriptions.filter((x) => x.signedIn).length, limited = s.subscriptions.filter((x) => /limit reached/i.test(subState(x).word)).length;
   return html`<div class="view-body"><div class="page">
     <div class="page-head"><h1 class="page-title">Harnesses</h1><${Saved} s=${s} /><span class="grow"></span>
       <button type="button" class="btn" disabled=${live.on && liveGit.busy('read-service')} onClick=${() => live.on ? liveGit.checkHarnesses() : act.toast('Sample harnesses checked.')}><${Icon} name="refresh-cw" size=${14} />Check again</button></div>
+    <p class="muted">${signed} of ${s.subscriptions.length} signed in, ${limited} at its limit</p>
     ${live.on && (liveGit.busy('subscriptions') || liveGit.busy('settings')) && html`<span role="status">Saving…</span>`}
     <fieldset disabled=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0" aria-busy=${live.on && liveGit.busy('read-service')}><div data-main>
     ${(!live.on || s.ui.serviceReady) && html`<${Section} title="Defaults for new project leads"><${HarnessDefaults} s=${s} /><//>`}
@@ -341,6 +343,7 @@ export function Harnesses({ s }) {
         <div class="section-head"><h2>${h.name}</h2><span class=${cx('badge outline', !h.installed && 'warn')}>${h.installed ? 'Installed' + (h.version ? ' · ' + h.version : '') : 'Not installed'}</span><span class="grow"></span>
           <button type="button" class="btn sm" onClick=${() => act.openDialog({ type: 'add-subscription', harness: hid })}><${Icon} name="plus" size=${13} />Add account</button></div>
         ${h.path && html`<p class="mono muted">${h.path}</p>`}
+        ${h.installationReason && html`<p class="muted">${h.installationReason}</p>`}
         <div class="svc-rows">
           <${Row} label="Run mode" id=${'hm-' + hid}><select id=${'hm-' + hid} class="select" value=${h.runMode?.toLowerCase()} onChange=${(e) => save({ runMode: e.target.value })}><option value="acp">Agent Client Protocol (ACP)</option><option value="interactive">Interactive</option></select><//>
           <${Row} label="Default model" id=${'hmodel-' + hid}>${h.models.length ? html`<select id=${'hmodel-' + hid} class="select" value=${h.defaultModel || ''} onChange=${(e) => save({ defaultModel: e.target.value })}><option value="">Harness default</option>${h.models.map((m) => html`<option value=${m}>${h.modelLabels?.[m] || m}</option>`)}</select>` : html`<span class="muted">${h.reason || 'This harness did not report model choices.'}</span>`}<//>
@@ -366,11 +369,12 @@ function AddSubscription({ s, d }) {
   useEffect(() => { if (live.on && step === 'install') liveGit.harnessRecipe(harness).then(setRecipe).catch((e) => setError(e.message)); }, [harness]);
   const install = async () => { setPending(true); setError(''); try {
     if (live.on) setResult(await liveGit.installHarness(harness));
-    else { const next = { state: 'installed', installation: { installed: true, version: 'Sample installation' }, output: '' }; update(() => Object.assign(h, next.installation)); setResult(next); }
+    else { const next = { state: 'installed', installation: { installed: true, version: 'Sample installation' }, output: '' }; update(() => { Object.assign(h, next.installation); const m = machineOf(s, machine); if (m?.status === 'online') { m.harnesses ||= {}; m.harnesses[harness] = 'Sample installation'; } }); setResult(next); }
   } catch (e) { setError(e.message); } finally { setPending(false); } };
   const check = async () => { setPending(true); try { if (live.on) await liveGit.checkHarnesses(); if (h.installed || HARNESSES[harness]?.installed) { setStep('account'); setResult(null); } } finally { setPending(false); } };
   const dup = s.subscriptions.some((x) => x.harness === harness && (live.on || x.machine === machine) && x.name.toLowerCase() === name.trim().toLowerCase());
-  const why = !name.trim() ? 'Give the account a name.' : dup ? 'This harness already has an account with that name.' : home && !home.startsWith('/') ? 'Use an absolute login folder.' : '';
+  const selectedMachine = machineOf(s, machine);
+  const why = !live.on && selectedMachine?.status !== 'online' ? `${selectedMachine?.name || 'This machine'} is offline.` : !live.on && !selectedMachine?.harnesses?.[harness] ? `${h.name} is not installed on ${selectedMachine?.name || 'this machine'}.` : !name.trim() ? 'Give the account a name.' : dup ? 'This harness already has an account with that name.' : home && !home.startsWith('/') ? 'Use an absolute login folder.' : '';
   const add = () => { if (why || step !== 'account') return; if (live.on) return liveGit.addAccount(harness, name.trim(), home.trim());
     update((st) => st.subscriptions.push({ id: uid('sub'), harness, name: name.trim(), machine, enabled: true, signedIn: false, useForNew: false, usage: null, window: null, account: null, model: h.defaultModel || h.models[0] || '' })); act.closeDialog(); };
   return html`<${Dialog} title=${'Add account · ' + h.name} onClose=${pending ? () => {} : act.closeDialog} onSubmit=${step === 'account' ? add : () => {}}
@@ -382,7 +386,7 @@ function AddSubscription({ s, d }) {
       <div class="field"><label for="as-name">Name</label><input id="as-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} autofocus />${name && why && html`<span class="error">${why}</span>`}</div>
       ${!live.on && html`<div class="field"><label for="as-machine">Machine</label><select id="as-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : ''}</option>`)}</select></div>`}
       ${['claude', 'codex'].includes(harness) && html`<div class="field"><label for="as-home">Login folder</label><input id="as-home" class="input mono" value=${home} onInput=${(e) => setHome(e.target.value)} placeholder="Use the harness's default folder" /><span class="hint">Use a separate absolute folder for another sign-in.</span></div>`}
-      <p>Run the harness's sign-in command in your terminal.</p><${CodeBox} text=${h.signInCommand || h.recipe?.signInCommand || 'Use the harness’s own sign-in command.'} label="sign-in command" />`}
+      <p>Run the harness's sign-in command in your terminal.</p><${CodeBox} text=${h.signInCommand || h.recipe?.signInCommand || 'Use the harness’s own sign-in command.'} label="sign-in command" />${h.recipe?.signInSource && html`<p><a class="link" href=${h.recipe.signInSource} target="_blank" rel="noreferrer">Official sign-in documentation</a></p>`}`}
     ${error && html`<p role="alert" class="error-text">${error}</p>`}
   <//>`;
 }
@@ -395,6 +399,7 @@ function HarnessSignIn({ s, d }) {
   useEffect(() => { void again(); }, [d.account]);
   return html`<${Dialog} title=${'Sign in · ' + (account?.name || '')} onClose=${act.closeDialog} foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Close</button><button type="button" class="btn primary" disabled=${pending} onClick=${again}>Check again</button>`}>
     <p>Run this command in your terminal. Sign-in stays with you.</p><${CodeBox} text=${check?.signInCommand || h?.signInCommand || h?.recipe?.signInCommand || ''} label="sign-in command" />
+    ${h?.recipe?.signInSource && html`<p><a class="link" href=${h.recipe.signInSource} target="_blank" rel="noreferrer">Official sign-in documentation</a></p>`}
     ${check && html`<p role="status">${{ 'local-credential': 'Local sign-in found. The provider checks it when an agent starts.', 'signed-out': 'No local sign-in found.', 'missing-executable': 'The harness is not installed.', unavailable: 'Local sign-in could not be checked.' }[check.state]}</p>`}
     ${error && html`<p role="alert">${error}</p>`}
   <//>`;
@@ -536,13 +541,14 @@ function HarnessDefaults({ s }) {
     <${Row} label="Model" id="df-model" hint=${live.on ? 'Defaults for new project leads.' : 'Leads start one step above this model.'}>
       <select id="df-model" class="select" style="width:200px" value=${set.defaultModel} onChange=${(e) => setS({ defaultModel: e.target.value })}>${live.on && !set.defaultModel && html`<option value=""></option>`}${h.models.map((m) => html`<option value=${m}>${m}</option>`)}</select><//>
     <${Row} label="Effort"><${Seg} label="Effort" value=${set.defaultEffort} onChange=${(v) => setS({ defaultEffort: v })} options=${h.efforts.map((e) => ({ id: e, label: e }))} /><//>
-    <${Row} label="Permission" hint="What a new agent may do without asking. A project can set its own." top>
-      <${PermissionPicker} name="df-perm" value=${set.defaultPermission} onChange=${(v) => setS({ defaultPermission: v })} /><//>
+
   </div>`;
 }
 function Defaults({ s }) {
   const set = s.settings;
   return html`<div class="svc-rows">
+    <${Row} label="Permission" hint="What a new agent may do without asking. A project can set its own." top>
+      <${PermissionPicker} name="df-perm" value=${set.defaultPermission} onChange=${(v) => setS({ defaultPermission: v })} /><//>
     <${Row} label="Need-to-know messages" hint="New teams keep direct messages private to the agents in them. You always see everything.">
       <${Switch} on=${set.needToKnow} label="Need-to-know messages" onChange=${(v) => setS({ needToKnow: v })} /><//>
     <${Row} label="Remove agent credits when merging" hint="Strips the co-author lines agents add to their commits.">

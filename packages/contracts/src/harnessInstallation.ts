@@ -4,13 +4,13 @@ import { HarnessSettings } from "./harnesses.ts"
 
 export const HarnessInstallation = Schema.Struct({
   harnessId: HarnessId, installed: Schema.Boolean,
-  version: Schema.optionalKey(Schema.String), path: Schema.optionalKey(Schema.String),
+  reason: Schema.optionalKey(Schema.String), version: Schema.optionalKey(Schema.String), path: Schema.optionalKey(Schema.String),
   settings: Schema.optionalKey(HarnessSettings)
 })
 export type HarnessInstallation = typeof HarnessInstallation.Type
 export const HarnessRecipe = Schema.Struct({
   harnessId: HarnessId, name: Schema.String, automatic: Schema.Boolean,
-  packages: Schema.Array(Schema.String), registry: Schema.String, source: Schema.String,
+  packages: Schema.Array(Schema.String), registry: Schema.String, source: Schema.String, signInSource: Schema.optionalKey(Schema.String),
   commands: Schema.Array(Schema.String), signInCommand: Schema.String, signInArguments: Schema.Array(Schema.String), reason: Schema.optionalKey(Schema.String)
 })
 export type HarnessRecipe = typeof HarnessRecipe.Type

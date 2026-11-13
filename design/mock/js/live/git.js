@@ -52,7 +52,7 @@ async function refreshScreen() {
   if (busy('read-service')) { clearTimeout(refreshTimer); refreshTimer = setTimeout(refreshScreen, 200); return; }
   return run('read-service', () => loadService(screen?.name));
 }
-async function loadService(name) {
+async function loadService(name, refreshHarnesses = false) {
   const version = revision;
   if (name === 'notifications' || name === 'phone-offer') {
     const settings = await request('client.alerts.settings');
@@ -79,7 +79,7 @@ async function loadService(name) {
   if (version !== revision || S().session.status !== 'in') return;
   service = { harnesses: harnessReply.harnesses, project: project.settings, roles: roles.settings, web, roleFile: roleFile.file };
   accounts = accountReply.accounts; statuses = snapshot.accounts;
-  const installationReply = await request('client.harness.status');
+  const installationReply = await request('client.harness.status', { refresh: refreshHarnesses });
   const recipes = await Promise.all(installationReply.harnesses.map(async (row) => {
     try { return (await request('client.harness.recipe', { harnessId: row.harnessId })).recipe; } catch { return null; }
   }));
@@ -110,7 +110,7 @@ export const installHarness = async (harnessId) => {
   await run('read-service', () => loadService('harnesses'));
   return result;
 };
-export const checkHarnesses = () => run('read-service', () => loadService('harnesses'));
+export const checkHarnesses = () => run('read-service', () => loadService('harnesses', true));
 export const checkAccount = async (accountId) => {
   const result = await request('client.harness.account.check', { accountId });
   engineWrite({ subscriptions: S().subscriptions.map((a) => a.id === accountId ? { ...a, signedIn: result.state === 'local-credential' } : a) });

@@ -1,6 +1,6 @@
 import { lstatSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -34,7 +34,8 @@ import { migrate, migratePieces } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
-import { userHarnessBin, makeHarnessPrograms } from "./harnesses/programs.ts";
+import * as GuardedRunner from "./harnesses/guardedRunner.ts";
+import { makeHarnessPrograms, userHarnessPrefix } from "./harnesses/programs.ts";
 import { installedHarnessDefaults } from "./runner/harnesses.ts";
 import { engineLists, type EngineLists } from "./pieces/lists.ts";
 import { drainPieceErrors } from "./pieces/guardPiece.ts";
@@ -148,13 +149,20 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
       },
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
+    const managedRoot = userHarnessPrefix(process.env.HOME ?? folder);
+    const harnessPath = (process.env.PATH ?? "").split(delimiter).filter((path) => isAbsolute(path) && resolve(path) !== managedRoot && !resolve(path).startsWith(managedRoot + "/")).join(delimiter);
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
-      harnessDefaults: installedHarnessDefaults(`${userHarnessBin(process.env.HOME ?? folder)}:${process.env.PATH ?? ""}`),
-      harnessPrograms: makeHarnessPrograms({ home: process.env.HOME ?? folder, path: process.env.PATH ?? "", credentials }) };
+      harnessDefaults: installedHarnessDefaults(harnessPath),
+      harnessPrograms: makeHarnessPrograms({ home: process.env.HOME ?? folder, path: harnessPath, stateFolder: folder, credentials }) };
     const base = baseServices(lists);
-    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env, PATH: `${userHarnessBin(process.env.HOME ?? configuration.home)}:${process.env.PATH ?? "/usr/bin:/bin"}` }, protocolLog, credentials }).pipe(
+    const runnerEnvironment: NodeJS.ProcessEnv = { ...process.env, PATH: harnessPath };
+    // Bundled adapters resolve their own vendor runtimes. Do not implicitly
+    // select a mutable managed install through PATH or a service override.
+    delete runnerEnvironment.CODEX_PATH; delete runnerEnvironment.CLAUDE_CODE_EXECUTABLE;
+    const rawRunner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: runnerEnvironment, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
+    const runner = GuardedRunner.layer(configuration).pipe(Layer.provideMerge(rawRunner));
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
     const services = handlerServices(configuration, lists).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
     return yield* Effect.gen(function* () {

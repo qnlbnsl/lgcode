@@ -10,7 +10,7 @@ import { buildServices } from "../../../engine/src/service.ts"
 import { serve } from "../../../engine/src/client/web/server.ts"
 import { engineLists } from "../../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../../engine/src/log/Redactor.ts"
-import { makeHarnessPrograms } from "../../../engine/src/harnesses/programs.ts"
+import { fixtureHarnessPrograms } from "../../../engine/test/support/fixtureHarnessPrograms.ts"
 import { unusedPort } from "../../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../../engine/test/support/fakeRunner.ts"
 import { appendSetup, eventOf, harnessSettings, makeFakeSecrets, makeRig, readLog, removeRig } from "../../../engine/test/support/handlerRig.ts"
@@ -25,8 +25,7 @@ export async function exerciseStudioHarnesses(page: Page) {
   const executable = join(rig.root, "fixture-harness"), script = join(rig.root, "install.cjs")
   // This is the entire install. No package manager or provider is contacted.
   writeFileSync(script, `const fs=require('node:fs'); fs.writeFileSync(${JSON.stringify(executable)}, '#!/bin/sh\\necho fixture-1.2.3\\n'); fs.chmodSync(${JSON.stringify(executable)}, 0o700);`)
-  const harnessPrograms = makeHarnessPrograms({ home: rig.home, path: "", recipes: [{ harnessId: "fixture", name: "Fixture harness", executable: "fixture-harness", automatic: true,
-    packages: ["fixture@1.2.3"], registry: "https://example.test", source: "https://example.test/install", signIn: ["fixture-harness", "login"], steps: [{ executable: process.execPath, args: [script] }] }] })
+  const harnessPrograms = fixtureHarnessPrograms({ home: rig.home, executable, script, id: "fixture", name: "Fixture harness", version: "fixture-1.2.3" })
   const password = randomBytes(32).toString("base64url"), port = await unusedPort()
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
@@ -71,6 +70,8 @@ export async function exerciseStudioHarnesses(page: Page) {
           await expect(harness.locator(".svc-sub")).toContainText("Owner account")
           await page.goto(`${root}#/subscriptions`)
           await expect(page.getByRole("heading", { name: "Harnesses", exact: true })).toBeVisible()
+          await expect(page).toHaveURL(/#\/harnesses$/)
+          await expect(page.locator('.sidebar a[aria-current="page"]')).toContainText("Harnesses")
         })
         const events = (yield* readLog).filter((e) => e.event._tag.startsWith("HarnessInstall"))
         expect(events.map((e) => e.event._tag)).toEqual(["HarnessInstallStarted", "HarnessInstallFinished"])
@@ -109,24 +110,37 @@ async function exerciseSampleHarnesses(page: Page) {
     await page.goto(`${root}#/harnesses`)
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     await expect(page.locator(".svc-harness")).toHaveCount(4)
+    await expect(page.locator(".page")).toContainText(/\d+ of \d+ signed in, \d+ at its limit/)
+    await expect(page.locator('[name="df-perm"]')).toHaveCount(0)
     await page.screenshot({ path: ".foundry/harnesses-sample.png", fullPage: true, animations: "disabled" })
     const gemini = page.locator(".svc-harness").filter({ has: page.getByRole("heading", { name: "Gemini CLI", exact: true }) })
     await expect(gemini).toContainText("Not installed")
     await gemini.getByRole("button", { name: "Add account", exact: true }).click()
     const dialog = page.getByRole("dialog")
-    await expect(dialog.locator(".qc-code pre")).toContainText("@google/gemini-cli@0.68.0")
+    await expect(dialog.locator(".qc-code pre")).toContainText("ci")
+    await expect(dialog).toContainText("@google/gemini-cli@0.68.0")
     await dialog.getByRole("button", { name: "Install", exact: true }).click()
     await dialog.getByRole("button", { name: "Continue", exact: true }).click()
     await dialog.locator("#as-name").fill("Sample account")
     await dialog.getByRole("button", { name: "Add account", exact: true }).click()
     await expect(gemini.locator(".svc-sub")).toContainText("Sample account")
+    await gemini.getByRole("button", { name: "Add account", exact: true }).click()
+    await dialog.locator("#as-name").fill("Another account")
+    await dialog.locator("#as-machine").selectOption("buildbox")
+    await expect(dialog).toContainText("Gemini CLI is not installed on")
+    await expect(dialog.getByRole("button", { name: "Add account", exact: true })).toBeDisabled()
+    await dialog.locator("#as-machine").evaluate((select: HTMLSelectElement) => { select.value = "laptop"; select.dispatchEvent(new Event("change", { bubbles: true })) })
+    await expect(dialog).toContainText("is offline.")
+    await expect(dialog.getByRole("button", { name: "Add account", exact: true })).toBeDisabled()
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
     const cursor = page.locator(".svc-harness").filter({ has: page.getByRole("heading", { name: "Cursor", exact: true }) })
     await cursor.getByRole("button", { name: "Add account", exact: true }).click()
     await expect(dialog.getByRole("button", { name: "Install", exact: true })).toBeDisabled()
     await expect(dialog).toContainText("Run the official installer in your terminal")
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
-    await page.goto(`${root}#/settings`)
+    await page.goto(`${root}#/settings?section=defaults`)
     await expect(page.locator("#df-model")).toHaveCount(0)
+    await expect(page.getByText("What a new agent may do without asking.", { exact: false })).toBeVisible()
     expect(errors).toEqual([])
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 }

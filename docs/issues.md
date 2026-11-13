@@ -11940,3 +11940,93 @@ The new read now resolves the same effective home as readiness and launch.
 It does not create that folder or copy credentials.
 A harmless regression writes a synthetic credential to the displayed folder and verifies that the readiness read sees it.
 A login-folder secret reference or conflicting settings receive a plain refusal.
+
+## s5-harnesses-8. The installer must resolve its own package manager.
+
+The first installer selected npm and Node.js through a mutable search path.
+A harness executable folder could therefore replace the installer itself.
+The installer now resolves the running Node.js and its adjacent npm to real absolute paths.
+It passes a fixed search path and starts in a new empty temporary folder.
+The hostile-path regression fails against the original implementation.
+
+## s5-harnesses-9. Managed executable files need an installation receipt.
+
+The first status read executed any file found in the managed harness folder.
+The installer now records the real executable path and hashes every regular file and executable link in its dependency tree.
+The receipt lives in the engine state folder, outside the installation prefix.
+Status and runner entry points refuse a changed tree before executing it.
+Version reads happen after installation or an explicit owner refresh.
+Ordinary status reads use saved versions.
+This check does not provide an operating-system boundary against another process with full access to the engine user's state and source files.
+
+## s5-harnesses-10. A package version does not pin its dependency tree.
+
+The automatic Codex and Gemini recipes now include npm lockfiles with registry integrity hashes.
+They use npm ci with all lifecycle scripts disabled.
+The current Claude Code npm package needs its postinstall linking script.
+Its separate CLI installer is therefore manual.
+The bundled Claude adapter and native runtime remain available without that separate install.
+Cursor's shell installer remains manual.
+Automatic installation is limited to Linux, where process recovery can identify a leftover process group.
+
+## s5-harnesses-11. Interrupted installs need cleanup and recovery.
+
+The original request masked interruption while a detached package manager ran.
+Requests now cancel the complete process group and wait for cleanup before auditing cancellation.
+Engine shutdown closes active installs.
+A durable operation identity lets startup find leftover descendants and remove their partial installation.
+The operation has a ten-minute deadline to accommodate slow downloads.
+Failed and cancelled installs remove their partial prefix.
+
+## s5-harnesses-12. An unreadable login file must not break every harness section.
+
+Status now handles a malformed, oversized or unreadable login store per harness.
+It reports that the sign-in state cannot be read.
+Other harness sections remain available.
+A subprocess probe still requires readable credential sources so its output can be redacted safely.
+
+## s5-harnesses-13. Cursor's executable name is not a vendor identity.
+
+An arbitrary program named agent on the service search path is no longer probed as Cursor.
+Discovery requires Cursor's installation location and a recognizable version report.
+A failed version read reports an unknown version.
+A found version that differs from a recipe's pin is labelled explicitly.
+
+## s5-harnesses-14. Moving the subscriptions page lost existing controls.
+
+The combined page again shows the signed-in and capacity summary.
+Sample account creation refuses an offline machine and a machine without the selected harness.
+The default permission picker is back under Service settings.
+An old subscriptions address is rewritten to the Harnesses address.
+The browser journey covers these restorations.
+
+## s5-harnesses-15. Automatic installs do not support inherited proxy settings.
+
+This matter is open.
+The installer deliberately drops proxy variables and npm configuration variables.
+An installation behind a required proxy can fail.
+A future proxy setting needs an explicit owner-controlled design that preserves the fixed recipe and redaction rules.
+
+## s5-harnesses-16. npm has a built-in configuration beside its program.
+
+This matter is open.
+The installer disables user and global npm configuration and uses an empty working folder.
+npm still reads its own built-in configuration.
+For this to alter the installer, another process would need to change the trusted Node.js and npm installation or its built-in configuration.
+The installer does not claim to protect a compromised toolchain.
+
+## s5-harnesses-17. npm rejects one file used as both user and global configuration.
+
+The original environment named /dev/null for both configuration roles.
+Current npm refuses to load the same configuration file twice.
+The user configuration now names a repository-owned empty file.
+The global configuration still names /dev/null.
+The command-plan and child-environment regressions cover the fixed environment without installing a vendor package.
+
+## s5-harnesses-18. The full browser check can time out in the existing Git journey.
+
+The full check of the original feature passed its type checks and unit tests.
+It passed 51 browser journeys.
+The Git journey timed out while clicking its existing integration control.
+The Harnesses journey passed in that run.
+This matter remains open because the Git journey is outside this builder's assignment.

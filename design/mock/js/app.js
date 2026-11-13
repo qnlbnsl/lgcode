@@ -319,6 +319,7 @@ function App() {
   }, []);
   useEffect(() => {
     if (!route.parts.length) go('/home');
+    if (route.parts[0] === 'subscriptions') go('/harnesses');
     // The old Home tabs keep working: Projects moved to its own page, and Questions and
     // Approvals became the Type filter on Needs attention.
     if (route.path === '/home/projects') go('/projects');

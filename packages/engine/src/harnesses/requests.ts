@@ -1,3 +1,6 @@
+import * as Schema from "effect/Schema"
+import { HarnessSettings } from "@lgtm/contracts"
+import { harnesses as planHarnesses } from "../commands/harnesses.ts"
 import { randomUUID } from "node:crypto"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import type { Event, HarnessInstallation, HarnessInstallResult, RequestId } from "@lgtm/contracts"
@@ -27,11 +30,12 @@ const redactInstallation = (input: Input, value: HarnessInstallation) => Effect.
   const { settings, ...installation } = value
   const safeSettings = settings && (yield* input.runtime.log.redactText(JSON.stringify(settings))) === JSON.stringify(settings) ? settings : undefined
   return { ...installation, ...(safeSettings ? { settings: safeSettings } : {}), ...(value.path === undefined ? {} : { path: yield* input.runtime.log.redactText(value.path) }),
+    ...(value.reason === undefined ? {} : { reason: yield* input.runtime.log.redactText(value.reason) }),
     ...(value.version === undefined ? {} : { version: (yield* input.runtime.log.redactText(value.version)).trim().split(/\r?\n/)[0]!.slice(0, 200) }) }
 })
-const inspect = (input: Input, programs: HarnessPrograms, id: string, settings?: import("@lgtm/contracts").HarnessSettings) =>
-  Effect.tryPromise({ try: () => programs.inspect(id, settings), catch: () => refused("The harness installation could not be read.") })
-const audit = (input: Input, events: ReadonlyArray<Event>) => input.runtime.log.append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {}, false)
+const inspect = (input: Input, programs: HarnessPrograms, id: string, settings?: import("@lgtm/contracts").HarnessSettings, refresh = false) =>
+  Effect.tryPromise({ try: (signal) => programs.inspect(id, settings, refresh, signal), catch: () => refused("The harness installation could not be read.") })
+const audit = (input: Pick<Input, "runtime">, events: ReadonlyArray<Event>) => input.runtime.log.append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {}, false)
   .pipe(Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))))
 
 const status: ReadHandler = (input, p) => Effect.gen(function* () {
@@ -40,7 +44,7 @@ const status: ReadHandler = (input, p) => Effect.gen(function* () {
   const ids = [...new Set([...programs.ids, ...configured.map((h) => h.id)])]
   const harnesses = []
   for (const id of ids) {
-    const saved = configured.find((h) => h.id === id), installation = yield* inspect(input, programs, id, saved)
+    const saved = configured.find((h) => h.id === id), installation = yield* inspect(input, programs, id, saved, p.refresh === true)
     const settings = saved ?? (installation.path ? programs.defaultSettings(id, installation.path) : undefined)
     harnesses.push(yield* redactInstallation(input, { ...installation, ...(settings ? { settings } : {}) }))
   }
@@ -65,7 +69,7 @@ const install: ReadHandler = (input, p) => Effect.gen(function* () {
   // All shipped npm recipes share one user prefix. Serialize its writes too.
   if (running.size > 0) return yield* refused("Another harness install is already running.")
   running.add(id)
-  return yield* Effect.gen(function* () {
+  return yield* Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
     const settings = (yield* readHarnesses(input.runtime)).find((h) => h.id === id)
     const prior = yield* input.runtime.sql<{ payload_json: string }>`SELECT payload_json FROM events
       WHERE event_type IN ('HarnessInstallStarted', 'HarnessInstallFinished')
@@ -81,22 +85,40 @@ const install: ReadHandler = (input, p) => Effect.gen(function* () {
       return { reply: { requestId, ...result } }
     }
     yield* audit(input, [{ _tag: "HarnessInstallStarted", harnessId: id as HarnessInstallation["harnessId"], operationRequestId: requestId }])
-    // Finish even if a browser disconnects. The subprocess has a two-minute
-    // deadline and a process-group kill. Output never enters the event log.
-    const result = yield* Effect.tryPromise({ try: (signal) => programs.install(id, signal), catch: () => refused("The install command could not run.") })
-      .pipe(Effect.catch(() => Effect.succeed({ ok: false, output: "", reason: "The install command could not run." })))
+    const controller = new AbortController()
+    let pending: Promise<import("./programs.ts").ProcessResult> | undefined
+    const result = yield* restore(Effect.tryPromise({ try: () => {
+      pending = programs.install(id, controller.signal)
+      return pending
+    }, catch: () => refused("The install command could not run.") })).pipe(
+      Effect.catch(() => Effect.succeed({ ok: false, output: "", reason: "The install command could not run." })),
+      Effect.onInterrupt(() => Effect.gen(function* () {
+        controller.abort()
+        if (pending) yield* Effect.promise(() => pending!.then(() => undefined, () => undefined))
+        yield* audit(input, [{ _tag: "HarnessInstallFinished", harnessId: id as HarnessInstallation["harnessId"], operationRequestId: requestId,
+          state: "failed", reason: "The install was cancelled." }])
+      }))
+    )
     const installation = yield* inspect(input, programs, id, settings).pipe(Effect.catch(() => Effect.succeed({ harnessId: id as HarnessInstallation["harnessId"], installed: false } as HarnessInstallation)))
-    const state = result.ok && installation.installed ? "installed" as const : "failed" as const
-    const reason = state === "installed" ? undefined : result.reason ?? "The command ended, but the harness executable was not found."
-    const events: Event[] = [{ _tag: "HarnessInstallFinished", harnessId: id as HarnessInstallation["harnessId"], operationRequestId: requestId, state, ...(reason ? { reason } : {}) }]
+    let state = result.ok && installation.installed ? "installed" as const : "failed" as const
+    let reason = state === "installed" ? undefined : result.reason ?? "The command ended, but the harness executable was not found."
+    const events: Event[] = []
     if (state === "installed" && settings === undefined && installation.path) {
       const defaults = programs.defaultSettings(id, installation.path)
-      if (defaults) events.push({ _tag: "HarnessChanged", harness: defaults })
+      if (defaults) {
+        const planned = yield* Effect.gen(function* () {
+          const validated = yield* Effect.try({ try: () => Schema.decodeUnknownSync(HarnessSettings)(defaults), catch: () => refused("The installed harness settings are invalid.") })
+          return yield* planHarnesses(input, { operation: "set", harness: validated, requestId: freshRequest() })
+        }).pipe(Effect.result)
+        if (planned._tag === "Success") events.push(...planned.success.events)
+        else { state = "failed"; reason = "The installed harness settings are invalid." }
+      }
     }
+    events.unshift({ _tag: "HarnessInstallFinished", harnessId: id as HarnessInstallation["harnessId"], operationRequestId: requestId, state, ...(reason ? { reason } : {}) })
     yield* audit(input, events)
     return { reply: { requestId, state, installation: yield* redactInstallation(input, installation),
       output: yield* input.runtime.log.redactText(result.output), ...(reason ? { reason: yield* input.runtime.log.redactText(reason) } : {}) } }
-  }).pipe(Effect.uninterruptible, Effect.ensuring(Effect.sync(() => { running.delete(id) })))
+  })).pipe(Effect.ensuring(Effect.sync(() => { running.delete(id) })))
 }).pipe(Effect.catchTag("SqlError", () => Effect.fail(refused("The install record could not be read."))))
 const accountCheck: ReadHandler = (input, p) => Effect.gen(function* () {
   if (input.actor._tag !== "owner") return yield* refused()
