@@ -11118,3 +11118,11 @@ Prompt context showed a task identifier instead of its available label.
 The roster did not distinguish an agent whose task was under review.
 The open screens now read account names and map task labels and the Reviewing state.
 The account reader retains only the identifier, harness, and display name.
+
+## s2-chat-8. The live idle lane could claim that no work was assigned.
+
+An idle agent can still own an active task.
+The mock's fallback reason said "Nothing assigned" for that agent.
+The live lane now leaves the reason empty when the engine supplies no reason.
+The linked task remains visible.
+The standalone mock keeps its original wording.

@@ -396,7 +396,7 @@ function situation(s, a, now) {
   }
   if (a.state === 'working') return { lane: 'working', why: a.activity, quiet };
   if (a.workState === 'done') return { lane: 'done', why: 'Finished its work items' };
-  return { lane: 'idle', why: a.workState === 'assigned' ? 'Assigned, not started' : 'Nothing assigned' };
+  return { lane: 'idle', why: live.on ? '' : a.workState === 'assigned' ? 'Assigned, not started' : 'Nothing assigned' };
 }
 const workState = (a) => (live.on ? a.workState || 'off' : a.state === 'stopped' || a.state === 'failed' ? 'off' : a.state === 'working' ? 'working' : a.workState || 'off');
 const fmtTokens = (m) => (m >= 1 ? m.toFixed(1) + 'M' : Math.round(m * 1000) + 'k');
