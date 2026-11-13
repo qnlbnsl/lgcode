@@ -50,7 +50,7 @@ function Switcher({ s }) {
     const p = projectOf(s, a.project); if (!p || p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
     all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: live.on ? text.agents[a.id] : `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
   }
-  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/subscriptions', 'Subscriptions', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
+  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/harnesses', 'Harnesses', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
   const ql = q.trim();
   const found = ql
     ? all.map((x) => [searchScore(ql, x), x]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0] || KIND_ORDER[a[1].kind] - KIND_ORDER[b[1].kind]).map(([, x]) => x)

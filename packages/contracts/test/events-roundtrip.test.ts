@@ -16,6 +16,8 @@ import { LifecycleState } from "../src/stateMachine.ts"
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
 const expectedEngineTags = [
+  "HarnessInstallStarted",
+  "HarnessInstallFinished",
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",

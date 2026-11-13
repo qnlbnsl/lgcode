@@ -940,12 +940,19 @@ A button on a harness adds another account or subscription.
 Adding an account checks whether the harness is installed.
 A harness that is not installed shows its install script and is installed from the page.
 "Subscriptions" then leaves the left navigation.
+The mock and the live website now provide this page.
+The old address opens Harnesses.
+Harness defaults now live beside the accounts.
 
 ## A harness installer
 
 The owner asked for this on 2026-11-13.
 LGTM Studio installs a missing harness by itself.
 The page shows the install script before it runs.
+The engine now provides owner-only status, recipe, install, and local sign-in reads.
+Claude Code, Codex, and Gemini CLI have pinned npm recipes.
+Cursor shows its official command for the owner to run manually.
+Provider sign-in stays in the owner's terminal.
 
 ## Notifications with more than one kind of delivery
 

@@ -909,3 +909,9 @@ test('live website: Service settings discovers models when the default harness c
   const { exerciseStudioModels } = await import('./support/studioModels.ts')
   await exerciseStudioModels(page)
 })
+
+test('live website: Harnesses installs a missing harness with a fake recipe and adds its account', async ({ page }) => {
+  test.setTimeout(90_000)
+  const { exerciseStudioHarnesses } = await import('./support/studioHarnesses.ts')
+  await exerciseStudioHarnesses(page)
+})

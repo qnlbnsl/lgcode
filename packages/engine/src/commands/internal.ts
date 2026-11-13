@@ -38,6 +38,8 @@ export interface Runtime {
   readonly pluginRoot: string;
   // The harness defaults of this installation, when the service has them.
   readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
+  // Service construction only. Tests supply harmless local recipes here.
+  readonly harnessPrograms?: import("../harnesses/programs.ts").HarnessPrograms;
 }
 export interface Input {
   readonly runtime: Runtime;

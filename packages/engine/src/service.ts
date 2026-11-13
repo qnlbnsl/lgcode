@@ -34,6 +34,7 @@ import { migrate, migratePieces } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
+import { userHarnessBin, makeHarnessPrograms } from "./harnesses/programs.ts";
 import { installedHarnessDefaults } from "./runner/harnesses.ts";
 import { engineLists, type EngineLists } from "./pieces/lists.ts";
 import { drainPieceErrors } from "./pieces/guardPiece.ts";
@@ -84,13 +85,13 @@ const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(fu
   }
 }));
 
-const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists) =>
+const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults" | "harnessPrograms">, lists: EngineLists) =>
   pieceFollowers(lists).pipe(Layer.provideMerge(CommandHandler.layer({ ...configuration,
     capacityHoldCondition: (id, snapshot) => withinCapacityLimit(snapshot, id, capacityHoldCount(snapshot, id)),
   }, lists)));
 
 // Importing this module never starts the CLI or changes the process environment.
-export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
+export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults" | "harnessPrograms">, lists: EngineLists = engineLists) =>
   handlerServices(configuration, lists).pipe(Layer.provideMerge(baseServices(lists)));
 
 const program = (inheritedToken: string | undefined, webPassword: Redacted.Redacted<string> | undefined) => Effect.scoped(Effect.gen(function* () {
@@ -148,9 +149,10 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
-      harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
+      harnessDefaults: installedHarnessDefaults(`${userHarnessBin(process.env.HOME ?? folder)}:${process.env.PATH ?? ""}`),
+      harnessPrograms: makeHarnessPrograms({ home: process.env.HOME ?? folder, path: process.env.PATH ?? "", credentials }) };
     const base = baseServices(lists);
-    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
+    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env, PATH: `${userHarnessBin(process.env.HOME ?? configuration.home)}:${process.env.PATH ?? "/usr/bin:/bin"}` }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));

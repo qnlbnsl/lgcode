@@ -43,7 +43,7 @@ export async function exerciseStudioModels(page: Page) {
         success(yield* call(ownerCredential, 'project.settings.set', { settings: { workspaceFolder: rig.root, shell: 'sh', lead: { harness: 'first', account: { _tag: 'any' }, permission: 'ask' } } }))
         yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
-          const url = `http://127.0.0.1:${port}/studio/#/settings?section=defaults`
+          const url = `http://127.0.0.1:${port}/studio/#/harnesses`
           await page.goto(url)
           await page.locator('#login-password').fill(password)
           await page.getByRole('button', { name: 'Sign in', exact: true }).click()

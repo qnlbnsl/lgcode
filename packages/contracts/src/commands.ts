@@ -146,6 +146,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const WebRpcGroup = ClientRpcGroup.omit(
+  "client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check",
   "client.harness.choices",
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
@@ -158,6 +159,7 @@ export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
+  "client.harness.status": ["owner"], "client.harness.recipe": ["owner"], "client.harness.install": ["owner"], "client.harness.account.check": ["owner"],
   "client.web.settings": ["owner"], "client.web.settings.set": ["owner"],
   "client.alerts.retry": ["owner"], "client.alerts.test": ["owner"], "client.alerts.prompt.dismiss": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],

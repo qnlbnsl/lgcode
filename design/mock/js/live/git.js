@@ -79,8 +79,14 @@ async function loadService(name) {
   if (version !== revision || S().session.status !== 'in') return;
   service = { harnesses: harnessReply.harnesses, project: project.settings, roles: roles.settings, web, roleFile: roleFile.file };
   accounts = accountReply.accounts; statuses = snapshot.accounts;
+  const installationReply = await request('client.harness.status');
+  const recipes = await Promise.all(installationReply.harnesses.map(async (row) => {
+    try { return (await request('client.harness.recipe', { harnessId: row.harnessId })).recipe; } catch { return null; }
+  }));
+  if (version !== revision || S().session.status !== 'in') return;
   Object.keys(HARNESSES).forEach((k) => { delete HARNESSES[k]; });
   Object.assign(HARNESSES, mapping.mapHarnesses(service.harnesses));
+  Object.assign(HARNESSES, mapping.mapInstalledHarnesses(HARNESSES, installationReply.harnesses, recipes));
   settingsPatch(mapping.mapServiceSettings(service.project, service.harnesses, service.roles, service.web, service.roleFile));
   engineWrite({ subscriptions: mapping.mapAccounts(accounts, statuses, service.harnesses, service.project) });
   subscriptionsLoaded = true; S().ui.serviceReady = true; notify();
@@ -91,9 +97,32 @@ export const accountAction = (id, operation, patch = {}) => run('subscriptions',
   await request('accounts', operation === 'set' ? { operation, account: { ...account, ...patch } } : { operation, accountId: id });
   await loadService('subscriptions');
 });
-export const addAccount = (harness, name) => run('subscriptions', async () => {
-  await request('accounts', { operation: 'add', account: { id: 'account-' + crypto.randomUUID(), harness, displayName: name, enabled: true } });
+export const addAccount = (harness, name, home) => run('subscriptions', async () => {
+  const h = HARNESSES[harness];
+  if (!h?.installed) throw new Error('Install the harness before adding an account.');
+  if (!service?.harnesses.some((row) => row.id === harness) && h.settings) await request('harnesses', { operation: 'set', harness: h.settings });
+  await request('accounts', { operation: 'add', account: { id: 'account-' + crypto.randomUUID(), harness, displayName: name, enabled: true, ...(home ? { home } : {}) } });
   await loadService('subscriptions'); act.closeDialog();
+});
+export const harnessRecipe = async (harnessId) => (await request('client.harness.recipe', { harnessId })).recipe;
+export const installHarness = async (harnessId) => {
+  const result = await request('client.harness.install', { harnessId });
+  await run('read-service', () => loadService('harnesses'));
+  return result;
+};
+export const checkHarnesses = () => run('read-service', () => loadService('harnesses'));
+export const checkAccount = async (accountId) => {
+  const result = await request('client.harness.account.check', { accountId });
+  engineWrite({ subscriptions: S().subscriptions.map((a) => a.id === accountId ? { ...a, signedIn: result.state === 'local-credential' } : a) });
+  return result;
+};
+export const harnessSetting = (harnessId, patch) => run('subscriptions', async () => {
+  const previous = service?.harnesses.find((h) => h.id === harnessId) || HARNESSES[harnessId]?.settings;
+  if (!previous) { refuse(); return; }
+  const harness = { ...previous, ...patch };
+  for (const field of ['defaultModel', 'defaultEffort']) if (harness[field] === '') delete harness[field];
+  await request('harnesses', { operation: 'set', harness });
+  await loadService('harnesses');
 });
 export const makeDefault = (id) => run('subscriptions', async () => {
   const account = accounts?.find((a) => a.id === id), h = service?.harnesses.find((h) => h.id === account?.harness);

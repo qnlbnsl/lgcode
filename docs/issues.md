@@ -11875,3 +11875,59 @@ The requested empty state allows one plain sentence.
 The error now uses one sentence.
 A session-failure regression checks that sentence and the child's cleanup.
 This is fixed in this change.
+
+## s5-harnesses-1. Cursor has no compliant automatic recipe.
+
+Cursor's official installation page documents a download piped into a shell.
+The assignment forbids that installation method inside LGTM Studio.
+The recipe therefore exposes the official command for the owner to run manually.
+The Install button stays disabled for Cursor.
+The owner can run the command and use Check again.
+An automatic recipe needs an official method that satisfies these limits.
+The source is https://cursor.com/docs/cli/installation.
+
+## s5-harnesses-2. A timed-out installer must stop its descendants.
+
+The first harmless timeout test exposed an orphaned fixture process.
+The initial process helper did not create the process group it tried to kill.
+The helper now uses spawn with a separate process group on Linux.
+A timeout, cancellation, or oversized output kills that group.
+The exact orphaned fixture process from the failed test was removed.
+The literal-argument and process-limit regression now passes.
+
+## s5-harnesses-3. A status refresh must preserve a complete harness row.
+
+An asynchronous status read briefly replaced installed rows with incomplete settings rows.
+The Add account dialog could observe that intermediate state.
+The page now finishes its asynchronous reads before replacing the harness map.
+The browser journey checks adding an account after installation and after reload.
+The old service-page test also exposed a host CLI bootstrap shim during version probing.
+Embedded test engines now use an empty host search path unless their constructor supplies one.
+The production service explicitly supplies its real search path.
+Every installer test uses a harmless fixture.
+
+## s5-harnesses-4. Concurrent npm installs would share a destination.
+
+The shipped recipes install into one user prefix.
+Separate harness locks alone would permit concurrent writes there.
+The engine now serializes all installer requests for that prefix.
+A second request receives a plain refusal while the first is running.
+The overlap regression checks the same harness and another harness.
+
+## s5-harnesses-5. Contract inventories need the new installation surface.
+
+The full check found that the independent command and event inventories did not yet list the installer additions.
+The contract tests now name all four owner-only requests and both installation audit events.
+Their existing request-identifier and event round-trip checks now cover these additions.
+The expected agent tool inventory remains unchanged.
+The command-line parity fixtures now exercise the new commands in their spaced and dotted forms.
+The subscription matrix now includes both events and checks their owner-only visibility.
+
+## s5-harnesses-6. Redaction must precede output shortening.
+
+The security review found that shortening a raw version string could leave a partial secret at its end.
+A new harmless regression reproduced that boundary.
+The engine now redacts the complete version capture before selecting its first line and limiting its length.
+Oversized or forcibly interrupted captures are discarded.
+A failure still returns its plain reason.
+This prevents the capture limit from cutting a secret before the redactor can recognize it.
