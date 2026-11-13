@@ -110,5 +110,5 @@ export function workspaceIdentity(row: Workspace, workspaces: ReadonlyArray<Work
   const kind = row.checkout === 'main' ? 'base' : team || row.teamId ? 'team' : project ? 'project' : 'base'
   const parent = workspaces.find((w) => w.worktreeId === row.parentId) ?? (kind === 'project' ? workspaces.find((w) => w.repoId === row.repoId && w.checkout === 'main') : undefined)
   return { kind, project: kind === 'base' ? null : project?.projectId ?? null, team: team?.teamId ?? row.teamId ?? null,
-    owner: row.owner ?? (kind === 'project' ? project?.leadAgentId : undefined) ?? null, parent: parent?.branch ?? null } as const
+    owner: row.owner ?? (kind === 'project' ? project?.leadAgentId : undefined) ?? null, parent: parent?.branch ?? null, parentId: parent?.worktreeId ?? null } as const
 }

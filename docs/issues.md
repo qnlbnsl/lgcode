@@ -11111,3 +11111,13 @@ A repeated click must recover the original request instead of creating another d
 The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
+
+## s2-git-5. Git destinations must keep their workspace identifiers.
+
+Found: 2026-11-13, while reviewing the integration mapping.
+State: fixed in this change.
+
+The page displays a parent branch name.
+A branch name alone does not identify a registered workspace.
+The mapping also keeps the parent workspace identifier.
+Integration and main review use that identifier to select their destinations.

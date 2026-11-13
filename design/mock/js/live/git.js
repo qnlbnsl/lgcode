@@ -151,7 +151,9 @@ export const sendTest = () => run('notifications', async () => { const r = await
 export const retryAlert = (n) => run('notifications', async () => {
   if (retryPending && retryPending.alertId !== n.id) throw new Error('Recover the pending notification retry first.');
   retryPending ||= { alertId: n.id, generation: n.generation, attempt: n.attempt };
-  const r = await request('client.alerts.retry', retryPending);
+  let r;
+  try { r = await request('client.alerts.retry', retryPending); }
+  catch (e) { if (e.refused) retryPending = undefined; throw e; }
   retryPending = undefined;
   await loadService('notifications');
   if (!r.accepted) throw new Error(r.reason);
@@ -164,7 +166,7 @@ const scope = (w) => ({ worktreeId: w.id });
 const read = (reply) => { if (!('result' in reply)) throw new Error('The service returned no usable Git record.'); return reply.result; };
 const writeWt = (id, patch) => engineWrite({ worktrees: S().worktrees.map((w) => w.id === id ? { ...w, ...patch } : w) });
 function local(w) { if (!w || w.machine !== 'local') throw new Error('Git is available only for a workspace on local.'); }
-function destination(w) { return S().worktrees.find((x) => x.repo === w.repo && x.branch === w.parent); }
+function destination(w) { return S().worktrees.find((x) => x.repo === w.repo && x.id === w.parentId); }
 async function loadGit(project) {
   if (!mapping) return;
   const version = revision;

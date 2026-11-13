@@ -67,7 +67,7 @@ export interface StoreRequest {
 }
 export interface StoreWorktree {
   readonly id: string; readonly repo: string; readonly kind: "base" | "project" | "team"; readonly branch: string
-  readonly parent: string | null; readonly machine: string; readonly folder: string
+  readonly parent: string | null; readonly parentId: string | null; readonly machine: string; readonly folder: string
   readonly files: ReadonlyArray<never>; readonly commits: ReadonlyArray<never>; readonly ahead: number; readonly behind: number
   readonly merge: null; readonly owner: string | null; readonly team: string | null; readonly project: string | null
 }

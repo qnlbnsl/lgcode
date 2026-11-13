@@ -228,8 +228,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       try {
         const result = await Effect.runPromise(invoke({ ...payload, ...(secret ? { value: secret } : {}), requestId: id }).pipe(Effect.result), { signal: controller!.signal })
         if (result._tag === "Failure") {
-          const error = result.failure as { reason?: unknown; message?: unknown }
-          throw new Error(typeof error.reason === "string" ? error.reason : typeof error.message === "string" ? error.message : "The service refused the request.")
+          const error = result.failure as { _tag?: unknown; reason?: unknown; message?: unknown }
+          const refused = error?._tag === "CommandError"
+          if (refused && retryKey !== undefined) retryIds.delete(retryKey)
+          throw Object.assign(new Error(typeof error?.reason === "string" ? error.reason : typeof error?.message === "string" ? error.message : "The service refused the request."), { refused })
         }
         if (retryKey !== undefined) retryIds.delete(retryKey)
         return result.success

@@ -90,8 +90,8 @@ describe('Git mapping', () => {
     const team = { worktreeId: 'team', repoId: 'repo', branch: 'build', checkout: 'worktree', parentId: 'source' } as import('@lgtm/contracts').Workspace
     const project = { projectId: 'project', worktreeId: 'source', leadAgentId: 'lead' } as import('@lgtm/contracts').Project
     const teams = [{ teamId: 'build', projectId: 'project', worktreeId: 'team' }] as import('@lgtm/contracts').Team[]
-    expect(workspaceIdentity(source, [base, source, team], [project], teams)).toEqual({ kind: 'project', project: 'project', team: null, owner: 'lead', parent: 'main' })
-    expect(workspaceIdentity(team, [base, source, team], [project], teams)).toEqual({ kind: 'team', project: 'project', team: 'build', owner: null, parent: 'project' })
+    expect(workspaceIdentity(source, [base, source, team], [project], teams)).toEqual({ kind: 'project', project: 'project', team: null, owner: 'lead', parent: 'main', parentId: 'base' })
+    expect(workspaceIdentity(team, [base, source, team], [project], teams)).toEqual({ kind: 'team', project: 'project', team: 'build', owner: null, parent: 'project', parentId: 'source' })
   })
   it('keeps both indexed and working sides of a partially staged file', () => {
     const rows = mapGitChanges([{ path: 'file.txt', originalPath: 'old.txt', staged: true, unstaged: true, conflict: false, untracked: false, index: 'R', worktree: 'M' }])
