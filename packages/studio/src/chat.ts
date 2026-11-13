@@ -33,15 +33,16 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
   const proposed = question?.proposedAnswer ?? row.display?.proposedAnswer
   const input = permission?.toolInput
   const kind = row.display?.toolKind ?? permission?.toolKind
-  // A very long command arrives cut, and not as a readable input. The harness's description is
-  // then the command.
+  const cut = kind === "execute" && (permission?.inputTruncated ?? row.display?.inputTruncated) === true
+  // The engine marks a very long command's input as cut, and it is then not a readable input.
+  // The harness's description is the command in that case, and only in that case.
   const command = input && typeof input === "object" && "command" in input && typeof input.command === "string" ? input.command
-    : kind === "execute" && permission?.description ? permission.description : null
+    : cut && permission?.description ? permission.description : null
   const cwd = input && typeof input === "object" && "cwd" in input && typeof input.cwd === "string" ? input.cwd : null
   return { ...base, sourceSequence: row.sourceSequence, status: row.status, canAnswer: row.canAnswer,
     sprint: row.sprintId ?? question?.sprintId ?? permission?.sprintId ?? null,
     project: row.projectId ?? base.project, task: row.taskId ?? base.task,
-    title: question?.title ?? (row.kind === "permission" ? attemptTitle(base.title, command ?? (kind === "execute" && base.body ? base.body : null), kind) : base.title),
+    title: question?.title ?? (row.kind === "permission" ? attemptTitle(base.title, command ?? (cut && base.body ? base.body : null), kind) : base.title),
     body: question?.text ?? permission?.description ?? base.body,
     ...(cwd ? { folder: cwd } : {}),
     recommendation: question?.recommendation ?? base.recommendation, command,

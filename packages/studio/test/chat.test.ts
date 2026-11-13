@@ -32,7 +32,10 @@ describe("Home mapping", () => {
   })
   it("gives a plain title to a command whose input arrived cut", () => {
     const row = { ...engineSnapshot.requests[0], kind: "permission", display: { ...engineSnapshot.requests[0]!.display, title: undefined, preview: "printf '%s' \\\n  'one'", toolKind: "execute" } } as unknown as ClientRequest
-    const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "printf '%s' \\\n  'one' \\\n  'two'", toolKind: "execute", toolInput: "{\"command\":\"printf", options: [] }))!
+    const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "printf '%s' \\\n  'one' \\\n  'two'", toolKind: "execute", inputTruncated: true, toolInput: "{\"command\":\"printf", options: [] }))!
+    // A description in plain words is never read as a command when the input is whole or hidden.
+    const prose = { ...row, display: { ...row.display, preview: "Run Studio checks" } } as unknown as ClientRequest
+    expect(mapHomeRequest(prose, agents)).toMatchObject({ title: "Run Studio checks", command: null })
     expect(result).toMatchObject({ title: 'Run "printf" in the terminal', command: "printf '%s' \\\n  'one' \\\n  'two'" })
   })
   it("names what a command attempts and keeps a harness's own description", () => {

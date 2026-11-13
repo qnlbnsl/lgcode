@@ -11756,3 +11756,11 @@ The complete two-worker repeat run passed all 120 cases in 18.9 minutes with zer
 The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
 The unit suite retained its two pre-existing skips.
 The fixes are in signed commits `eeab43a` and `3e5f892`.
+
+## 683. A plain-word approval description was read as a command.
+
+The full check on 2026-11-13 found this in the live chat browser journey.
+The fix for issue 668 treated a harness's description as the command whenever the tool's input was not readable.
+A request without its source event, such as a row on Home, then turned "Run Studio checks" into 'Run "Run" in the terminal'.
+The description now stands in for the command only when the engine marks the input as cut.
+A unit test covers the plain-word case.
