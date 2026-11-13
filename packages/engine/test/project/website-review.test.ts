@@ -93,6 +93,9 @@ it.live("validates a component workspace once per read and rechecks every design
       unlinkSync(join(workspace.path, "design/card.html"))
       symlinkSync(join(workspace.path, "design/other.html"), join(workspace.path, "design/card.html"))
       expect((yield* componentDisplay(input, selection).pipe(Effect.result))._tag).toBe("Failure")
+      unlinkSync(join(workspace.path, "design/card.html"))
+      writeFileSync(join(workspace.path, "design/card.html"), files["card.html"])
+      expect((yield* componentDisplay(input, selection)).text).toBe(files["card.html"])
       expect((yield* componentDisplay({ ...input, actor: { _tag: "agent", agentId: project.leadAgentId } }, selection).pipe(Effect.result))._tag).toBe("Failure")
     } finally { process.mockRestore() }
   }))

@@ -10768,7 +10768,7 @@ The manager owns the separate new-project disposition; that case is not repeated
 ## 609. The Git lost-reply assertion is timing-sensitive in a full browser run
 
 Found: 2026-11-10, while finishing the independently reviewed W09 correction.
-State: open, reserved by the manager; no correction is applied in this merge.
+State: fixed by the web-flaky investigation.
 
 The full check on signed d71de21 passed typing, 507 unit files and 36 browser cases.
 The lost-reply assertion at git.spec.ts:269 still saw the initial unconfirmed acknowledgement within its unchanged five-second budget.
@@ -10796,6 +10796,13 @@ Every assertion retains its original five-second deadline.
 A related timing failure appeared in the full run of the rename branch on 2026-11-12, at git.spec.ts:316.
 After Pull, the sync line still said "1 incoming" after five seconds.
 The unchanged case passed on its own in 24.5 seconds.
+
+The corrected lost-reply and synchronization cases each passed 20 remote repetitions with two browser workers.
+The repeat run used zero retries and retained the original assertion deadlines.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
 
 
 ## 610. The merged shell constrained the Git workspace width
@@ -11128,6 +11135,8 @@ The live repository description also omits the mock's promise that a lead will w
 
 ## 634. The full browser check failed in three unchanged website cases.
 
+State: fixed by the web-flaky investigation.
+
 The full check at `04eb7aa` passed all TypeScript checks and all 528 test files.
 Its browser run passed the three Studio cases and failed three existing website cases.
 The Git staging case could not find the expected disabled "Commit 2 files" button after staging.
@@ -11147,6 +11156,15 @@ Those waits correct test ordering faults.
 The same investigation found repeated engine workspace validation on every component request.
 Issue web-flaky-1 records that product performance fault and its correction.
 The same correction separates the synchronization command acknowledgments from their subsequent counts.
+
+The corrected bulk-stage and component-preview cases each passed 20 remote repetitions with two browser workers.
+The same run also passed 20 synchronization cases and 20 heavy Git layout cases.
+The complete repeat run passed all 120 cases in 18.9 minutes without retries.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
 
 ## 635. A failed logout claimed that the engine had ended the session.
 
@@ -11229,7 +11247,7 @@ They inspect every mapped collection after confirmed and unconfirmed logout atte
 ## 643. The separate browser gate reported four failures outside the studio page.
 
 Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
-State: open.
+State: fixed by the web-flaky investigation.
 
 The separate browser run passed 42 cases and failed four cases.
 The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
@@ -11252,6 +11270,14 @@ It separates display issuance, the exact document response, and rendered asset e
 The original five-second assertion deadlines remain unchanged.
 Its logout correction is recorded in issue 653.
 The reproduced fetch report receives the same acknowledgment ordering correction in issue 609.
+
+The web-flaky repeat run passed all 120 cases in 18.9 minutes with two workers and zero retries.
+It included 20 repetitions each of bulk staging, lost-reply recovery, synchronization, logout, component preview, and the heavy Git layout journey.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
 
 ## 644. A fast first response could leave the live page on its checking screen.
 
@@ -11328,7 +11354,7 @@ The standalone mock keeps its original wording.
 ## 653. The existing project-creation logout journey can time out.
 
 Found: 2026-11-13, during the full remote check of `8577d48`.
-State: open.
+State: fixed by the web-flaky investigation.
 
 The case at `packages/web/e2e/new-project.spec.ts:225` reached its unchanged 30-second limit.
 The other 45 browser cases passed.
@@ -11348,6 +11374,14 @@ The old test passed only when it opened the detour before that default selection
 This was a test fault.
 The test now explicitly selects New repository before entering its private registration draft.
 The corrected journey still verifies the real logout, the next login, and both cleared drafts.
+
+The corrected logout journey passed all 20 remote repetitions with two browser workers and zero retries.
+Its real session revocation and cleared-draft assertions remain intact.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
 
 ## 654. The Nudge regression test still expected an unconnected control after the merge.
 
@@ -11385,7 +11419,7 @@ The browser journey checks the same worker in the blocked lane and the table.
 ## web-flaky-1. A component preview repeated its Git workspace validation for every artifact.
 
 Found: 2026-11-13, while reproducing issues 634 and 643.
-State: corrected, with the full verification in progress.
+State: fixed.
 
 The component display read verified the design file, its tokens, and every registered component independently.
 Each artifact verification repeated the same repository and workspace Git checks.
@@ -11403,3 +11437,10 @@ It retains no verification across requests.
 The regression test rejects changed design bytes, tokens, sibling components, selected components, branches, symbolic links, and agent access on subsequent reads.
 That test fails against the old engine at 60 Git processes and passes with the correction.
 No timeout, retry, authentication rule, or display authority was changed.
+
+The corrected browser journey passed all 20 remote repetitions alongside the other Git and logout cases.
+The complete two-worker repeat run passed all 120 cases in 18.9 minutes with zero retries.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
