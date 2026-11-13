@@ -38,6 +38,9 @@ export const RolesSettings = Schema.Struct({
   stallWatch: Schema.optionalKey(Schema.Boolean),
   assignedStallMinutes: Schema.optionalKey(bounded(1, 120)),
   leadStallMinutes: Schema.optionalKey(bounded(1, 240)),
+  autoNudge: Schema.optionalKey(Schema.Boolean),
+  nudgeAttempts: Schema.optionalKey(bounded(0, 9)),
+  replaceAfter: Schema.optionalKey(bounded(1, 9)),
   standingRules: Schema.optionalKey(Schema.Boolean),
   limits: Schema.optionalKey(RoleLimits),
 })

@@ -16,11 +16,28 @@ test('saved assigned, worker and lead timers change the stall evaluator input; a
     expect((yield* read('roles.settings.get')).settings).toEqual(settings)
     const input = yield* handler.input({ _tag: 'owner' })
     const snapshot = input.snapshot
-    expect(stallInput(snapshot).snapshot.agents[agent.agentId].stallMinutes).toBe(minutes)
+    expect(stallInput(snapshot).snapshot.agents[agent.agentId]!.stallMinutes).toBe(minutes)
     expect(resolveSettings(settings, { kind: 'worker', limits: {} }).stallMinutes).toBe(minutes + 2)
     expect(resolveSettings(settings, { kind: 'lead', limits: {} }).stallMinutes).toBe(minutes + 1)
     expect(resolveSettings(settings, { kind: 'lead', limits: { stallMinutes: 44 } }).stallMinutes).toBe(44)
     const refused = yield* call(agentCredential(agent.token), 'roles.settings.set', { settings })
     expect(refused).toMatchObject({ _tag: 'Failure', failure: { reason: 'command refused' } })
+  }
+}), registerRebuildCheck()))
+
+import { evaluateStall, type StallInput } from '../../../src/roles/stall-watch/rules/stall.ts'
+test('saved auto-nudge, attempt count and replacement threshold change who is woken', async () => run(Effect.gen(function* () {
+  const handler = yield* CommandHandler
+  const evaluate = (settings: object, occurrence: number) => evaluateStall({ now: 600_000,
+    snapshot: { sequence: 1, agents: { worker: { state: 'idle', parent: 'owner', role: 'worker' } }, deliveries: {}, roles: { settings, actions: [] } },
+    status: { disabled: false }, episode: { elapsed: 600_000, occurrence, addressee: 'worker', post: { postId: 'p', author: 'owner', reply: 'all', to: ['worker'] } },
+  } as StallInput)
+  for (const settings of [{ autoNudge: false, nudgeAttempts: 2, replaceAfter: 4 }, { autoNudge: true, nudgeAttempts: 1, replaceAfter: 3 }]) {
+    expect((yield* call(ownerCredential, 'roles.settings.set', { settings }))._tag).toBe('Success')
+    const saved = (yield* read('roles.settings.get')).settings
+    expect(evaluate(saved, 0)[0]!.noticeRecipient).toBe(settings.autoNudge ? 'worker' : 'owner')
+    expect(evaluate(saved, 1).some((a) => a.noticeRecipient === 'worker')).toBe(!settings.autoNudge ? false : settings.nudgeAttempts > 1)
+    expect(evaluate(saved, settings.replaceAfter - 1)[0]!._tag).toBe('roles.ReplaceAdvised')
+    expect(evaluate(saved, settings.replaceAfter)).toEqual([])
   }
 }), registerRebuildCheck()))
