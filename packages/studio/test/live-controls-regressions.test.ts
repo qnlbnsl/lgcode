@@ -162,13 +162,13 @@ it("Home renders retained requests when agent summaries are truncated (finding 2
   expect(element.textContent).not.toMatch(/undefined|NaN/)
 })
 
-it("Nudge refuses even when the board has no channel to mutate (finding 7)", async () => {
+it("Nudge shows an engine refusal without inventing a board post (finding 7)", async () => {
   const { store, calls } = await mount("/p/pj-orchard/agents")
   element.querySelector<HTMLElement>('[aria-label="More for Worker one"]')!.click(); await settle()
   button("Nudge").click(); await settle()
-  noticeOnly(store.state)
+  expect(store.state.toasts.map((t: { text: string }) => t.text)).toEqual(["Test refusal"])
   expect(store.state.posts).toEqual([])
-  expect(calls).toEqual([])
+  expect(calls).toEqual(["board.post"])
 })
 
 it("sign-in refuses before showing a simulated account flow (finding 7)", async () => {
@@ -200,4 +200,26 @@ it("shows a fast initial session response before passive effects run", async () 
   expect(store.state.session.status).toBe("in")
   expect(element.querySelector(".tree-row.project")).not.toBeNull()
   expect(element.querySelector(".tree-row.project")?.textContent).toContain("Harvest report")
+})
+
+it("the actual logout clears an answered request retained by the Home reader", async () => {
+  const mapping = await import("../src/chat.ts")
+  const chat = await import("../../../design/mock/js/live/chat.js" as string) as { setMapping(value: typeof mapping | undefined): void }
+  chat.setMapping(mapping)
+  try {
+    const client = {
+      "client.snapshot": () => Effect.succeed(engineSnapshot), "project.settings": () => Effect.succeed({}),
+      "client.subscribe": () => Stream.never, accounts: () => Effect.succeed({ accounts: [] }),
+      "client.alerts.settings": () => Effect.succeed({ carrier: { _tag: "none" }, pushPromptDismissed: false }),
+      "client.requests": () => Effect.succeed({ items: [{ ...engineSnapshot.questions[0]!, kind: "question", status: "answered", canAnswer: false, answer: "Recorded answer" }] })
+    } as unknown as Client
+    const connection = engineConnection({ location: { protocol: "http:", host: "127.0.0.1:8787" }, debug() {},
+      connect: (() => Effect.succeed(client)) as typeof connect, fetch: async () => new Response(null, { status: 204 }) })
+    const { store } = await mount("/home", connection)
+    await vi.waitFor(() => expect(store.state.requests).toEqual(expect.arrayContaining([expect.objectContaining({ status: "answered", answer: "Recorded answer" })])))
+    element.querySelector<HTMLElement>('[aria-label="Log out"]')!.click()
+    await vi.waitFor(() => expect(store.state.session.status).toBe("out"))
+    expect(store.state.requests).toEqual([])
+    expect(element.querySelector("#login-password")).not.toBeNull()
+  } finally { chat.setMapping(undefined) }
 })

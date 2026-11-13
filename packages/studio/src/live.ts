@@ -4,6 +4,8 @@
 import { engineConnection, type LiveConnection } from "./connection.ts"
 import * as mappings from "./git.ts"
 
+import * as chatMapping from "./chat.ts"
+
 interface Website {
   mount(element: Element, options: { readonly connection: LiveConnection; readonly mode: "live" }): unknown
 }
@@ -12,5 +14,8 @@ const app = new URL(/* @vite-ignore */ "./js/app.js", import.meta.url).href
 const { mount } = await import(/* @vite-ignore */ app) as Website
 const actions = new URL(/* @vite-ignore */ "./js/live/git.js", import.meta.url).href
 ;(await import(/* @vite-ignore */ actions)).installMappings(mappings)
+const chatModule = new URL(/* @vite-ignore */ "./js/live/chat.js", import.meta.url).href
+const chat = await import(/* @vite-ignore */ chatModule) as { setMapping(mapping: typeof chatMapping): void }
+chat.setMapping(chatMapping)
 const element = document.getElementById("app")
 if (element !== null) mount(element, { connection: engineConnection(), mode: "live" })

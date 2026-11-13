@@ -37,5 +37,6 @@ export function push(kind, payload) {
   try { current.push(kind, payload); } catch (e) { console.error('The connection failed to deliver', kind, e); }
 }
 
+// The live connection owns request ids and the transport.
 // Resolves with the engine reply, or rejects with its refusal reason.
 export function request(tag, payload) { return current.request(tag, payload); }

@@ -67,7 +67,7 @@ describe("machines, repositories and workspaces", () => {
 describe("projects and teams", () => {
   it("maps a project with its branch, folder, stage and lead", () => {
     expect(mapProject(section.projects[0]!, section.workspaces)).toEqual({
-      id: "pj-orchard", repo: "rp-orchard", name: "Harvest report", prefix: "HR", goal: "Count the apples every morning.",
+      worktree: "wt-project", id: "pj-orchard", repo: "rp-orchard", name: "Harvest report", prefix: "HR", goal: "Count the apples every morning.",
       stage: "Build", phase: "build", branch: "feature/harvest", folder: "/srv/repos/orchard/.worktrees/harvest", machine: "local",
       lead: "ag-lead", shell: "bash", createdAt: null, archived: false, hasMocks: false, tests: "on", agentReview: "on"
     })
@@ -75,7 +75,7 @@ describe("projects and teams", () => {
   })
   it("keeps a team's own name and its branch", () => {
     expect(mapTeam(section.teams[0]!, section.workspaces)).toEqual({
-      id: "tm-alpha", project: "pj-orchard", name: "Alpha team", stage: "Build", area: null, branch: "feature/harvest/alpha", needToKnow: false
+      worktree: "wt-team", id: "tm-alpha", project: "pj-orchard", name: "Alpha team", stage: "Build", area: null, branch: "feature/harvest/alpha", needToKnow: false
     })
   })
 })
@@ -112,8 +112,8 @@ describe("requests", () => {
   const agents = engineSnapshot.agents.flatMap((a) => mapAgent(a, section) ?? [])
   it("maps a permission request as an approval with its options", () => {
     expect(mapRequest(engineSnapshot.requests[0]!, "approval", agents)).toEqual({
-      id: "perm-1", kind: "approval", agent: "ag-worker", project: "pj-orchard", task: null, title: "Run the orchard checks",
-      body: "Run the orchard checks\nnpm test", command: null, folder: "", tool: "execute", recommendation: null,
+      sourceSequence: 30, id: "perm-1", kind: "approval", agent: "ag-worker", project: "pj-orchard", task: null, title: "Run the orchard checks",
+      body: "Run the orchard checks\nnpm test", command: null, folder: "/srv/repos/orchard", tool: "execute", recommendation: null,
       options: [{ id: "allow", label: "Allow once", primary: true }, { id: "deny", label: "Deny" }],
       createdAt: 1_700_000_100_000, status: "open", heldBy: null
     })

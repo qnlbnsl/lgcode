@@ -19,6 +19,7 @@ import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type Engin
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable" | "logout-unconfirmed"
 export interface StorePatch extends Partial<EngineRecords> {
+  readonly chatEvent?: unknown
   readonly session?: { readonly status: SessionStatus; readonly firstRun: boolean }
   readonly conn?: StoreConn
   readonly owner?: StoreOwner
@@ -150,7 +151,6 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     let failures = 0
     const publish = (snapshot: ClientSnapshot) => {
       current = snapshot
-      after = snapshot.sequence
       const records = board.mapBoardRecords(snapshot, mapSnapshot(snapshot, now()))
       if (!signal.aborted) write({ ...records, notifications: mapAlerts(snapshot.alerts ?? [], records.agents), channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision, boardDetails: board.mapStalls(snapshot.roles),
         session: { status: "in", firstRun: snapshot.project?.setup !== undefined && snapshot.project.setup.completedAt === undefined } })
@@ -160,6 +160,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         yield* Effect.scoped(Effect.gen(function* () {
           const client: Client = yield* open({ url })
           activeClient = client
+          yield* Effect.addFinalizer(() => Effect.sync(() => { if (activeClient === client) activeClient = undefined }))
           // The snapshot is bounded. Page its navigation records when its project
           // section was cut short, and retry if the log changed during that read.
           const hydrate = (snapshot: ClientSnapshot) => Effect.gen(function* () {
@@ -200,7 +201,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
               yield* Effect.sleep(25)
             }
           })
-          if (current === undefined) yield* refresh()
+          if (current === undefined) {
+            yield* refresh()
+            after = (current as ClientSnapshot | undefined)?.sequence ?? after
+          }
           if (!signal.aborted) setConn("live")
           // The owner's name is the one saved in the engine's settings, or else Git's
           // user.name. Refresh it when settings change as well as on connection.
@@ -222,6 +226,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
             if (signal.aborted) return
             setConn("live")
             if (item.sequence <= after) return
+            if (!signal.aborted) write({ chatEvent: item })
             if ("event" in item) {
               if (item.event._tag === "project.SettingsChanged") yield* refreshOwner()
               yield* apply(item, refresh)
@@ -252,7 +257,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         accountLimits = { ...accountLimits, [event.accountId]: event._tag === "AccountOutOfUsage" ? event.resetAt ?? null : null }
         write({ accountLimits })
       }
-      if (event._tag === "StateChanged" && current !== undefined) {
+      if (event._tag === "StateChanged" && current !== undefined && item.sequence > current.sequence) {
         publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => {
           if (agent.agentId !== event.agentId) return agent
           const updated = { ...agent, state: event.state }
@@ -275,8 +280,6 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   return {
     kind: "engine",
     label: "the service",
-    // Sending changes to the engine is step 2 of the plan. Until then the website refuses
-    // each action before it reaches this point.
     board,
     call() {},
     push() {},

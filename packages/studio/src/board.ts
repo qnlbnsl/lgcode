@@ -27,7 +27,7 @@ export function mapBoardRecords(snapshot: ClientSnapshot, records: EngineRecords
       worktreeId: section?.tasks.find((r) => r.taskId === t.id)?.worktreeId ?? "",
       blockedBy: records.requests.find((r) => r.task === t.id)?.kind ?? null })),
     requests: records.requests.map((r) => ({ ...r, sprint: [...snapshot.requests, ...snapshot.questions].find((row) => row.id === r.id)?.display?.sprintId ?? null })),
-    agents: records.agents.map((a) => ({ ...a, stalled: stalls.agents.includes(a.id), activity: snapshot.agents.find((row) => row.agentId === a.id)?.displayedState ?? "", name: a.role === "project-lead" ? "Project lead" : a.role === "team-lead" ? "Team lead" : a.role.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "), task: section?.tasks.find((t) => t.owner === a.id && t.state !== "done")?.label ?? null }))
+    agents: records.agents.map((a) => ({ ...a, stalled: stalls.agents.includes(a.id), activity: snapshot.agents.find((row) => row.agentId === a.id)?.displayedState ?? "", name: a.role === "project-lead" ? "Project lead" : a.role === "team-lead" ? "Team lead" : a.name, task: section?.tasks.find((t) => t.owner === a.id && t.state !== "done")?.label ?? null }))
   }
 }
 export const authorId = (author: BoardAuthor): string => author._tag === "agent" ? author.agentId : author._tag === "owner" ? "owner" : `service:${author.service}`

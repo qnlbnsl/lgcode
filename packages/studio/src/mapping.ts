@@ -39,12 +39,14 @@ export interface StoreSubscription {
 }
 export type StoreStage = "Design" | "Plan" | "Build" | "Review" | "Hand over"
 export interface StoreProject {
+  readonly worktree?: string
   readonly id: string; readonly repo: string; readonly name: string; readonly prefix: string; readonly goal: string
   readonly stage: StoreStage | ""; readonly phase: string; readonly branch: string; readonly folder: string
   readonly machine: string; readonly lead: string; readonly shell: string; readonly createdAt: number | null
   readonly archived: boolean; readonly hasMocks: boolean; readonly tests: "on" | "off" | ""; readonly agentReview: "on" | "off" | ""
 }
 export interface StoreTeam {
+  readonly worktree?: string
   readonly id: string; readonly project: string; readonly name: string; readonly stage: StoreStage | ""
   readonly area: string | null; readonly branch: string; readonly needToKnow: boolean
 }
@@ -52,6 +54,7 @@ export type StoreAgentState = "starting" | "working" | "waiting" | "idle" | "pau
 export interface StoreAgent {
   readonly id: string; readonly project: string; readonly team: string | null; readonly role: string; readonly name: string
   readonly harness: string; readonly subscription: string; readonly model: string; readonly effort: string | null
+  readonly folder?: string
   readonly permission: string; readonly state: StoreAgentState; readonly activity: string; readonly task: string | null
   readonly context: number; readonly turns: number; readonly tokens: number; readonly workState: string
   readonly stalled: boolean; readonly startedAt: number; readonly lastOutputAt: number
@@ -59,6 +62,7 @@ export interface StoreAgent {
 }
 export interface StoreOption { readonly id: string; readonly label: string; readonly primary?: boolean }
 export interface StoreRequest {
+  readonly sourceSequence?: number
   readonly id: string; readonly kind: "approval" | "question"; readonly agent: string; readonly project: string
   readonly task: string | null; readonly title: string; readonly body: string; readonly command: string | null
   readonly folder: string; readonly tool: string | null; readonly recommendation: string | null
@@ -163,7 +167,7 @@ export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<Engi
 export function mapProject(project: EngineProject, workspaces: ReadonlyArray<EngineWorkspace>): StoreProject {
   const workspace = workspaces.find((row) => row.worktreeId === project.worktreeId)
   return {
-    id: project.projectId, repo: project.repoId, name: project.name, prefix: prefixOf(project.name), goal: project.goal,
+    worktree: project.worktreeId, id: project.projectId, repo: project.repoId, name: project.name, prefix: prefixOf(project.name), goal: project.goal,
     stage: mapStage(project.stage), phase: project.stage ?? "", branch: workspace?.branch ?? "", folder: workspace?.path ?? "",
     machine: project.machineId, lead: project.leadAgentId, shell: project.shell ?? "", createdAt: null,
     archived: project.archivedAt !== undefined, hasMocks: false, tests: "on", agentReview: "on"
@@ -172,7 +176,7 @@ export function mapProject(project: EngineProject, workspaces: ReadonlyArray<Eng
 
 export function mapTeam(team: EngineTeam, workspaces: ReadonlyArray<EngineWorkspace>): StoreTeam {
   return {
-    id: team.teamId, project: team.projectId, name: team.name, stage: mapStage(team.stage), area: team.area ?? null,
+    worktree: team.worktreeId, id: team.teamId, project: team.projectId, name: team.name, stage: mapStage(team.stage), area: team.area ?? null,
     branch: workspaces.find((row) => row.worktreeId === team.worktreeId)?.branch ?? "", needToKnow: false
   }
 }
@@ -214,7 +218,7 @@ export function mapAgent(agent: EngineAgent, section: Pick<ProjectSection, "proj
   return {
     id: agent.agentId, project: projectId, team: led !== undefined ? null : team?.teamId ?? null,
     role: mapRole(agent.role, led !== undefined), name: agent.name, harness: agent.harness, subscription: agent.account,
-    model: agent.model ?? "", effort: agent.effort ?? null, permission: mapPermission(agent.permission), state,
+    folder: agent.folder, model: agent.model ?? "", effort: agent.effort ?? null, permission: mapPermission(agent.permission), state,
     activity: quiet ? "" : agent.displayedState, task: null, context: 0, turns: 0, tokens: 0, workState: WORK_STATE[state],
     stalled: false, startedAt: agent.startedAt, lastOutputAt: agent.startedAt,
     failure: agent.startFailure === undefined ? null : { reason: startFailureText(agent.startFailure) }
@@ -261,12 +265,13 @@ export function mapRequest(row: EngineRow, kind: "approval" | "question", agents
   const preview = display?.preview ?? ""
   const firstLine = preview.split("\n").find((line) => line.trim() !== "")?.trim() ?? ""
   const title = display?.title ?? (firstLine || (kind === "approval" ? "Permission request" : "Question"))
-  const options: StoreOption[] = (display?.options ?? []).map((option, index) => ({
-    id: option.id, label: option.name, ...(index === 0 ? { primary: true } : {})
+  const options: StoreOption[] = (display?.options ?? []).map((option) => ({
+    id: option.id, label: option.name, ...(option.kind === "allow_once" ? { primary: true } : {})
   }))
   return {
+    sourceSequence: row.sourceSequence,
     id: row.id, kind, agent: row.agentId, project, task: display?.taskId ?? null, title, body: preview,
-    command: null, folder: "", tool: display?.toolKind ?? null, recommendation: display?.recommendation ?? null,
+    command: null, folder: agent?.folder ?? "", tool: display?.toolKind ?? null, recommendation: display?.recommendation ?? null,
     options, createdAt: row.openedAt ?? 0, status: "open", heldBy: row.holder._tag === "agent" ? row.holder.agentId : null
   }
 }

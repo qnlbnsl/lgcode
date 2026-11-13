@@ -1,4 +1,5 @@
 import * as liveGit from './live/git.js';
+import * as chat from './live/chat.js';
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
   html, render, useState, useEffect, useRef, Icon, cx, store, update, useStore, useRoute, go, href, ago, useNow, useKey, useMedia,
@@ -397,6 +398,11 @@ function mountLive(el) {
   addEventListener('error', onRefusedError);
   addEventListener('unhandledrejection', onRefusedError);
   engine.connection().open?.((patch) => {
+    if (patch.session && patch.session.status !== 'checking' && patch.session.status !== 'in') {
+      chat.reset(); engineWrite({ threads: {}, pending: {} });
+    }
+    if (patch.chatEvent) { chat.receive(patch.chatEvent); return; }
+    chat.enrich(patch);
     // The Workflow and Mocks tabs keep one record per project. Each live project gets an
     // empty one, frozen like the rest, so the tabs show their empty structure.
     if (patch.projects) Object.assign(patch, {
@@ -409,6 +415,7 @@ function mountLive(el) {
     }
     liveGit.observe(patch);
     engineWrite(patch);
+    if (patch.conn?.status === 'live') chat.connected();
     // The sidebar opens each repository the first time the engine names it, as the sample does.
     if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
   });
@@ -423,7 +430,7 @@ function onRefusedError(e) {
 // Takes the website out of the element and returns to the default connection.
 export function unmount(el) {
   render(null, el);
-  if (live.on) { engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
+  if (live.on) { chat.reset(); engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
   engine.setConnection(null);
   slots = {};
 }

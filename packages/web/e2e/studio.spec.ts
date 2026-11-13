@@ -17,13 +17,285 @@ import { serve } from "../../engine/src/client/web/server.ts"
 import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
-import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
-import { appendSetup, call, eventOf, ownerCredential, seedAccount, harnessSettings, success, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
+import { incarnationOf, makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
+import { seedAccount, harnessSettings, agentCredential, appendSetup, eventOf, ownerCredential, success, call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
 
-test("live website: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
+test.use({ actionTimeout: 10_000 })
+
+test("live chat: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
+  test.setTimeout(90_000)
+  const rig = makeRig()
+  const previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
+  const password = randomBytes(32).toString("base64url")
+  const staticRoot = join(rig.root, "page")
+  mkdirSync(staticRoot)
+  writeFileSync(join(staticRoot, "index.html"), "<!doctype html><title>Current page</title><main>Current page</main>")
+  const errors: string[] = []
+  const violations: string[] = []
+  const timings: string[] = []
+  page.on("pageerror", (error) => errors.push(error.stack ?? error.message))
+  page.on("console", (message) => {
+    // The browser logs the engine's refusal of a signed-out session check and of a wrong
+    // password. Those refusals are expected here.
+    if (message.type() === "error" && !/status of 401/.test(message.text())) errors.push(message.text())
+    if (message.type() === "debug" && message.text().startsWith("LGTM Studio:")) timings.push(message.text())
+  })
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      (window as unknown as { violations?: string[] }).violations ??= []
+      ;(window as unknown as { violations: string[] }).violations.push(`${event.violatedDirective}: ${event.blockedURI}`)
+    })
+  })
+  try {
+    execFileSync('git', ['init', '-b', 'topic'], { cwd: rig.work, stdio: 'ignore' })
+    writeFileSync(join(rig.work, 'reference.txt'), 'Context file body stays on disk.\n')
+    execFileSync('git', ['add', 'reference.txt'], { cwd: rig.work })
+    execFileSync('git', ['-c', 'user.name=Test owner', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Fixture'], { cwd: rig.work, stdio: 'ignore' })
+    const studioRoot = await buildStudio(join(rig.root, "studio"))
+    const port = await unusedPort()
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const runner = yield* makeFakeRunner()
+      const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, {
+        redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text)
+      }))
+      yield* Effect.scoped(Effect.gen(function* () {
+        yield* registerRebuildCheck()
+        const project = yield* decisionSetup()
+        yield* completedSetup(project.projectId)
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "sh" } }))
+        yield* appendSetup([
+          eventOf({ _tag: 'project.RepositoryAdded', repoId: project.repoId, name: 'Repository', path: rig.work }),
+          eventOf({ _tag: 'project.RepositoryLocated', repoId: project.repoId, machineId: 'local', path: rig.work }),
+          eventOf({ _tag: 'project.WorktreeCreated', repoId: project.repoId, worktreeId: project.worktreeId, branch: 'topic', path: rig.work, machineId: 'local', checkout: 'main' }),
+        ])
+        const contextTask = success(yield* call(ownerCredential, 'project.task.create', { ...project.task, label: 'TASK-1', title: 'Use selected context' })).taskId
+        runner.script("choices", () => Effect.succeed({ models: { source: "negotiated", options: [{ id: "test-model", label: "Test model" }, { id: "other-model", label: "Other model" }] }, efforts: { source: "negotiated", options: [{ id: "high", label: "High" }, { id: "low", label: "Low" }] } }))
+        runner.script("context", () => Effect.succeed({ _tag: "available", used: 25, window: 100, percent: 25, reportedAt: Date.now() }))
+        runner.script("cancel", (input) => runner.emitRaw({ _tag: "turnEnded", ...input, stopped: true,
+          incarnation: runner.callsOf("prompt").filter((c) => c.input.agentId === input.agentId).at(-1)?.input.incarnation ?? incarnationOf(project.worker.token) }))
+        const questionId = success(yield* call(project.leadCredential, "ask", { title: "Choose the release branch", text: "Which branch should the release use?", recommendation: "Keep one branch", proposedAnswer: "Use trunk" })).questionId
+        yield* appendSetup([eventOf({ _tag: "PermissionRequested", agentId: project.leadId, permissionRequestId: "studio-permission", holder: { _tag: "owner" }, deliveryId: `seed-turn-${project.leadId}`, toolCallId: "studio-check", description: "Run Studio checks", options: [{ id: "harness-once", name: "Run once", kind: "allow_once", level: "ask", persistent: false }, { id: "harness-never", name: "Refuse this check", kind: "reject_once", level: "read-only", persistent: false }], settingsWrite: false, toolKind: "execute", toolInput: { command: "pnpm test studio" } })])
+        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
+          settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          // The current page keeps working at the root, and /studio is sent to /studio/.
+          await page.goto(origin)
+          await expect(page).toHaveTitle("Current page")
+          await page.goto(`${origin}/studio`)
+          await expect(page).toHaveURL(`${origin}/studio/`)
+
+          // A signed-out visitor sees the Login page, and a wrong password is refused.
+          await expect(page.locator("#login-password")).toBeVisible()
+          await page.locator("#login-password").fill("not the password")
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          await expect(page.getByText("That password is wrong. Nothing was signed in.")).toBeVisible()
+
+          await page.locator("#login-password").fill(password)
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          const sidebar = page.locator(".sidebar")
+          await expect(sidebar.locator(".tree-row.repo")).toContainText("Repository")
+          await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
+          await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
+          for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
+
+          await expect(page.getByRole('button', { name: 'Not now', exact: true })).toBeVisible()
+          await page.getByRole('button', { name: 'Not now', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Not now', exact: true })).toHaveCount(0)
+
+          // Home answers real questions and harness permissions, including full input.
+          await expect(page.locator('.rq-table')).toContainText('Choose the release branch')
+          await page.getByRole('button', { name: 'Show Choose the release branch', exact: true }).click()
+          await page.getByRole('button', { name: 'Accept recommendation', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Show Choose the release branch', exact: true })).toHaveCount(0)
+          await page.getByRole('button', { name: 'Show Run Studio checks', exact: true }).click()
+          await expect(page.locator('.rq-detail')).toContainText('pnpm test studio')
+          await page.getByRole('button', { name: 'Run once', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Show Run Studio checks', exact: true })).toHaveCount(0)
+          await page.getByLabel('Show answered', { exact: true }).check()
+          await expect(page.locator('.rq-table')).toContainText('Use trunk')
+          await expect(page.locator('.rq-table')).toContainText('Run once')
+
+          // A worker's thread is writable for the owner. The engine drives pending state.
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/chat/${project.workerId}`)
+          const thread = page.locator('.chat-main')
+          const composer = thread.locator('textarea')
+          await expect(thread.locator('.ctxuse')).toHaveText('25%')
+          await expect(thread.getByRole('button', { name: 'Subscription', exact: true })).toContainText('Primary')
+          await thread.getByRole('button', { name: 'Stop this reply', exact: true }).click()
+          await expect.poll(() => runner.callsOf('cancel').length).toBe(1)
+          await expect(thread.getByRole('button', { name: 'Send', exact: true })).toBeVisible()
+          await thread.getByRole('button', { name: 'Context', exact: true }).click()
+          await thread.getByPlaceholder('Search tasks and files').fill('TASK-1')
+          await thread.getByRole('button', { name: /TASK-1 · Use selected context/ }).click()
+          await thread.getByRole('button', { name: 'Context', exact: true }).click()
+          await thread.getByPlaceholder('Search tasks and files').fill('reference.txt')
+          await thread.getByRole('button', { name: 'reference.txt', exact: true }).click()
+          await composer.fill('Build the requested screen')
+          await thread.getByRole('button', { name: 'Send', exact: true }).click()
+          await expect(composer).toHaveValue('')
+          await expect.poll(() => runner.callsOf('prompt').filter((c) => c.input.agentId === project.workerId).length).toBe(1)
+          const current = runner.callsOf('prompt').find((c) => c.input.agentId === project.workerId)!.input
+          expect(current.delivery.content).toMatchObject({ _tag: 'prompt', context: [{ _tag: 'task', projectId: project.projectId, taskId: contextTask }, { _tag: 'file', projectId: project.projectId, repoId: project.repoId, worktreeId: project.worktreeId, path: 'reference.txt' }] })
+          expect(JSON.stringify(current.delivery.content)).not.toContain('Context file body stays on disk.')
+          await expect(thread.locator('.thread')).toContainText('Build the requested screen')
+          await expect(thread.locator('.thread')).toContainText('TASK-1')
+          await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-reply', content: { _tag: 'text', text: 'Screen ' }, text: 'Screen ' }))
+          await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-reply', content: { _tag: 'text', text: 'implemented.' }, text: 'implemented.' }))
+          await expect(thread.locator('.thread')).toContainText('Screen implemented.')
+          const largeText = Array.from({ length: 12_000 }, (_, i) => `Trace ${i}: <b>literal output</b>`).join('\n') + '\nEND-OF-STUDIO-TRACE'
+          await Effect.runPromise(runner.emitRaw({ _tag: 'deliveryUpdate', agentId: project.workerId, incarnation: current.incarnation, deliveryId: current.delivery.id, kind: 'message', replay: false, itemId: 'studio-large', content: { _tag: 'text', text: largeText }, text: largeText }))
+          await thread.getByRole('button', { name: 'Load', exact: true }).click()
+          await expect(thread.locator('.thread')).toContainText('END-OF-STUDIO-TRACE')
+          await expect(thread.locator('.thread b')).toHaveCount(0)
+          // Requests rejected by the engine retain its reason in a notice.
+          await thread.getByRole('button', { name: 'Agent actions', exact: true }).click()
+          await page.getByRole('menuitem', { name: 'Compact context', exact: true }).click()
+          await expect(page.locator('.toasts')).toContainText('command refused')
+          await thread.getByRole('button', { name: 'Stop this reply', exact: true }).click()
+          await expect.poll(() => runner.callsOf('cancel').length).toBe(2)
+          await expect(thread.getByRole('button', { name: 'Send', exact: true })).toBeVisible()
+          await thread.getByRole('button', { name: 'Model', exact: true }).click()
+          await page.getByRole('menuitemradio', { name: 'Other model', exact: true }).click()
+          await expect(thread.getByRole('button', { name: 'Model', exact: true })).toContainText('other-model')
+          await thread.getByRole('button', { name: 'Effort', exact: true }).click()
+          await page.getByRole('menuitemradio', { name: 'Low', exact: true }).click()
+          await expect(thread.getByRole('button', { name: 'Effort', exact: true })).toContainText('low')
+          await thread.getByRole('button', { name: 'Agent actions', exact: true }).click()
+          await page.getByRole('menuitem', { name: 'Compact context', exact: true }).click()
+          await expect.poll(() => runner.callsOf('compact').length).toBe(1)
+          await thread.getByRole('button', { name: 'Agent actions', exact: true }).click()
+          await page.getByRole('menuitem', { name: 'Stop agent', exact: true }).click()
+          await page.getByRole('dialog').getByRole('button', { name: 'Stop agent', exact: true }).click()
+          await expect(thread).toContainText('is stopped.')
+          await thread.getByRole('button', { name: 'Resume', exact: true }).click()
+          await expect(thread.locator('textarea')).toBeVisible()
+          await expect.poll(() => runner.callsOf('load').length).toBe(1)
+          await page.reload()
+          await expect(thread.locator('.thread')).toContainText('Build the requested screen')
+          await expect(thread.locator('.thread')).toContainText('Screen implemented.')
+
+          // The project's lead and its team come from the engine.
+          await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/agents`)
+          await expect(page.locator(".main")).toContainText("Build")
+          await expect(page.locator(".main")).toContainText("Project lead")
+          await expect(page.locator(".topbar")).toContainText("Project")
+        })
+
+        // A worker question passes through its lead and is answered inside its thread.
+        const resumedToken = Redacted.value(runner.callsOf("load").at(-1)!.input.token)
+        const workerQuestion = success(yield* call(agentCredential(resumedToken), "ask", { title: "Choose a worker approach", text: "Use the existing adapter?", proposedAnswer: "Keep the adapter", recommendation: "Preserve the interface" })).questionId
+        success(yield* call(project.leadCredential, "pass-up", { subject: { _tag: "question", id: workerQuestion } }))
+        yield* appendSetup([eventOf({ _tag: "PermissionRequested", agentId: project.workerId, permissionRequestId: "studio-thread-permission", holder: { _tag: "owner" }, deliveryId: "thread-permission-delivery", toolCallId: "thread-tool", description: "Check the thread options", options: Array.from({ length: 10 }, (_, i) => ({ id: `thread-option-${i}`, name: i === 9 ? "Harness persistent allow" : `Harness option ${i}`, kind: i === 9 ? "allow_always" : "reject_once", level: i === 9 ? "ask" : "read-only", persistent: i === 9 })), settingsWrite: false, toolInput: { command: "pnpm test thread" } })])
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/chat/${project.workerId}`)
+          const thread = page.locator('.chat-main')
+          // The compact card renders the full source, with a proposed answer from the engine.
+          await expect(thread.locator(`#req-${workerQuestion}`)).toContainText('Use the existing adapter?')
+          await thread.locator(`#req-${workerQuestion}`).getByRole('button', { name: 'Accept', exact: true }).click()
+          await expect(thread.locator(`#req-${workerQuestion}`)).toContainText('Keep the adapter')
+          const permission = thread.locator('#req-studio-thread-permission')
+          await permission.getByRole('button', { name: 'Details', exact: true }).click()
+          await expect(permission).toContainText('pnpm test thread')
+          await permission.getByRole('button', { name: 'Harness persistent allow', exact: true }).click()
+          await expect.poll(() => runner.callsOf('answerPermission').filter((c) => c.input.requestId === 'studio-thread-permission').length).toBe(1)
+        })
+
+        success(yield* call(ownerCredential, 'project.task.update', { projectId: project.projectId, taskId: contextTask, state: 'review' }))
+        yield* appendSetup([eventOf({ _tag: 'roles.StallSeen', agentId: project.workerId, noticeRecipient: 'owner', triggerSequence: 1, sourceSequence: 1, occurrence: 1, notice: 'sent' })])
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/agents`)
+          await expect(page.getByRole('region', { name: 'Blocked', exact: true })).toContainText('name-one-worker')
+          await expect(page.locator('.ag-row').filter({ hasText: 'name-one-worker' })).toContainText('TASK-1')
+          await expect(page.locator('.ag-row').filter({ hasText: 'name-one-worker' }).locator('.ctx')).toContainText('25%')
+          await page.getByRole('button', { name: 'Table', exact: true }).click()
+          const row = page.locator('.ag-table tbody tr').filter({ hasText: 'name-one-worker' })
+          await expect(row).toContainText('TASK-1')
+          await expect(row.locator('.ws')).toHaveText('Reviewing')
+          await expect(row).toContainText('other-model')
+          await row.getByRole('button', { name: 'More for name-one-worker', exact: true }).click()
+          await page.getByRole('menuitem', { name: /^Nudge/ }).click()
+          await row.getByRole('button', { name: 'Stop name-one-worker', exact: true }).click()
+          await page.getByRole('dialog').getByRole('button', { name: 'Stop agent', exact: true }).click()
+          await expect(row.getByRole('button', { name: 'Resume name-one-worker', exact: true })).toBeVisible()
+          await row.getByRole('button', { name: 'Resume name-one-worker', exact: true }).click()
+          await expect(row.getByRole('button', { name: 'Stop name-one-worker', exact: true })).toBeVisible()
+          await row.getByRole('button', { name: 'More for name-one-worker', exact: true }).click()
+          await page.getByRole('menuitemradio', { name: 'Test model', exact: true }).click()
+          await expect(row).toContainText('test-model')
+          // The docked lead panel reads the same engine-backed thread component.
+          await expect(page.locator('.panel .thread')).toContainText('Choose the release branch')
+        })
+        yield* appendSetup([eventOf({ _tag: 'roles.StallEnded', agentId: project.workerId, noticeRecipient: 'owner', triggerSequence: 1, sourceSequence: 1, occurrence: 1, notice: 'sent' })])
+        yield* Effect.promise(async () => {
+          await expect(page.locator('.ag-totals > div').filter({ hasText: 'May be stuck' }).locator('b')).toHaveText('0')
+        })
+        const channels = success(yield* call(ownerCredential, 'board.channels', {}))
+        const direct = channels.items.find((c: { kind: string; members: Array<{ _tag: string; agentId?: string }> }) => c.kind === 'direct' && c.members.some((m) => m.agentId === project.workerId))
+        expect(direct).toBeDefined()
+        const posts = success(yield* call(ownerCredential, 'board.read', { channelId: direct.channelId }))
+        expect(posts.items).toEqual(expect.arrayContaining([expect.objectContaining({ text: 'Status check: what are you on, and is anything in your way?', reply: 'any' })]))
+        const alertSettings = success(yield* call(ownerCredential, 'client.alerts.settings', {}))
+        expect(alertSettings.pushPromptDismissed).toBe(true)
+        // A failed start is a roster record and produces a Home row, without a merge request.
+        yield* appendSetup([eventOf({ _tag: 'AgentStartFailed', agentId: project.workerId, reason: 'not-signed-in' })])
+        yield* Effect.promise(async () => {
+          await page.goto(`http://127.0.0.1:${port}/studio/#/home`)
+          await expect(page.locator('.rq-table')).toContainText('name-one-worker failed to start')
+          await page.getByRole('button', { name: 'Show name-one-worker failed to start', exact: true }).click()
+          await expect(page.locator('.rq-detail')).toContainText('Not signed in')
+          await expect(page.locator('.rq-detail').getByRole('button', { name: 'Resume', exact: true })).toBeVisible()
+          await expect(page.locator('.rq-table .kind.merge')).toHaveCount(0)
+          await page.locator('.bell').click()
+          await expect(page.getByRole('menuitem', { name: /name-one-worker failed to start/ })).toBeVisible()
+          await page.getByRole('menuitem', { name: 'Open Home', exact: true }).click()
+        })
+
+        const answered = success(yield* call(ownerCredential, "client.requests", { after: 0, limit: 100 }))
+        expect(answered.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: questionId, status: "answered", answer: "Use trunk" }), expect.objectContaining({ id: "studio-permission", status: "answered", optionId: "harness-once" })]))
+
+        // A change in the engine reaches the open page through the stream.
+        yield* call(project.leadCredential, "project.sprint.create", { projectId: project.projectId, label: "SP-2",
+          name: "Pushed sprint", goal: "Arrive on the stream", phase: "Plan", owner: project.leadId, needs: [] })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          const sidebar = page.locator(".sidebar")
+          await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/board`)
+          await expect(page.locator(".main")).toContainText("Pushed sprint")
+          await expect.poll(() => timings.some((line) => line.includes("first pushed update") && line.includes("after the engine recorded it"))).toBe(true)
+          await page.goto(`${origin}/studio/#/home`)
+
+          // A reload keeps the session, which is the engine's cookie.
+          await page.reload()
+          await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBeGreaterThanOrEqual(3)
+
+          // Logging out ends the session and leaves no records on the page.
+          await page.getByRole("button", { name: "Log out" }).click()
+          await expect(page.locator("#login-password")).toBeVisible()
+          await expect(page.locator(".tree-row")).toHaveCount(0)
+        })
+      })).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
+    })).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<void, unknown, never>)
+    expect(await page.evaluate(() => (window as unknown as { violations?: string[] }).violations ?? [])).toEqual([])
+    expect(errors).toEqual([])
+    info.annotations.push({ type: "timing", description: timings.join("; ") })
+    console.log(timings.join("\n"))
+  } finally {
+    if (errors.length) console.log("PAGE ERRORS", errors)
+    if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome
+    removeRig(rig)
+  }
+})
+
+// design/mock still opens on its own, on its sample data, with its simulation and controls.
+test("live projects and board: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
   test.setTimeout(90_000)
   page.setDefaultTimeout(5_000)
   await page.setViewportSize({ width: 1920, height: 1080 })
@@ -269,7 +541,7 @@ test("design mock: still opens on its sample data with no console error", async 
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     await expect(page.locator(".sidebar")).toContainText("lgtm-studio")
     await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(1)
-    for (const route of ["/projects", "/p/console/board", "/p/console/sprint/sp1", "/p/console/task/t15", "/p/console/team/console-shell", "/p/console/messages", "/p/console/settings", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
+    for (const route of ["/projects", "/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/sprint/sp1", "/p/console/task/t15", "/p/console/team/console-shell", "/p/console/messages", "/p/console/settings", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
       await page.goto(`${origin}/mock/#${route}`)
       await expect(page.locator(".main")).toBeVisible()
     }

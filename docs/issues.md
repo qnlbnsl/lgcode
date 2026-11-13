@@ -11242,7 +11242,81 @@ The regression test uses the actual connection with immediate responses.
 The logout-control tests no longer delay their initial session response.
 The earlier delay had masked this product race in the test harness.
 
-## 645. A fast connection reply could leave a reloaded page blank.
+## 645. Live request cards used the mock's fixed permission options.
+
+The mock's compact approval card always offered its own Allow and Deny identifiers.
+A harness can send different identifiers and persistent options.
+The live card now renders the engine's complete option list.
+The standalone mock keeps its original choices.
+The browser test answers a permission with a harness-specific identifier.
+
+## 646. Reading an absent thread could write into the live store.
+
+The mock's thread reader created an empty thread when none existed.
+Live threads are engine records, so that read now returns an empty list without writing.
+The live connection clears thread records when the owner session ends.
+
+## 647. A snapshot refresh could skip queued conversation events.
+
+The live connection advanced its stream cursor when it published a refreshed snapshot.
+A lifecycle event could trigger a snapshot that already included later prompt and reply events.
+Those events were then skipped when they arrived on the stream.
+The connection now advances the stream cursor only after processing each stream item.
+The first snapshot still anchors the initial subscription.
+The browser test verifies that a sent prompt appears before any reload.
+
+## 648. A fast session check could leave the page on its loading screen.
+
+The store subscribed its rendering listener in a delayed effect.
+A fast session check and snapshot could publish before that listener existed.
+The store now subscribes in a layout effect, before browser responses can arrive.
+The browser journey checks a signed-in reload after live actions.
+
+## 649. Context selection needs the registered worktree identity.
+
+A team's worktree can also be the project's registered checkout.
+The live context picker now uses the engine's worktree identifiers from the project and team records.
+It maps the search reply's result before displaying tasks and files.
+The browser test attaches a task identity to a real prompt in a temporary Git repository.
+
+## 650. Reads could start before the live connection was ready.
+
+Home could try its request and phone-offer reads before the transport became available.
+Home now starts those reads when the connection reports that it is live.
+A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.
+
+## 651. Some supplied labels were still shown as identifiers.
+
+The live composer showed an account identifier instead of its display name.
+Prompt context showed a task identifier instead of its available label.
+The roster did not distinguish an agent whose task was under review.
+The open screens now read account names and map task labels and the Reviewing state.
+The account reader retains only the identifier, harness, and display name.
+
+## 652. The live idle lane could claim that no work was assigned.
+
+An idle agent can still own an active task.
+The mock's fallback reason said "Nothing assigned" for that agent.
+The live lane now leaves the reason empty when the engine supplies no reason.
+The linked task remains visible.
+The standalone mock keeps its original wording.
+
+## 653. The existing project-creation logout journey can time out.
+
+Found: 2026-11-13, during the full remote check of `8577d48`.
+State: open.
+
+The case at `packages/web/e2e/new-project.spec.ts:225` reached its unchanged 30-second limit.
+The other 45 browser cases passed.
+The captured page showed the Machines registration form with its default values after login.
+The snapshot does not establish which awaited operation exhausted the limit.
+The same case passed alone at the required baseline, `8f9f321`.
+A bounded five-run comparison at that baseline then produced four identical timeouts and one pass.
+The production web source, engine source, and affected test file are unchanged from that baseline.
+The cause remains unproved.
+The task result records the complete checks and baseline comparisons.
+
+## 654. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11252,7 +11326,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## 646. Registered workspaces need their project and team links joined.
+## 655. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11261,7 +11335,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## 647. The settings contract does not return effective role defaults.
+## 656. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11273,7 +11347,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## 648. Notification retries need the original receipt after a lost reply.
+## 657. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11284,7 +11358,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## 649. Git destinations must keep their workspace identifiers.
+## 658. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11294,7 +11368,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## 650. The existing website's browser assertions failed in the full check.
+## 659. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11325,7 +11399,7 @@ The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
 The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
 Their causes remain unproved.
 
-## 651. The automatic merge retained duplicate shared declarations.
+## 660. The automatic merge retained duplicate shared declarations.
 
 Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
 State: fixed in the merge.
@@ -11337,7 +11411,7 @@ The automatic merge also duplicated the JavaScript request export and the dialog
 The merge now keeps one request method, one request export, and one live import.
 The test connection keeps the board builder's request recording.
 
-## 652. The review control fixtures did not load connected service settings.
+## 661. The review control fixtures did not load connected service settings.
 
 Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
 State: fixed in the merge.
@@ -11351,3 +11425,46 @@ The original refusal assertions still inspect every request after each control i
 The service browser journey also waits for the standing-rules write to finish before clicking its next control.
 The streamed setting can update before the write's final refresh has completed.
 The test keeps its original refusal assertion and deadlines.
+
+## 662. The Nudge regression test still expected an unconnected control after the merge.
+
+Found: 2026-11-13, while merging the area branch into the chat worker branch.
+State: fixed in this merge.
+
+The area regression test expected Nudge to refuse before sending any request.
+The chat implementation connects Nudge to the engine's direct board post request.
+The merged test now checks that the request reaches the connection.
+It also checks that an engine refusal appears and leaves the local posts empty.
+The other unconnected controls keep their original refusal checks.
+
+## 663. The merged Messages module imported the live binding twice.
+
+Found: 2026-11-13, during the remote browser check of this merge.
+State: fixed in this merge.
+
+Both branches added the live binding to the Messages module's imports.
+Git kept both declarations when it merged the import lists.
+The browser rejected the module and left both the live page and the standalone mock blank.
+The test transformer accepted the declarations, so the Studio tests did not expose the error.
+Removing the redundant import lets the browser parse the module.
+
+## 664. The board mapping replaced worker names with role labels.
+
+Found: 2026-11-13, during the merged chat browser journey.
+State: fixed in this merge.
+
+The area board mapping replaced each worker's engine name with its role label.
+The chat roster needs the engine name to identify a worker and its controls.
+The merged mapping keeps worker names and retains the area's project lead and team lead labels.
+The browser journey checks the same worker in the blocked lane and the table.
+
+## 665. The Home reader retained an answered request after logout.
+
+Found: 2026-11-13, while merging the chat work with the connection review fixes.
+State: fixed in the merge.
+
+The chat reader kept answered requests across snapshot updates.
+It also restored an answered request when logout cleared the connection's records.
+The reader now retains an answered request only while its agent is still present.
+A regression test loads an answered request through the Home reader and clicks the actual logout control.
+It checks that the connection signs out and the request store becomes empty.
