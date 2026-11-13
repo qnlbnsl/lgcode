@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { mkdirSync, writeFileSync } from "node:fs"
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 import { build } from "vite"
 import * as Effect from "effect/Effect"
@@ -24,6 +24,7 @@ import { call, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCre
 
 import { makeRedactor } from "../../engine/src/identity/redactor.ts"
 import { httpsProxy } from "./support/httpsProxy.ts"
+import { attachEngineEvents } from "./support/engineEvents.ts"
 
 test.use({ ignoreHTTPSErrors: true })
 
@@ -89,7 +90,7 @@ const fixture = async (page: Page, body: (rig: Rig, gate: ReplyGate, runner: Eff
           await gate.login!()
           await expect(registered ? page.getByRole("button", { name: "New project", exact: true }).first() : page.getByRole("main", { name: "Set up LGTM Studio", exact: true })).toBeVisible()
         })
-        yield* body(rig, gate, runner)
+        yield* body(rig, gate, runner).pipe(Effect.ensuring(attachEngineEvents))
       }))
     })
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
@@ -228,6 +229,9 @@ test("actual authenticated logout clears both creation and registration drafts b
       const dialog = await openForm(page)
       await dialog.getByLabel("Project name", { exact: true }).fill("Private browser project")
       await dialog.getByLabel("Goal", { exact: true }).fill("Private browser goal")
+      // An existing repository opens Locate with a read-only name. Select
+      // New explicitly instead of racing the asynchronous default selection.
+      await dialog.getByLabel("Repository", { exact: true }).selectOption("__new")
       await dialog.getByRole("button", { name: "Add repository", exact: true }).click()
       const registration = page.getByRole("region", { name: "Add repository to this computer" })
       await registration.getByLabel("Name", { exact: true }).fill("Private owner repository")
@@ -543,15 +547,32 @@ test("registered component View renders its own styles and image inertly, denies
       await expect(design).toContainText("Preview unavailable for this source format.")
       const preview = page.getByRole("region", { name: "Registered Card preview", exact: true })
       let issuedStatus = 0
-      page.on("response", (response) => { if (new URL(response.url()).pathname === "/api/display/open") issuedStatus = response.status() })
+      const documents = new Map<string, number>()
+      page.on("response", (response) => {
+        if (new URL(response.url()).pathname === "/api/display/open") issuedStatus = response.status()
+        if (response.request().resourceType() === "document") documents.set(response.url(), response.status())
+      })
+      const documentLoaded = async (iframe: Locator) => {
+        await expect(iframe).toBeVisible()
+        const url = (await iframe.getAttribute("src"))!
+        // Issuance, the document, and its separately authorized assets are
+        // distinct requests. Frame attachment alone proves none of them.
+        await expect.poll(() => documents.get(url)).toBe(200)
+        return url
+      }
       await preview.getByRole("button", { name: "View component", exact: true }).click()
       await expect.poll(() => issuedStatus).toBe(200)
       const iframe = preview.locator("iframe"), frame = preview.frameLocator("iframe")
-      await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toHaveCSS("color", "rgb(18, 52, 86)")
-      await expect(frame.locator("body")).toHaveAttribute("data-loaded", "yes")
-      await expect(frame.locator("body")).toHaveAttribute("data-opaque", "yes")
-      await expect(frame.locator("body")).toHaveAttribute("inert", "")
-      await expect.poll(() => frame.getByAltText("Owned component mark").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth === 64)).toBe(true)
+      const componentReady = async () => {
+        const url = await documentLoaded(iframe)
+        await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toHaveCSS("color", "rgb(18, 52, 86)")
+        await expect(frame.locator("body")).toHaveAttribute("data-loaded", "yes")
+        await expect(frame.locator("body")).toHaveAttribute("data-opaque", "yes")
+        await expect(frame.locator("body")).toHaveAttribute("inert", "")
+        await expect.poll(() => frame.getByAltText("Owned component mark").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth === 64)).toBe(true)
+        return url
+      }
+      await componentReady()
       expect(await iframe.getAttribute("sandbox")).toBe("allow-scripts")
       expect(await iframe.getAttribute("tabindex")).toBe("-1")
       expect(await page.locator("body").getAttribute("data-escaped")).toBeNull()
@@ -579,14 +600,16 @@ test("registered component View renders its own styles and image inertly, denies
         expect((await open(data)).ok()).toBe(false)
       }
       await preview.getByRole("button", { name: "View component", exact: true }).click()
-      await expect(iframe).toBeVisible()
-      const staleUrl = await iframe.getAttribute("src")
+      // Finish each real document's asset checks before mutating its evidence
+      // or closing it. A heading can precede both asset requests finishing.
+      const staleUrl = await componentReady()
       writeFileSync(join(folder, "design/components/card.html"), "Changed registered component")
       expect((await page.request.get(staleUrl!)).status()).toBe(404)
       expect((await open(selection)).ok()).toBe(false)
       writeFileSync(join(folder, "design/components/card.html"), component)
       await close.click()
       await preview.getByRole("button", { name: "View component", exact: true }).click()
+      await componentReady()
       await expect(frame.getByRole("heading", { name: "Actual registered component", includeHidden: true })).toBeVisible()
       // Component inertness must not disable the existing active mock path.
       await close.click()
@@ -595,19 +618,10 @@ test("registered component View renders its own styles and image inertly, denies
       // Issuance, navigation and script readiness are distinct boundaries.
       // Keep the same default assertion deadline for each actual consequence.
       issuedStatus = 0
-      let mockDocumentStatus = 0
-      const documentResponse = (response: import("@playwright/test").Response) => {
-        const url = new URL(response.url())
-        if (response.request().resourceType() === "document" && url.hostname === "localhost" && url.pathname === "/card") mockDocumentStatus = response.status()
-      }
-      page.on("response", documentResponse)
       await mock.getByRole("button", { name: "Open preview", exact: true }).click()
       await expect.poll(() => issuedStatus).toBe(200)
-      await expect(mock.locator("iframe")).toBeVisible()
-      const mockUrl = await mock.locator("iframe").getAttribute("src")
+      const mockUrl = await documentLoaded(mock.locator("iframe"))
       await expect.poll(() => page.frames().some((child) => child.parentFrame() === page.mainFrame() && child.url() === mockUrl)).toBe(true)
-      await expect.poll(() => mockDocumentStatus).toBe(200)
-      page.off("response", documentResponse)
       const mockFrame = mock.frameLocator("iframe")
       await expect(mockFrame.locator("body")).toHaveAttribute("data-loaded", "yes")
       await page.getByRole("button", { name: "Desktop", exact: true }).click()

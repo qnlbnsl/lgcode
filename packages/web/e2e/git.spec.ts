@@ -1,4 +1,5 @@
 import { completedSetup } from "./support/completedSetup.ts"
+import { attachEngineEvents } from "./support/engineEvents.ts"
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
@@ -83,7 +84,7 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
           return Effect.succeed(reply)
         })) }
       })).pipe(Layer.provideMerge(real))
-      yield* Effect.scoped(run).pipe(Effect.provide(services), Effect.provide(runner.layer))
+      yield* Effect.scoped(run.pipe(Effect.ensuring(attachEngineEvents))).pipe(Effect.provide(services), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
@@ -205,7 +206,12 @@ test("Git: actual bulk stage/unstage, stale discard and a real literal rename co
     await page.getByRole("button", { name: "Discard", exact: true }).click(); await expect(page.getByRole("dialog")).toBeVisible()
     save(f.source.path, "new.txt", "later edit stays\n"); await page.getByRole("button", { name: "Confirm discard", exact: true }).click()
     await expect(page.locator(".git-pane-head")).toContainText("state changed"); expect(readFileSync(join(f.source.path, "new.txt"), "utf8")).toBe("later edit stays\n")
-    await page.getByRole("button", { name: "Stage all", exact: true }).click(); await expect(page.getByRole("button", { name: "Commit 2 files", exact: true })).toBeDisabled()
+    await page.getByRole("button", { name: "Stage all", exact: true }).click()
+    // The command receipt precedes the coherent state/changes/state refresh.
+    // The count belongs to that completed refresh, not the click's return.
+    await expect(page.locator("#git-notice")).toHaveText("All available nonconflicting files staged.")
+    await expect(page.getByRole("button", { name: "Refresh Git", exact: true })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "Commit 2 files", exact: true })).toBeDisabled()
     await page.getByLabel("Commit message", { exact: true }).fill("Real rename and later edit")
     await page.getByRole("button", { name: "Commit 2 files", exact: true }).click()
     await expect(page.locator("#git-notice")).toContainText("Committed ")
@@ -268,6 +274,10 @@ test("Git: a typed lost reply refreshes to terminal uncertainty without replay o
     await page.getByRole("button", { name: "Stage all", exact: true }).click()
     await page.getByLabel("Commit message", { exact: true }).fill("Original receipt body")
     await page.getByRole("button", { name: "Commit 1 file", exact: true }).click()
+    // First observe the failed acknowledgment, then the separate Git refresh.
+    // A fast refresh may already have replaced the initial uncertainty text.
+    await expect(page.locator(".git-workspace [role=alert]")).toContainText(/acknowledgment is unconfirmed|does not establish/)
+    await expect(page.getByRole("button", { name: "Refresh Git", exact: true })).toBeEnabled()
     await expect(page.locator(".git-workspace [role=alert]")).toContainText("does not establish")
     expect(git(f.source.path, "rev-list", "--count", "HEAD")).toBe("2")
     await expect(page.locator("#git-notice")).toHaveCount(0)
@@ -312,12 +322,18 @@ test("Git: fetch, fast-forward pull and push use only the owned temporary remote
     git(other, "config", "user.name", "Temporary remote writer"); git(other, "config", "user.email", "temporary@example.invalid"); git(other, "config", "commit.gpgsign", "false")
     save(other, "incoming.txt", "actual remote bytes\n"); commit(other, "Incoming"); git(other, "push", "origin", f.source.branch)
   }, async (f) => {
-    await page.getByRole("button", { name: "Fetch", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("1 incoming")
-    await page.getByRole("button", { name: "Pull", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("0 incoming")
+    await page.getByRole("button", { name: "Fetch", exact: true }).click()
+    await expect(page.locator("#git-notice")).toHaveText("fetch completed.")
+    await expect(page.locator("#git-sync-state")).toContainText("1 incoming")
+    await page.getByRole("button", { name: "Pull", exact: true }).click()
+    await expect(page.locator("#git-notice")).toHaveText("pull completed.")
+    await expect(page.locator("#git-sync-state")).toContainText("0 incoming")
     expect(readFileSync(join(f.source.path, "incoming.txt"), "utf8")).toBe("actual remote bytes\n")
     save(f.source.path, "outgoing.txt", "actual outgoing bytes\n"); await refresh(page)
     await page.getByRole("button", { name: "Stage all", exact: true }).click(); await page.getByLabel("Commit message", { exact: true }).fill("Outgoing")
-    await page.getByRole("button", { name: "Commit 1 file", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("1 outgoing")
+    await page.getByRole("button", { name: "Commit 1 file", exact: true }).click()
+    await expect(page.locator("#git-notice")).toContainText("Committed ")
+    await expect(page.locator("#git-sync-state")).toContainText("1 outgoing")
     await page.getByRole("button", { name: "Push", exact: true }).click()
     // Check command acknowledgment separately from the subsequent received state.
     await expect(page.locator("#git-notice")).toHaveText("push completed.")
