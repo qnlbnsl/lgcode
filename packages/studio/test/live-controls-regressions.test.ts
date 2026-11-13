@@ -100,7 +100,7 @@ for (const logout of [204, 403, "network"] as const) it(`the actual logout contr
   const client = { "client.snapshot": () => Effect.succeed(engineSnapshot), "project.settings": () => Effect.succeed({}), "client.subscribe": () => Stream.never } as unknown as Client
   const connection = engineConnection({
     location: { protocol: "http:", host: "127.0.0.1:8787" }, debug() {}, connect: (() => Effect.succeed(client)) as typeof connect,
-    fetch: (async (path) => { if (path === "/api/session") await new Promise((r) => setTimeout(r, 30)); posts.push(String(path)); if (path === "/api/logout" && logout === "network") throw new Error("network"); return { status: path === "/api/logout" ? logout : 204 } }) as typeof fetch
+    fetch: (async (path) => { posts.push(String(path)); if (path === "/api/logout" && logout === "network") throw new Error("network"); return { status: path === "/api/logout" ? logout : 204 } }) as typeof fetch
   })
   const { store } = await mount("/home", connection)
   await vi.waitFor(() => expect(element.querySelector('[aria-label="Log out"]')).not.toBeNull())
@@ -163,4 +163,14 @@ it("a refused full run starts no delayed simulation (finding 7)", async () => {
     expect(store.state.workflow["pj-orchard"].runs).toEqual([])
     expect(calls).toEqual([])
   } finally { vi.useRealTimers() }
+})
+
+it("shows a fast initial session response before passive effects run", async () => {
+  const client = { "client.snapshot": () => Effect.succeed(engineSnapshot), "project.settings": () => Effect.succeed({}), "client.subscribe": () => Stream.never } as unknown as Client
+  const connection = engineConnection({ location: { protocol: "http:", host: "127.0.0.1:8787" }, debug() {},
+    connect: (() => Effect.succeed(client)) as typeof connect, fetch: (async () => ({ status: 204 })) as typeof fetch })
+  const { store } = await mount("/home", connection)
+  expect(store.state.session.status).toBe("in")
+  expect(element.querySelector(".tree-row.project")).not.toBeNull()
+  expect(element.querySelector(".tree-row.project")?.textContent).toContain("Harvest report")
 })

@@ -11161,3 +11161,16 @@ The live studio case and the standalone mock case both passed.
 The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
 These failures were not investigated or attributed to a cause in this change.
 The lead owns the completion-gate assessment.
+
+## connect-fix-10. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.
