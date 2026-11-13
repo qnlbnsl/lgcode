@@ -11521,3 +11521,11 @@ The grey row that shows an agent's tool call used the whole command as its one-l
 A long script filled the page, and its output had no limit either.
 The closed row now shows the first line of the command, cut with an ellipsis.
 The full command and the output open inside the row, in code boxes that scroll and can be copied.
+
+## 670. An answered question shows its accepted answer beside the buttons.
+
+The owner reported this on 2026-11-13.
+An answered question card puts the accepted answer in the button row, between "Deny" and "Details".
+The owner finds that placement odd.
+The owner wants a short form of the accepted answer on its own line above the buttons, as the card's second or third line.
+The owner will work on this part of the look later, so it is recorded and not changed.
