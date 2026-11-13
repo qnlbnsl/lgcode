@@ -44,3 +44,18 @@ export function validDisplayFrame(value: { url: string; displayOrigin: string; e
       && url.origin === origin.origin && !url.username && !url.password && value.expiresAt > now
   } catch { return false }
 }
+
+// Search uses only the navigation records already in memory. There is no search RPC.
+export function mapSearchText(records: Pick<import("./mapping.ts").EngineRecords, "repos" | "projects" | "sprints" | "agents" | "teams">) {
+  const repositories = Object.fromEntries(records.repos.map((r) => [r.id, ""]))
+  const projects = Object.fromEntries(records.projects.filter((p) => !p.archived).map((p) => [p.id,
+    [records.repos.find((r) => r.id === p.repo)?.name, p.goal, p.branch,
+      ...records.sprints.filter((s) => s.project === p.id).flatMap((s) => [s.name, s.goal])].filter(Boolean).join(" ")]))
+  const agents = Object.fromEntries(records.agents.flatMap((a) => {
+    const p = records.projects.find((p) => p.id === a.project)
+    if (!p || p.archived) return []
+    return [[a.id, [a.role, records.teams.find((t) => t.id === a.team)?.name, p.name,
+      records.repos.find((r) => r.id === p.repo)?.name].filter(Boolean).join(" ")]]
+  }))
+  return { repositories, projects, agents }
+}

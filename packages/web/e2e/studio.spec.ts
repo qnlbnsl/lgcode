@@ -40,6 +40,8 @@ test("live website: signs in through the engine, shows its real records, and kee
   let displayProxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
   const violations: string[] = []
   const timings: string[] = []
+  const sent: string[] = []
+  page.on("websocket", (socket) => socket.on("framesent", (frame) => sent.push(String(frame.payload))))
   page.on("pageerror", (error) => errors.push(error.stack ?? error.message))
   page.on("console", (message) => {
     // The browser logs the engine's refusal of a signed-out session check and of a wrong
@@ -129,6 +131,23 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
           for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
 
+          await page.keyboard.press("Control+k")
+          const switcher = page.getByRole("dialog", { name: "Find project or agent", exact: true })
+          const query = switcher.getByRole("textbox")
+          await query.fill("Real decisions")
+          await expect(switcher.getByRole("option")).toHaveCount(1)
+          await expect(switcher.getByRole("option")).toContainText("Project")
+          await query.fill("Repository")
+          await expect(switcher.getByRole("option").first()).toContainText("Repository")
+          await expect(switcher).not.toContainText("No remote")
+          await query.fill("Engine task")
+          await expect(switcher).toContainText('Nothing matches')
+          await query.fill("agent builder")
+          await expect(switcher.getByRole("option").first()).toContainText("Agent")
+          await query.press("Enter")
+          await expect(page).toHaveURL(new RegExp(`/chat/${project.workerId}$`))
+          expect(sent.join("\n")).not.toContain("context.search")
+
           // Mock data is fetched when its tab opens, with no sample thumbnails.
           await page.goto(`${origin}/studio/#/p/${project.projectId}/mocks`)
           await expect(page.locator(".mk-screens")).toContainText("Engine requests screen")
@@ -172,6 +191,9 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(page.locator(".wf-status")).toContainText("Approved")
           await page.reload()
           await expect(page.locator(".wf-status")).toContainText("Approved")
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/board`)
+          await page.reload()
+          await expect(page.getByRole("tab", { name: "Mocks", exact: true })).toBeVisible()
 
           await page.goto(`${origin}/studio/#/r/${project.repoId}/design`)
           await expect(page.locator(".dz-file")).toContainText("studio-design.pen")
@@ -288,6 +310,10 @@ test("live website: signs in through the engine, shows its real records, and kee
           await page.goto(`${origin}/studio/#/projects`)
           await page.getByRole("button", { name: /^Archived/ }).click()
           await expect(page.locator(".main .table")).toContainText("Renamed project")
+          await page.keyboard.press("Control+k")
+          await page.getByRole("dialog").getByRole("textbox").fill("Renamed")
+          await expect(page.getByRole("dialog")).toContainText("Nothing matches")
+          await page.keyboard.press("Escape")
           await page.getByRole("button", { name: "Restore", exact: true }).click()
           await expect(page.getByRole("button", { name: "Restore", exact: true })).toHaveCount(0)
           await page.goto(`${origin}/studio/#/machines`)
@@ -354,7 +380,7 @@ test("live website: signs in through the engine, shows its real records, and kee
           // A reload keeps the session, which is the engine's cookie.
           await page.reload()
           await expect(sidebar.locator(".tree-row.project").filter({ hasText: "Renamed project" })).toBeVisible()
-          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(3)
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(4)
 
           // Logging out ends the session and leaves no records on the page.
           await page.getByRole("button", { name: "Log out" }).click()

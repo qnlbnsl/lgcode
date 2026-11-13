@@ -350,6 +350,7 @@ export function MocksTab({ s, project: p, route }) {
           : html`<span><b class="num">${m.screens.length - open}</b> of ${plural(m.screens.length, 'screen')} approved</span>`}
         ${unseen > 0 && html`<span class="warn-text">${plural(unseen, 'change')} not seen</span>`}
         <span class="grow"></span>
+        ${live.on && html`<button type="button" class="icon-btn sm" aria-label="Refresh mocks" disabled=${mocks.busy('read-mocks:' + p.id)} onClick=${() => mocks.loadMocks(p.id)}><${Icon} name="refresh-cw" size=${13} /></button>`}
         ${view === 'changes' && unseen > 0 && html`<button type="button" class="btn sm ghost" onClick=${() => update(() => { for (const c of m.changes) c.seen = true; })}><${Icon} name="check" size=${13} />Mark seen</button>`}
         <button type="button" class="btn sm" disabled=${!m.screens.length} onClick=${() => act.openDialog({ type: 'mock-changes', project: p.id, screen: '' })}><${Icon} name="message-square" size=${13} />Request changes</button>
         ${!m.approvedAt && html`<button type="button" class="btn sm primary" disabled=${!m.screens.length || live.on && mocks.busy('approve-mocks:' + p.id)} onClick=${() => approveAll(s, p)}><${Icon} name="check" size=${13} />${live.on && mocks.busy('approve-mocks:' + p.id) ? 'Approving…' : 'Approve mocks'}</button>`}

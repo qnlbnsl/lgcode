@@ -124,3 +124,4 @@ export function openDisplay(selection, title) { openDialog({ type: 'engine-displ
 registerDialog('engine-display', ({ d }) => html`<${Dialog} title=${d.title} onClose=${closeDialog}>
   <${Display} key=${JSON.stringify(d.selection)} selection=${d.selection} title=${d.title} action="Open display" />
 <//>`);
+export const searchText = (records) => maps().mapSearchText(records);

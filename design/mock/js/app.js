@@ -25,6 +25,7 @@ import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSetting
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
 import { emptyWorkflow } from './screens/workflow.js';
 import { emptyMocks } from './screens/mocks.js';
+import * as mocks from './live/mocks.js';
 
 // ---- named places ---------------------------------------------------------------
 // A page that mounts the website can fill these places with its own components, without
@@ -240,6 +241,7 @@ function SidePanel({ s, agent, project }) {
   </aside>`;
 }
 function ProjectView({ s, route, project }) {
+  useEffect(() => { if (live.on && route.parts[2] !== 'mocks') void mocks.loadMocks(project.id); }, [project.id, s.boardRevision]);
   const tab = route.parts[2] || 'board'; const lead = leadOf(s, project);
   const chatAgent = tab === 'chat' ? agentOf(s, route.parts[3] || lead.id) : null;
   const other = s.ui.panelAgent && agentOf(s, s.ui.panelAgent);

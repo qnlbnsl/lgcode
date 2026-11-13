@@ -53,3 +53,33 @@ describe("isolated displays", () => {
     expect(validDisplayFrame({ displayOrigin: "http://display.example.test", url: "http://display.example.test/", expiresAt: 100 }, "studio.example.test", 1)).toBe(false)
   })
 })
+
+describe("search over loaded navigation records", () => {
+  it("indexes engine goals, branches and sprints without sample prose or agent activity", async () => {
+    const { mapSnapshot } = await import("../src/mapping.ts")
+    const { engineSnapshot } = await import("./fixtures.ts")
+    const { mapSearchText } = await import("../src/mocks.ts")
+    const records = mapSnapshot(engineSnapshot, 1)
+    const before = JSON.stringify(records)
+    const text = mapSearchText(records)
+    expect(text.repositories).toEqual({ "rp-orchard": "" })
+    expect(text.projects["pj-orchard"]).toContain("Count the apples every morning.")
+    expect(text.projects["pj-orchard"]).toContain("feature/harvest")
+    expect(text.projects["pj-orchard"]).toContain("Mail it.")
+    expect(text.projects["pj-orphan"]).toBeUndefined()
+    expect(text.agents["ag-worker"]).toContain("Alpha team")
+    expect(text.agents["ag-worker"]).not.toContain("Waiting on a permission")
+    expect(text.agents["ag-gone"]).toBeUndefined()
+    expect(JSON.stringify(records)).toBe(before)
+  })
+  it("keeps the mock's word ranking, name weighting and role boost", async () => {
+    const { searchScore } = await import("../../../design/mock/js/dialogs.js" as string) as { searchScore(query: string, item: { label: string; text: string; kind: string; boost?: number }): number }
+    const title = { label: "Apple report", text: "", kind: "Project" }
+    const body = { label: "Daily totals", text: "apple report", kind: "Project" }
+    expect(searchScore("apple reports", title)).toBeGreaterThan(searchScore("apple reports", body))
+    expect(searchScore("project", title)).toBeGreaterThan(searchScore("project", { ...title, kind: "Agent" }))
+    expect(searchScore("the of", title)).toBe(0)
+    expect(searchScore("unrelated", title)).toBe(0)
+    expect(searchScore("lead", { label: "Project lead", text: "", kind: "Agent", boost: 0.5 })).toBeGreaterThan(searchScore("lead", { label: "Project lead", text: "", kind: "Agent" }))
+  })
+})

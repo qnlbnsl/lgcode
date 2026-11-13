@@ -269,7 +269,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         const body = await response.text()
         if (body.length > 16_384) throw new Error("The display reply is invalid.")
         const frame = Schema.decodeUnknownSync(DisplayFrame, { onExcessProperty: "error" })(JSON.parse(body))
-        if (!mocks.validDisplayFrame(frame, where.host.split(":")[0]!, now())) throw new Error("The display reply is invalid.")
+        if (!mocks.validDisplayFrame(frame, new URL(`${where.protocol}//${where.host}`).hostname, now())) throw new Error("The display reply is invalid.")
         return frame
       }
       const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, unknown>>)[tag]

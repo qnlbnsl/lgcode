@@ -287,6 +287,7 @@ export function RepoDesign({ s, repoId, route }) {
       <${PickMenu} label=${cat} value=${item} items=${items} unit=${UNIT[cat]} onPick=${(i) => to(cat, i)} />
       <span class="grow"></span>
       ${d && html`<span class="dz-file muted not-phone" title=${d.file}><span class="mono">${d.file}</span> · ${ago(d.changedAt, now) === 'now' ? 'just now' : ago(d.changedAt, now) + ' ago'}${by ? ` · ${by.name}` : live.on && d.changedBy ? ` · ${d.changedBy === 'owner' ? 'Owner' : d.changedBy}` : ''}</span>`}
+      ${live.on && html`<button type="button" class="icon-btn sm" aria-label="Refresh design" disabled=${mocks.busy('read-design:' + repoId)} onClick=${() => mocks.loadDesign(repoId)}><${Icon} name="refresh-cw" size=${13} /></button>`}
       <${DesignCanvasControls} key=${cat + item} />
       ${d ? html`<button type="button" class="btn sm primary" disabled=${live.on && (!d.available || mocks.busy('read-design:' + r.id))} onClick=${() => live.on ? mocks.openDisplay({ _tag: 'editor', repoId: r.id, projectId: d.projectId, revisionId: d.revisionId }, 'Repository design editor') : act.toast(`Opening ${page} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${13} /><span class="not-phone">Open in OpenPencil</span></button>`
         : html`<button type="button" class="btn sm primary" disabled=${live.on && mocks.busy('read-design:' + r.id)} onClick=${create}><${Icon} name="plus" size=${13} />Create design file</button>`}

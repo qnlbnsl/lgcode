@@ -11159,3 +11159,15 @@ It counts worktrees from the loaded workspace records.
 Pairing, renaming, removing, and changing the limit retain the existing refusal.
 Browser tests cover these refusals, discovery, rescanning, and repository registration.
 This problem is fixed on the worker branch.
+
+## s2-mocks-4. Search treated unavailable repository metadata as known.
+
+The switcher showed "No remote" when the engine had not supplied a remote.
+Its wider agent text also used a lifecycle display word as activity.
+The live search mapping now indexes only the loaded repository, project, sprint,
+team, and role fields that the engine supplies.
+The existing word ranking remains in place.
+Unit tests cover the search mapping and ranking.
+The browser test covers navigation, empty results, and archived project exclusion.
+No search request is made to the engine.
+This problem is fixed on the worker branch.
