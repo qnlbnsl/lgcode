@@ -11842,3 +11842,13 @@ A registered secret containing a newline or quote was escaped before the sanitiz
 The new regression test failed on that assertion.
 The handler now redacts each string value before serialization.
 The regression test and authenticated workflow API tests pass.
+
+## s5-workflows-6. The existing service-settings browser journey failed once while waiting for its saved state.
+
+The full check passed 8,080 unit tests and 50 browser tests.
+The existing service-settings journey timed out at `studioService.ts:74` after changing the heartbeat from 25 to 31.
+Its save bar did not show "No unsaved changes." within five seconds.
+The unchanged journey passed when run alone.
+The workflow browser journey passed in the full run.
+The service-settings implementation was left to its assigned builder.
+The full check therefore remains a failed run even though the isolated retry passed.
