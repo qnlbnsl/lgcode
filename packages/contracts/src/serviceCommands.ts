@@ -13,3 +13,4 @@ export const ServiceControlRpcGroup = RpcGroup.make(
   Rpc.make('restart', { payload: { ...request, confirmed: Schema.Boolean }, success: Schema.Struct({ ...request, restarting: Schema.Boolean }), error: Refused }),
 ).prefix('client.service.')
 export const serviceControlAccess = { 'client.service.version': ['owner'], 'client.service.restart': ['owner'] } as const
+export const serviceControlCommandNames = ['client.service.version', 'client.service.restart'] as const

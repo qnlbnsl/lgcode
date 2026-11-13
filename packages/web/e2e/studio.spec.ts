@@ -1112,4 +1112,4 @@ test('workflows: sees default phases, clones, edits and saves across reload with
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 })
 
-test("live service settings: timers, nudges, workflow folder, review defaults and upkeep", { timeout: 90_000 }, async ({ page }) => exerciseStudioSettings(page))
+test("live service settings: timers, nudges, workflow folder, review defaults and upkeep", async ({ page }) => exerciseStudioSettings(page))

@@ -51,13 +51,14 @@ const projectTools = ["project.context.search", "project.changes", "project.diff
 const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedWorkflowCommands = ["client.workflows.list", "client.workflows.read", "client.workflows.clone", "client.workflows.save", "client.workflows.validate", "client.workflows.delete"]
-const expectedApiCommands = [...expectedCommands, ...expectedWebCommands, ...expectedWorkflowCommands]
+const expectedServiceCommands = ["client.service.version", "client.service.restart"]
+const expectedApiCommands = [...expectedCommands, ...expectedWebCommands, ...expectedWorkflowCommands, ...expectedServiceCommands]
 const expectedOwnerOnly = ["client.harness.choices", "configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
-  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands, ...expectedWorkflowCommands, ...projectOwnerCommands]
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands, ...expectedWorkflowCommands, ...expectedServiceCommands, ...projectOwnerCommands]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.peek", "board.channels", "board.status", "board.flush"]

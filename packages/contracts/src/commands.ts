@@ -1,4 +1,4 @@
-import { ServiceControlRpcGroup, serviceControlAccess } from "./serviceCommands.ts"
+import { ServiceControlRpcGroup, serviceControlAccess, serviceControlCommandNames } from "./serviceCommands.ts"
 import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "./workflowCommands.ts"
 import { QuestionMetadataFields } from "./questions.ts"
 import { ChoiceId } from "./agentConfiguration.ts"
@@ -147,7 +147,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-const StandardClientRpcGroup = ClientRpcGroup.omit(...workflowCommandNames)
+const StandardClientRpcGroup = ClientRpcGroup.omit(...workflowCommandNames, ...serviceControlCommandNames)
 export const WebRpcGroup = StandardClientRpcGroup.omit(
   "client.harness.choices",
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.agent.configuration", "client.agent.context",

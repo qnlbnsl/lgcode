@@ -12348,3 +12348,39 @@ The reload and token-revocation probes passed for both harnesses.
 These results have the execution-context limitation described in issue 526.
 The token exposure remains the previously reported issue 240.
 This run does not establish the known 19-of-23 baseline.
+
+## s6-settings-7. The new browser test used an unsupported declaration option.
+
+The first full settings check stopped during TypeScript checking.
+The new browser test passed a timeout property as Playwright test metadata.
+Playwright ran the isolated journey but rejected that property during type checking.
+The test now uses the configured browser timeout.
+The next check found two unbranded request identifiers in the executable restart test.
+Those synthetic identifiers now use the client contract's request identifier type.
+
+## s6-settings-8. Service controls were missing from the standalone client declarations.
+
+The full unit run found six contract inventory failures after adding the service controls.
+The running service exposed both requests through the installed group.
+The standalone client definition group did not include them.
+Both requests now belong to that group and its owner-only access table.
+The explicit inventory tests include both requests.
+The alert, read, and web subgroups still exclude them before installation.
+
+## s6-settings-9. A Git transport default alone did not constrain URL rewriting.
+
+A repository can override a general transport default with a per-protocol setting.
+A URL rewrite could then select an executable helper after the HTTPS URL check.
+The version checker now sets Git's HTTPS-only protocol environment allowlist.
+Git documents that this allowlist overrides existing protocol configuration.
+A test combines an HTTPS remote, an executable URL rewrite, and an explicit protocol allowance.
+The check refuses the rewritten transport without creating its marker file.
+The relevant Git documentation is at https://git-scm.com/docs/git.
+
+## s6-settings-10. The workflow redaction fixture omitted project state.
+
+The full unit run found one workflow redaction failure in addition to the six contract failures.
+The fixture passed an empty snapshot to the workflow handlers.
+Reading the saved workflow folder now requires the normal project view.
+The fixture now supplies an empty project view and its private state folder.
+Its real redactor and secret assertions remain unchanged.

@@ -56,6 +56,11 @@ test('version reports the checkout commit and refuses executable Git transports 
       git('config', 'remote.origin.url', remote)
       expect(await serviceVersion(root, true)).toMatchObject({ comparison: 'unavailable', version: '1.2.3' })
     }
+    git('config', 'remote.origin.url', 'https://example.invalid/owner/repository.git')
+    git('config', 'protocol.ext.allow', 'always')
+    git('config', 'url.ext::touch /tmp/lgtm-s6-injection.insteadOf', 'https://example.invalid/owner/repository.git')
+    expect(await serviceVersion(root, true)).toMatchObject({ comparison: 'unavailable' })
+    expect(existsSync('/tmp/lgtm-s6-injection')).toBe(false)
     const calls: string[][] = []
     const check = async (_cwd: string, args: string[]) => { calls.push(args); return args[0] === 'config' ? 'https://example.invalid/owner/repository.git' : git('rev-parse', 'HEAD') + '\tHEAD' }
     expect(await serviceVersion(root, true, check)).toMatchObject({ comparison: 'same' })

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { chmodSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { RequestId } from '@lgtm/contracts'
 import * as Effect from 'effect/Effect'
 import * as Layer from 'effect/Layer'
 import * as SqliteClient from '@lgtm/t3-node-sqlite/nodeSqliteClient'
@@ -38,7 +39,7 @@ test('the executable restarts with the same arguments and environment and invali
     let diagnostics = ''; child.stdout!.on('data', (part) => { diagnostics += String(part) }); child.stderr!.on('data', (part) => { diagnostics += String(part) });
     const reported = await poll(() => Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const client = yield* connect(join(rig.stateFolder, 'engine.sock'), ownerBearer(rig.stateFolder))
-      return yield* client['client.web.settings']({ requestId: 'startup-settings' })
+      return yield* client['client.web.settings']({ requestId: 'startup-settings' as RequestId })
     }))), () => true)
     expect(reported).toMatchObject({ port, serverState: 'running' })
     let lastStatus = 0
@@ -51,7 +52,7 @@ test('the executable restarts with the same arguments and environment and invali
     expect((await login()).headers.get('set-cookie')!.split(';')[0]).toBe(cookie)
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const client = yield* connect(join(rig.stateFolder, 'engine.sock'), ownerBearer(rig.stateFolder))
-      expect(yield* client['client.service.restart']({ requestId: 'restart-process', confirmed: true })).toMatchObject({ restarting: true })
+      expect(yield* client['client.service.restart']({ requestId: 'restart-process' as RequestId, confirmed: true })).toMatchObject({ restarting: true })
     })))
     await poll(session, (reply) => reply.status === 401)
     expect(child.exitCode).toBeNull()

@@ -25,7 +25,7 @@ export const gitVersion = (cwd: string, args: string[]): Promise<string> => new 
     '-c', 'protocol.allow=never', '-c', 'protocol.https.allow=always', '-c', 'http.followRedirects=false',
     '-c', 'http.sslVerify=true', ...args], {
     cwd, encoding: 'utf8', timeout: 10_000, maxBuffer: 16_384,
-    env: { PATH: '/usr/bin:/bin', HOME: '/nonexistent', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0', GIT_EXEC_PATH: '/usr/lib/git-core' },
+    env: { PATH: '/usr/bin:/bin', HOME: '/nonexistent', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0', GIT_EXEC_PATH: '/usr/lib/git-core', GIT_ALLOW_PROTOCOL: 'https' },
   }, (error, stdout) => error ? reject(new Error('The Git version check is unavailable.')) : resolve(stdout.trim()))
 })
 const running = new Map<string, Promise<{ version: string; commit: string }>>()
