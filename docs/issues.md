@@ -11161,6 +11161,11 @@ The live studio case and the standalone mock case both passed.
 The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
 These failures were not investigated or attributed to a cause in this change.
 The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
 
 ## connect-fix-10. A fast first response could leave the live page on its checking screen.
 
