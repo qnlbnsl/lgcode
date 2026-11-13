@@ -1,7 +1,9 @@
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { WorkflowStore } from '../../src/workflows/store.ts'
+registerRebuildCheck({ noLog: true })
 let root: string, home: string, repo: string, store: WorkflowStore
 beforeEach(() => { root = mkdtempSync('/tmp/lgtm-workflows-'); home = join(root, 'home'); repo = join(root, 'repo'); mkdirSync(home); mkdirSync(repo); store = new WorkflowStore(home, repo) })
 afterEach(() => rmSync(root, { recursive: true, force: true }))
