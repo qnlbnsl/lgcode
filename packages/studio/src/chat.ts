@@ -10,7 +10,10 @@ const scriptNames: Record<string, string> = { python: "Python", python3: "Python
 export function attemptTitle(title: string, command: string | null, toolKind?: string | null): string {
   const first = (text: string) => text.split("\n").find((line) => line.trim() !== "")?.trim() ?? ""
   if (command === null) return title
-  if (title !== "Permission request" && first(title) !== first(command).slice(0, first(title).length)) return title
+  const whole = command
+  // A backslash at the end of a line continues one command.
+  command = command.replace(/\\\n\s*/g, " ")
+  if (title !== "Permission request" && first(title) !== first(whole).slice(0, first(title).length)) return title
   const words = first(command).split(/\s+/).filter((word) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word))
   const program = (words[0] ?? "").split("/").at(-1) ?? ""
   const lines = command.trim().split("\n").length

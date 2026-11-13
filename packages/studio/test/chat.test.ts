@@ -33,7 +33,7 @@ describe("Home mapping", () => {
   it("gives a plain title to a command whose input arrived cut", () => {
     const row = { ...engineSnapshot.requests[0], kind: "permission", display: { ...engineSnapshot.requests[0]!.display, title: undefined, preview: "printf '%s' \\\n  'one'", toolKind: "execute" } } as unknown as ClientRequest
     const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "printf '%s' \\\n  'one' \\\n  'two'", toolKind: "execute", toolInput: "{\"command\":\"printf", options: [] }))!
-    expect(result).toMatchObject({ title: 'Run "printf" and other commands in the terminal', command: "printf '%s' \\\n  'one' \\\n  'two'" })
+    expect(result).toMatchObject({ title: 'Run "printf" in the terminal', command: "printf '%s' \\\n  'one' \\\n  'two'" })
   })
   it("names what a command attempts and keeps a harness's own description", () => {
     expect(attemptTitle("rm -- /tmp/probe", "rm -- /tmp/probe", "execute")).toBe('Run "rm" in the terminal')
