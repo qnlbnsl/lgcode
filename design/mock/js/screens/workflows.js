@@ -53,7 +53,8 @@ export function Workflows({ s }) {
   const [error, setError] = useState(''), [invalid, setInvalid] = useState(''), [checking, setChecking] = useState(false), [pending, setPending] = useState(false), [status, setStatus] = useState('');
   const [cloning, setCloning] = useState(false), [cloneError, setCloneError] = useState('');
   const [from, setFrom] = useState(''), [to, setTo] = useState(''), [when, setWhen] = useState('');
-  const generation = useRef(0), editor = useRef(null);
+  const generation = useRef(0), editor = useRef(null), loadedLocation = useRef(null);
+  const connected = !live.on || s.conn.status === 'live';
   const dirty = !!record && !!draft && JSON.stringify(record.definition) !== JSON.stringify(draft);
   const location = repoId ? { repoId } : {};
   const accept = (r) => { setRecord(r); setDraft(copy(r.definition)); setSelected(r.definition.phases[0]?.blocks[0]?.id); setInvalid(''); setError(''); setStatus(''); };
@@ -65,14 +66,15 @@ export function Workflows({ s }) {
   };
   const leave = (action) => dirty ? confirm({ title: 'Discard changes?', body: 'Your unsaved workflow changes will be lost.', action: 'Discard changes', onConfirm: action }) : action();
   useEffect(() => {
+    if (!connected || loadedLocation.current === repoId) return;
     let active = true; setPending(true); setRecord(null); setDraft(null); setError('');
     request('list', repoId ? { repoId } : {}).then(async (r) => {
       const first = r.items.find((i) => !i.error);
       const read = first && await request('read', { ...(repoId ? { repoId } : {}), scope: first.scope, id: first.id });
-      if (active) { setItems(r.items); setFolders(r.folders || []); if (read) accept(read.workflow); }
+      if (active) { loadedLocation.current = repoId; setItems(r.items); setFolders(r.folders || []); if (read) accept(read.workflow); }
     }).catch((e) => active && setError(e.message)).finally(() => active && setPending(false));
     return () => { active = false; };
-  }, [repoId]);
+  }, [repoId, connected]);
   useEffect(() => {
     if (!draft || record?.readOnly) return;
     const g = ++generation.current; setChecking(true);

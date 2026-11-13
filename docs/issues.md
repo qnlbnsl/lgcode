@@ -11878,3 +11878,21 @@ The owner must decide whether a separate identifier rename is needed.
 This is open for the owner.
 The editor shows and preserves a block's inner steps.
 Only the application programming interface (API) and terminal can edit these steps.
+
+
+## s5-workflows-11. The Git browser journey could not approve without evidence.
+
+The review-fix full check passed every unit test.
+The existing Git browser journey timed out at `packages/web/e2e/support/studioGit.ts:100`.
+The Approve without evidence button became disabled while Playwright waited to click it.
+The Git implementation and its journey were left unchanged for their assigned builder.
+This remains open.
+
+## s5-workflows-12. A workflow reload could request the list before connecting.
+
+The review-fix full browser run exposed this race.
+The Workflows page requested its list before the live connection was ready.
+It kept The service is not connected after the connection became live.
+The page now waits for the live connection before its first list request.
+It preserves an already loaded draft when the connection recovers.
+A deterministic Studio unit test covers startup and reconnection.
