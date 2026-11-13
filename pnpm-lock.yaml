@@ -441,6 +441,34 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.4(@types/node@26.6.6))
 
+  packages/studio:
+    dependencies:
+      '@lgtm/client':
+        specifier: workspace:*
+        version: link:../client
+      '@lgtm/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      effect:
+        specifier: 4.0.5
+        version: 4.0.5
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.1.3
+      typescript:
+        specifier: 'catalog:'
+        version: '@tsc-rs/typescript@0.8.0'
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.4(@types/node@26.6.6)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.4(@types/node@26.6.6))
+
   packages/testing:
     dependencies:
       '@effect/platform-node':

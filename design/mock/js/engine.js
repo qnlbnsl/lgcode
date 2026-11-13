@@ -9,6 +9,17 @@
 // That connection receives every call and every pushed update, so it can show them, or carry
 // them over a different route, without the screens changing. The default connection is the
 // service on this computer, and it does nothing.
+//
+// Live mode. A page that passes { mode: 'live' } to mount() gives a connection that also has:
+//   open(write)        starts reading the engine. It calls write(patch) with whole store keys
+//                      in the store's shape, such as { session }, { conn } or { repos, projects,
+//                      teams, agents, requests, machines, owner }. Only this route changes them.
+//   signIn(password)   resolves to the session's new status: 'in', 'rejected' or 'unavailable'
+//   signOut()          ends the session for every browser
+//   reconnect()        tries the engine again at once
+//   close()            stops reading, when the website is unmounted
+// The live connection is written in TypeScript in packages/studio. No file here knows which
+// transport it uses.
 
 const local = { kind: 'local', label: 'the service on this computer', call() {}, push() {} };
 let current = local;

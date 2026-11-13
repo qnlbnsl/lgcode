@@ -45,6 +45,8 @@ const boundedBody = (request: HttpServerRequest.HttpServerRequest) => request.st
 export const serve = (options: {
   readonly password: Redacted.Redacted<string> | undefined;
   readonly staticRoot: string;
+  // The live website, built from design/mock by packages/studio, served at /studio/.
+  readonly studioRoot?: string;
   readonly settings?: WebSettings;
   readonly lists?: EngineLists;
   readonly registerSecret?: (secret: Redacted.Redacted<string>) => void;
@@ -149,6 +151,12 @@ export const serve = (options: {
     }
     if (navigation) {
       const configuration = yield* Effect.try(() => configuredDisplay(settings, port)).pipe(Effect.orElseSucceed(() => undefined));
+      // The live website's files hold no data either. They pass the same policy and confinement
+      // as the current page's files, from their own folder.
+      if (options.studioRoot !== undefined && (path === "/studio" || path.startsWith("/studio/"))) {
+        if (path === "/studio") return HttpServerResponse.empty({ status: 308, headers: { location: "/studio/" } });
+        return yield* staticResponse(options.studioRoot, request.url.slice("/studio".length), request.method === "HEAD", configuration?.displayOrigin);
+      }
       return yield* staticResponse(options.staticRoot, request.url, request.method === "HEAD", configuration?.displayOrigin);
     }
     if (caller === undefined) return HttpServerResponse.empty({ status: 401 });

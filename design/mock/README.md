@@ -1,8 +1,9 @@
 # The rebuilt LGTM Studio mock
 
 This folder is a working mock of the whole LGTM Studio web page. The owner asked for it on
-2026-11-10. It does not connect to the engine and it never calls an agent. Every screen
-works on data held in the browser's memory.
+2026-11-10. Opened from this folder, it does not connect to the engine and it never calls an agent.
+Every screen works on data held in the browser's memory.
+The live website, described below, runs the same files on the engine's records.
 
 ## How to open it
 
@@ -20,6 +21,32 @@ Changes you make stay until you reload the page. The colour mode, the density, a
 sizes of the panels are remembered in the browser. The "Mock controls" button at the foot
 of the sidebar switches the connection state, the login state and the first run, and it
 resets everything.
+
+## The live website built from this mock
+
+The same files also run as the live website, which reads the engine's real records.
+The package `packages/studio` copies this folder, adds the connection to the engine, and
+the engine serves the result at `/studio/`.
+This folder itself is not changed by that build, and it still opens on its sample data.
+
+Build the live website from the repository root:
+
+```
+pnpm --filter @lgtm/studio build
+```
+
+Then start the engine with a web password, as the root `README.md` describes, and open
+`http://127.0.0.1:8787/studio/`.
+The page asks for the web password, and it shows the engine's repositories, projects,
+teams, agents and open requests after you sign in.
+The current web page stays at `http://127.0.0.1:8787/`.
+
+In live mode the page has no "Mock controls" button and no sample data.
+Actions that change something are not connected to the engine yet.
+Such an action shows the notice "This is not connected to the service yet. Nothing was
+changed." and leaves the page as it was.
+The Terminal and Files tabs and the first run say that they are not connected yet.
+`js/engine.js` describes the connection object that `mount()` accepts in live mode.
 
 ## Using it as a package
 

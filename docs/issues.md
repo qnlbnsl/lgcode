@@ -11015,3 +11015,43 @@ The fix points the profile at `http://127.0.0.1:4178/mock/#/home` and copies the
 The components are now Button, Status dot, Agent row, Connection status, Segmented control, Inline link, Count and Badge.
 The agent rows show role names, such as Builder 2, in place of the invented name Rowan.
 `design/lgtm.fig` was made again from the rebuilt mock, and 15 of its 32 variants match the browser within 3 percent.
+
+## 622. The live website shows the page's default settings, not the engine's
+
+Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
+State: open.
+
+The live website at `/studio/` fills its Service settings and Notifications pages from the page's own defaults.
+The engine does not send these settings in `client.snapshot`, so the values shown may differ from the engine's real ones.
+Changing a setting is refused with a short notice, so nothing wrong is saved.
+Step 2 of the plan connects the settings to the engine's commands.
+
+## 623. The live website's Machines page has no figures for the engine's machine
+
+Found: 2026-11-13, while connecting the mock to the engine.
+State: open.
+
+The engine sends no processor, memory, agent slot, address, operating system or harness version for any machine.
+The live website therefore shows a dash for processor and memory, and "Scanning…" for the harnesses.
+Its agent count reads "0 of 0", in the warning colour, because the slot limit is unknown and is stored as 0.
+The engine calls its own computer `local` until machine pairing exists, so the page names the machine `local`.
+
+## 624. The browser logs an error when a signed-out page checks its session
+
+Found: 2026-11-13, while connecting the mock to the engine.
+State: accepted.
+
+The live website asks `POST /api/session` whether it is signed in, and the engine answers 401 when it is not.
+A wrong password at `POST /api/login` is also answered with 401.
+Browsers log each 401 answer to the console as "Failed to load resource", although the page handles it.
+The browser tests therefore ignore console errors that name status 401.
+
+## 625. `lgtm serve --detach` does not say why the service failed to start
+
+Found: 2026-11-13, while starting the engine with a test state folder for the live website.
+State: open.
+
+With a long `LGTM_HOME`, the engine's socket path exceeds 100 bytes, and the service exits at once.
+The service prints "socket path exceeds 100 bytes", but `serve --detach` discards the child's output.
+The launcher reports only "lgtm: service failed to start".
+Running `node packages/engine/src/service.ts` directly shows the reason.
