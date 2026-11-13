@@ -33,6 +33,12 @@ export const MockBundle = Schema.Struct({ sources: array(MockSource), screens: a
   schemaChanges: Schema.optionalKey(Schema.Never) })
   .check(Schema.makeFilter((value) => new TextEncoder().encode(JSON.stringify(value)).byteLength <= 64 * 1024))
 export const MockAuthor = Schema.Union([Schema.TaggedStruct("owner", {}), Schema.TaggedStruct("agent", { agentId: AgentId })])
+export const MockScreenComment = Schema.Struct({ commentId: RequestId, author: MockAuthor, text: Schema.String.check(Schema.isMaxLength(4096)), at: EpochMilliseconds })
+export const MockScreenReview = Schema.Struct({ projectId: ProjectId, revisionId: RequestId, screenId: MockScreenId,
+  comments: Schema.Array(MockScreenComment).check(Schema.isMaxLength(32)),
+  approval: Schema.optionalKey(Schema.Struct({ approved: Schema.Boolean, author: MockAuthor, at: EpochMilliseconds })),
+  seen: Schema.optionalKey(Schema.Struct({ author: MockAuthor, at: EpochMilliseconds })) })
+export type MockScreenReview = typeof MockScreenReview.Type
 export const MockArtifactIdentity = Schema.Struct({ sourceId: MockSourceId, fingerprint: Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/)) })
 export const MockRevision = Schema.Struct({ projectId: ProjectId, revisionId: RequestId, bundle: MockBundle, author: MockAuthor,
   at: EpochMilliseconds, artifacts: array(MockArtifactIdentity), comparisons: array(MockFieldComparison) })
@@ -66,6 +72,9 @@ export const ProjectMockRpcGroup = RpcGroup.make(
   Rpc.make("mocks.read", { payload: { ...project, ...page }, success: Schema.Union([
     Schema.Struct({ ...request, items: Schema.Array(MockRevision), next: Schema.optionalKey(RequestId), approval: Schema.optionalKey(MockApproval) }),
     Schema.Struct({ ...request, data: Schema.String })]), error }),
+  Rpc.make("mocks.screen.read", { payload: { ...project, revisionId: RequestId, screenId: MockScreenId }, success: Schema.Union([
+    Schema.Struct({ ...request, review: MockScreenReview }), Schema.Struct({ ...request, data: Schema.String })]), error }),
+  Rpc.make("mocks.comment", { payload: { ...project, revisionId: RequestId, screenId: MockScreenId, text: Schema.String.check(Schema.isMaxLength(4096)) }, success: ack, error }),
   Rpc.make("mocks.artifact", { payload: { ...project, revisionId: RequestId, sourceId: MockSourceId }, success: Schema.Union([
     Schema.Struct({ ...request, result: Schema.Union([Schema.TaggedStruct("available", { text: Schema.String.check(Schema.isMaxCodePoints(96 * 1024)), fingerprint: Schema.String }),
       Schema.TaggedStruct("unavailable", { reason: Schema.Literal("artifact unavailable") })]) }), Schema.Struct({ ...request, data: Schema.String })]), error }),
@@ -73,8 +82,10 @@ export const ProjectMockRpcGroup = RpcGroup.make(
 ).prefix("project.")
 const owner = ["owner"] as const, member = ["owner", "agent"] as const
 export const projectMockAccess = { "project.setup": owner, "project.setup.advance": owner, "project.setup.complete": owner,
-  "project.setup.discover": owner, "project.mocks.record": member, "project.mocks.read": member, "project.mocks.artifact": member, "project.mocks.approve": owner }
+  "project.setup.discover": owner, "project.mocks.record": member, "project.mocks.read": member, "project.mocks.artifact": member, "project.mocks.approve": owner,
+  "project.mocks.screen.read": member, "project.mocks.comment": owner }
 export const ProjectMockEvent = Schema.Union([
+  Schema.TaggedStruct("project.MockScreenCommented", { projectId: ProjectId, revisionId: RequestId, screenId: MockScreenId, commentId: RequestId, author: MockAuthor, text: Schema.String.check(Schema.isMaxLength(4096)) }),
   Schema.TaggedStruct("project.SetupAdvanced", { step: SetupStep }),
   Schema.TaggedStruct("project.SetupCompleted", { projectId: ProjectId }),
   Schema.TaggedStruct("project.MockRecorded", { projectId: ProjectId, revisionId: RequestId, bundle: MockBundle, author: MockAuthor, artifacts: array(MockArtifactIdentity), comparisons: array(MockFieldComparison) }),

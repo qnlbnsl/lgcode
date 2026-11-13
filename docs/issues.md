@@ -12290,3 +12290,10 @@ It kept The service is not connected after the connection became live.
 The page now waits for the live connection before its first list request.
 It preserves an already loaded draft when the connection recovers.
 A deterministic Studio unit test covers startup and reconnection.
+
+## s6-mocks-1. This Codex session cannot invoke the remote test helper.
+
+The Mocks control assignment requires the `run-remote-test` wrapper.
+Automatic approval review rejects this session's source transfer to the remote test computer.
+The lead will run the requested checks from this worktree and return their output.
+The builder records exact commands in `.foundry/test-request.txt`.

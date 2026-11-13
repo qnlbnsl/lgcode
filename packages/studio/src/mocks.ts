@@ -1,17 +1,18 @@
 // Pure translations for recorded mocks, repository designs and local discovery.
-import type { MockRevision, MockApproval, RepositoryDesignResult, Discovery, ProjectSettings } from "@lgtm/contracts"
+import type { MockRevision, MockApproval, MockScreenReview, RepositoryDesignResult, Discovery, ProjectSettings } from "@lgtm/contracts"
 
 type DesignResult = typeof RepositoryDesignResult.Type
 type DiscoveryResult = typeof Discovery.Type
 const author = (row: MockRevision["author"]) => row._tag === "owner" ? "owner" : row.agentId
-export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockApproval) {
+export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockApproval, reviews: ReadonlyArray<MockScreenReview> = []) {
   const head = items.at(-1)
   const approvedAt = head !== undefined && approval?.revisionId === head.revisionId ? approval.at : null
   const names = (ids: ReadonlyArray<string> = []) => ids.map((id) => head?.bundle.screens.find((s) => s.screenId === id)?.name ?? id)
   return {
     revisionId: head?.revisionId ?? null, designRevision: head?.bundle.designRevision ?? null,
     screens: (head?.bundle.screens ?? []).map((s) => ({ id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
-      status: approvedAt === null ? "draft" : "approved", rev: head!.revisionId, updatedAt: head!.at, comments: [],
+      status: approvedAt === null ? "draft" : "approved", rev: head!.revisionId, updatedAt: head!.at,
+      comments: (reviews.find((r) => r.revisionId === head!.revisionId && r.screenId === s.screenId)?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c), text: c.text, ts: c.at })),
       selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } })),
     changes: items.slice().reverse().map((r) => ({ id: r.revisionId, screen: null, name: r.bundle.screens.map((s) => s.name).join(", "),
       from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: null, compare: false })),

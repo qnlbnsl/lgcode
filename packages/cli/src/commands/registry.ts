@@ -113,6 +113,8 @@ const summaries: Record<CommandName, string> = {
   "project.setup.complete": "Complete first-run setup after a successful project creation.",
   "project.setup.discover": "Observe actual repositories, adapters and local credential evidence without launching or signing in.",
   "project.placement.preview": "Preview actual project placement without reserving paths or creating files.",
+  "project.mocks.comment": "Post a plain text owner comment on the current recorded mock screen.",
+  "project.mocks.screen.read": "Read versioned comments, approval and seen marks on a screen in your project.",
   "project.mocks.record": "Record a project-scoped mock revision with actual artifact references.",
   "project.mocks.read": "Read bounded immutable mock revisions and current owner approval.",
   "project.mocks.artifact": "Read actual bounded artifact text as data, or unavailable.",

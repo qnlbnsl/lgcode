@@ -1,5 +1,7 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "mock screen feedback exceeds the read budget",
+  "mock screen is unavailable", "mock comment must contain between 1 and 4096 characters", "mock screen comment limit reached; record a new revision",
   "project state changed; refresh and retry",
   "Git outcome is uncertain; refresh Git state",
   "Git attempt metadata is unavailable",

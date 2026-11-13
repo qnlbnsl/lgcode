@@ -1,3 +1,4 @@
+import { mockScreenPlanners, mockScreenReads } from "./mockScreenReviews.ts"
 import { MockBundle, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { fieldStructure, eventStructure, type RedactionStructure } from "../log/redactionStructure.ts"
@@ -238,5 +239,5 @@ const artifact: ReadHandler = (input, raw) => Effect.gen(function* () {
   if (Buffer.byteLength(JSON.stringify(reply)) > 256 * 1024) return yield* refused("mock artifact reply exceeds the read budget")
   return { reply }
 })
-export const mockPlanners = { "project.mocks.record": record(), "project.mocks.approve": approve() }
-export const mockReads = { "project.mocks.read": read, "project.mocks.artifact": artifact }
+export const mockPlanners = { ...mockScreenPlanners, "project.mocks.record": record(), "project.mocks.approve": approve() }
+export const mockReads = { ...mockScreenReads, "project.mocks.read": read, "project.mocks.artifact": artifact }

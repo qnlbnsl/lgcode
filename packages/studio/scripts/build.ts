@@ -1,4 +1,5 @@
 import { harnessChoicesSource } from "./harnessChoices.ts"
+import { mockControlsSource } from "./mockControlsSource.ts"
 // Builds the live website into packages/studio/dist, which the engine serves at /studio/.
 //
 // 1. It copies the website from design/mock. The folders that are links there, fonts and
@@ -72,6 +73,10 @@ export async function buildStudio(dist = defaultDist): Promise<string> {
   mkdirSync(join(mock, "workflows"), { recursive: true })
   writeGenerated(join(mock, "workflows/build-loop.json"), readFileSync(join(root, "../engine/src/workflows/build-loop.json")))
   for (const part of parts) cpSync(join(mock, part), join(dist, part), { recursive: true, dereference: true })
+  for (const path of ["js/screens/mocks.js", "js/live/mocks.js"]) {
+    const target = join(dist, path)
+    writeFileSync(target, mockControlsSource(path, readFileSync(target, "utf8")))
+  }
   for (const path of ["js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
     const target = join(dist, path)
     writeFileSync(target, harnessChoicesSource(path, readFileSync(target, "utf8")))
