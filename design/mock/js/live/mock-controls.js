@@ -11,3 +11,10 @@ export function comment(project, screen, text) {
   }, 'Comment saved');
 }
 export const state = () => store.state;
+export function approve(project, screen) {
+  return run('mock-approve:' + screen.id, async () => {
+    await engine.request('project.mocks.screen.approve', { projectId: project.id, revisionId: screen.rev, screenId: screen.id, approved: screen.status !== 'approved' });
+    await loadMocks(project.id);
+    return true;
+  }, screen.status === 'approved' ? 'Approval withdrawn' : 'Screen approved');
+}

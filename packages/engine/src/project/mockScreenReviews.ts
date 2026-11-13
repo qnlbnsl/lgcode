@@ -34,5 +34,12 @@ const read: ReadHandler = (input, raw) => Effect.gen(function* () {
   if (Buffer.byteLength(JSON.stringify(reply)) > 256 * 1024) return yield* refused("mock screen feedback exceeds the read budget")
   return { reply }
 })
-export const mockScreenPlanners = { "project.mocks.comment": comment }
+const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  if (input.actor._tag !== "owner") return yield* refused()
+  const p = raw as Payload<"project.mocks.screen.approve">
+  yield* screenReview(input, p, true)
+  return { events: [{ _tag: "project.MockScreenApprovalSet", projectId: p.projectId, revisionId: p.revisionId, screenId: p.screenId,
+    approved: p.approved, author: input.actor }], reply: () => ({ requestId: p.requestId }) }
+})
+export const mockScreenPlanners = { "project.mocks.comment": comment, "project.mocks.screen.approve": approve }
 export const mockScreenReads = { "project.mocks.screen.read": read }

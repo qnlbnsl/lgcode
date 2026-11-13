@@ -27,3 +27,12 @@ it("loads authenticated feedback before accepting a consistent mock snapshot", (
   expect(wired.indexOf("project.mocks.screen.read")).toBeLessThan(wired.indexOf("const final ="))
   expect(wired).toContain("mapMocks(items, approval, reviews)")
 })
+
+it("shows only the exact screen version approval and preserves explicit withdrawal", () => {
+  const revision = { projectId: "project", revisionId: "v1", at: 1, author: { _tag: "owner" }, artifacts: [], comparisons: [],
+    bundle: { sources: [], screens: [{ screenId: "home", sourceId: "page", name: "Home", route: "/home", scenarioRoutes: [] }], scenarios: [], components: [], draftedFields: [] } } as unknown as MockRevision
+  const review = { projectId: "project", revisionId: "v1", screenId: "home", comments: [], approval: { approved: true, author: { _tag: "owner" }, at: 3 } } as unknown as MockScreenReview
+  expect(mapMocks([revision], undefined, [review]).screens[0]).toMatchObject({ status: "approved", approval: { at: 3 } })
+  expect(mapMocks([{ ...revision, revisionId: "v2" } as MockRevision], undefined, [review]).screens[0]?.status).toBe("draft")
+  expect(mapMocks([revision], { revisionId: "v1", at: 2 } as never, [{ ...review, approval: { ...review.approval!, approved: false } }]).screens[0]?.status).toBe("draft")
+})

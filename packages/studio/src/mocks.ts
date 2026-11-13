@@ -10,10 +10,14 @@ export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockAppr
   const names = (ids: ReadonlyArray<string> = []) => ids.map((id) => head?.bundle.screens.find((s) => s.screenId === id)?.name ?? id)
   return {
     revisionId: head?.revisionId ?? null, designRevision: head?.bundle.designRevision ?? null,
-    screens: (head?.bundle.screens ?? []).map((s) => ({ id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
-      status: approvedAt === null ? "draft" : "approved", rev: head!.revisionId, updatedAt: head!.at,
-      comments: (reviews.find((r) => r.revisionId === head!.revisionId && r.screenId === s.screenId)?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c), text: c.text, ts: c.at })),
-      selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } })),
+    screens: (head?.bundle.screens ?? []).map((s) => {
+      const review = reviews.find((r) => r.projectId === head!.projectId && r.revisionId === head!.revisionId && r.screenId === s.screenId)
+      return { id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
+        status: (review?.approval?.approved ?? approvedAt !== null) ? "approved" : "draft", rev: head!.revisionId, updatedAt: head!.at,
+        approval: review?.approval ?? null,
+        comments: (review?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c), text: c.text, ts: c.at })),
+        selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } }
+    }),
     changes: items.slice().reverse().map((r) => ({ id: r.revisionId, screen: null, name: r.bundle.screens.map((s) => s.name).join(", "),
       from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: null, compare: false })),
     data: (head?.comparisons ?? []).map((c) => ({ field: [c.field.entity, c.field.name].filter(Boolean).join("."),

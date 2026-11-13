@@ -65,3 +65,26 @@ it.live("returns exact public reasons through the authenticated screen API", () 
   const read = yield* api["project.mocks.screen.read"]({ requestId: freshRequest(), ...f.selection } as never)
   expect(read).toMatchObject({ review: { comments: [{ text: "owner feedback" }] } })
 })))
+
+it.live("approves and withdraws one screen as the owner without moving the stage or granting agents approval authority", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* seedScreens(rig), requestId = freshRequest(), payload = { ...f.selection, approved: true, requestId }
+  expect(failureOf(yield* call(agentCredential(f.designer.token), "project.mocks.screen.approve", payload))?.reason).toBe("command refused")
+  success(yield* call(owner, "project.mocks.screen.approve", payload))
+  const rows = yield* readLog
+  success(yield* call(owner, "project.mocks.screen.approve", payload))
+  expect(yield* readLog).toEqual(rows)
+  const approved = success(yield* call(owner, "project.mocks.screen.read", f.selection)).review.approval
+  expect(approved).toMatchObject({ approved: true, author: { _tag: "owner" }, at: expect.any(Number) })
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("design")
+  expect(Object.values(projectView(yield* snapshot).mockApprovals)).toEqual([])
+  expect(success(yield* call(agentCredential(f.designer.token), "project.mocks.screen.read", f.selection)).data).toContain('"approved":true')
+  success(yield* call(owner, "project.mocks.screen.approve", { ...f.selection, approved: false }))
+  expect(success(yield* call(owner, "project.mocks.screen.read", f.selection)).review.approval).toMatchObject({ approved: false, author: { _tag: "owner" } })
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("design")
+  for (const screenId of ['../../outside', '$(touch escaped)', '--upload-pack=evil', '`touch escaped`'])
+    expect(failureOf(yield* call(owner, "project.mocks.screen.approve", { ...f.selection, screenId, approved: true }))?.reason).toBe("mock screen is unavailable")
+  expect(existsSync(join(rig.work, "escaped"))).toBe(false)
+  const next = success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: f.revisionId, bundle: screenBundle() }))
+  expect(success(yield* call(owner, "project.mocks.screen.read", { ...f.selection, revisionId: next.revisionId })).review.approval).toBeUndefined()
+  expect(failureOf(yield* call(owner, "project.mocks.screen.approve", { ...f.selection, approved: true }))?.reason).toBe("mock revision changed; refresh and retry")
+})))
