@@ -70,6 +70,8 @@ function Seg({ value, options, onChange, label }) {
     ${o.icon && html`<${Icon} name=${o.icon} size=${13} />`}${o.label}</button>`)}</div>`;
 }
 function Meter({ pct, wide }) {
+  // A machine whose figure is not known yet shows a dash, as an offline machine does.
+  if (typeof pct !== 'number') return html`<span class="faint">—</span>`;
   const tone = pct >= 100 ? 'full' : pct >= 80 ? 'warn' : null;
   return html`<span class=${cx('svc-meter', wide && 'wide')}><span class="progress" role="img" aria-label=${pct + ' percent used'}><i class=${tone} style=${{ width: Math.min(100, pct) + '%' }}></i></span>
     <span class=${cx('num', tone === 'full' && 'error-text', tone === 'warn' && 'warn-text')}>${pct}%</span></span>`;

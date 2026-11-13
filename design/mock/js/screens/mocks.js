@@ -101,6 +101,8 @@ function Frame({ kind, viewport = 'phone', before, fit = 'width', max = 1 }) {
 
 // ---- sample records ------------------------------------------------------------------
 function blank() { return { approvedAt: null, screens: [], changes: [], data: [], components: [] }; }
+// The live website gives every project an empty record until the engine holds one.
+export const emptyMocks = () => blank();
 function ensure(s, p) {
   s.mocks = s.mocks || {};
   if (!s.mocks[p.id]) { const m = blank(); if (p.hasMocks) m.screens.push({ id: 'first', name: 'First screen', kind: 'list', status: 'draft', rev: 1, updatedAt: Date.now(), note: 'The Designer is drawing this screen now.', comments: [] }); s.mocks[p.id] = m; }

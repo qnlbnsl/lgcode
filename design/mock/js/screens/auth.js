@@ -26,7 +26,9 @@ export function Login({ s }) {
   const [caps, setCaps] = useState(false);
   const field = useRef(null);
   const insecure = insecureOrigin();
+  // The live website knows no machine until it is signed in, so it names the page's own address.
   const master = s.machines.find((m) => m.role === 'master') || s.machines[0];
+  const address = master ? master.address : location.host;
   const down = status === 'unavailable';
   const blocked = insecure || down;
   useEffect(() => { if (!blocked) field.current?.focus(); }, [status, blocked]);
@@ -36,24 +38,23 @@ export function Login({ s }) {
     if (blocked || busy) return;
     if (!pw) { setEmpty(true); field.current?.focus(); return; }
     setBusy(true);
-    setTimeout(() => {
+    act.signIn(pw).then((next) => {
       setBusy(false);
-      if (pw.trim().toLowerCase() === 'wrong') { setPw(''); act.setSession('rejected'); return; }
-      act.setSession('in');
-      go(s.session.firstRun ? '/setup' : '/home');
-    }, 700);
+      if (next === 'rejected') { setPw(''); return; }
+      if (next === 'in') go(s.session.firstRun ? '/setup' : '/home');
+    });
   };
-  const retry = () => { setRetrying(true); setTimeout(() => { setRetrying(false); act.setSession('out'); act.toast('The service is answering again'); }, 1200); };
+  const retry = () => { setRetrying(true); act.retryService().then(() => setRetrying(false)); };
   const typed = (e) => { setPw(e.target.value); setEmpty(false); if (status === 'rejected') act.setSession('out'); };
   const error = empty ? 'Enter the password.' : status === 'rejected' ? 'That password is wrong. Nothing was signed in.' : null;
 
   return html`<main class="auth">
     <div class="auth-card">
-      <${Brand} sub=${`Sign in to the service on ${master.name}`} />
+      <${Brand} sub=${master ? `Sign in to the service on ${master.name}` : 'Sign in to the service'} />
 
       ${status === 'expired' && !insecure && html`<div class="callout info" role="status"><${Icon} name="clock" size=${14} /><span>You were signed out because the session expired. Sign in again and you return to where you were.</span></div>`}
       ${down && !insecure && html`<div class="callout error" role="alert"><${Icon} name="wifi-off" size=${14} />
-        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${master.address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
+        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
       ${insecure && html`<div class="callout warn" role="alert"><${Icon} name="shield-alert" size=${14} />
         <span><b>This page is not on a secure connection.</b> LGTM Studio accepts the password only over HTTPS, or from the computer the service runs on. Open the HTTPS address, or forward the port and open <span class="mono">127.0.0.1</span>.</span></div>`}
 
@@ -77,7 +78,7 @@ export function Login({ s }) {
 
       <div class="auth-foot">
         <span class="auth-conn"><i class=${cx('dot', down ? 'failed' : insecure ? 'waiting' : 'working')}></i>${down ? 'Service unreachable' : insecure ? 'Sign-in is blocked on this connection' : 'Service reachable'}</span>
-        <span class="mono">${insecure ? location.host : master.address}</span>
+        <span class="mono">${insecure ? location.host : address}</span>
       </div>
     </div>
   </main>`;

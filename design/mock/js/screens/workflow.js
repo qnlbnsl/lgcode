@@ -28,6 +28,8 @@ function blank(p) {
     settings: { fullRun: 'pnpm check', check: 'pnpm test --related', maxRounds: 6, stuckPoints: 12, autoMergeFix: true, nightly: true },
   };
 }
+// The live website gives every project an empty record until the engine holds one.
+export const emptyWorkflow = () => blank();
 // A project made while the page is open gets an empty record.
 function ensure(s, p) { s.workflow = s.workflow || {}; return s.workflow[p.id] || (s.workflow[p.id] = blank(p)); }
 

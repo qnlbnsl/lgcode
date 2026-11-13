@@ -1,15 +1,15 @@
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
   html, render, useState, useEffect, useRef, Icon, cx, store, update, useStore, useRoute, go, href, ago, useNow, useKey, useMedia,
-  HOUR, plural, isMac,
+  HOUR, plural, isMac, live, guardStore, engineWrite, refusal, refuse,
 } from './lib.js';
 import {
-  seed, projectOf, repoOf, agentOf, teamOf, teamName, teamsOf, agentsOfTeam, leadOf, openRequests, agentStatus, projectStatus,
-  KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf,
+  seed, emptyState, projectOf, repoOf, agentOf, teamOf, teamName, teamsOf, agentsOfTeam, leadOf, openRequests, agentStatus, projectStatus,
+  KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf, HARNESSES,
 } from './data.js';
 import * as act from './actions.js';
 import * as engine from './engine.js';
-import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar } from './ui.js';
+import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar, Empty } from './ui.js';
 import './dialogs.js';
 import { Home, AllProjects } from './screens/home.js';
 import { Board, SprintPage, TaskPage, TeamPage, RepoPage } from './screens/project.js';
@@ -23,6 +23,8 @@ import { MessagesTab, AgentsTab, seedBoard } from './screens/messages.js';
 import { WorkflowTab, seedWorkflow } from './screens/workflow.js';
 import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
+import { emptyWorkflow } from './screens/workflow.js';
+import { emptyMocks } from './screens/mocks.js';
 
 // ---- named places ---------------------------------------------------------------
 // A page that mounts the website can fill these places with its own components, without
@@ -157,8 +159,8 @@ function Sidebar({ s, route, onNavigate }) {
       <${Slot} name="sidebar.account" s=${s} route=${route} />
       <div class="row" style="height:var(--row);padding:0 2px 0 8px;margin-top:4px;gap:8px">
         <${OwnerAvatar} s=${s} /><span class="truncate grow" style="font-weight:var(--weight-medium)">${s.owner.name}</span>
-        <${MockControls} s=${s} />
-        <button type="button" class="icon-btn" aria-label="Log out" data-tip="Log out" data-tip-side="left" onClick=${() => { act.setSession('out'); go('/login'); }}><${Icon} name="log-out" size=${15} /></button>
+        ${!live.on && html`<${MockControls} s=${s} />`}
+        <button type="button" class="icon-btn" aria-label="Log out" data-tip="Log out" data-tip-side="left" onClick=${act.signOut}><${Icon} name="log-out" size=${15} /></button>
       </div>
     </div>
     ${!folded && html`<${Resizer} side="right" label="Resize the sidebar" value=${s.prefs.sidebarWidth} min=${220} max=${420} reset=${264} onChange=${(v) => act.setPref('sidebarWidth', v)} />`}
@@ -182,7 +184,7 @@ function Live({ s }) {
   const word = { live: 'Live', reconnecting: 'Reconnecting', offline: 'Offline' }[c.status];
   return html`<${Menu} class=${cx('live', c.status)} align="end" width=${280} label=${'Connection: ' + word}
     trigger=${html`<i class=${cx('dot', c.status === 'live' ? 'working' : c.status === 'reconnecting' ? 'waiting' : 'failed')}></i><span class="not-phone">${word}</span>`}
-    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? 'Connected to the service on Workstation.' : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
+    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? `Connected to the service on ${(s.machines.find((m) => m.here) || s.machines[0])?.name || 'this computer'}.` : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
     items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); act.toast('Connected'); } }]} />`;
 }
 function Inspecting({ s, project }) {
@@ -274,6 +276,7 @@ function ProjectView({ s, route, project }) {
   else if (tab === 'chat') body = html`<${ChatTab} s=${s} project=${project} agentId=${chatAgent?.id || route.parts[3]} route=${route} />`;
   else if (tab === 'messages') body = html`<${MessagesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'agents') body = html`<${AgentsTab} s=${s} project=${project} route=${route} />`;
+  else if (live.on && ['terminal', 'files'].includes(tab)) body = html`<${NotConnected} what=${tab === 'files' ? 'Files' : 'The terminal'} />`;
   else if (tab === 'terminal') body = html`<${TerminalTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'files') body = html`<${FilesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'git') body = html`<${GitTab} s=${s} project=${project} route=${route} />`;
@@ -296,6 +299,11 @@ function ProjectView({ s, route, project }) {
   </div>`;
 }
 
+// A screen whose records the engine cannot give yet, in live mode. It never shows the sample.
+function NotConnected({ what }) {
+  return html`<div class="page"><${Empty} title=${`${what} is not connected yet`}>The service does not send this to the website yet.</${Empty}></div>`;
+}
+
 // ---- the app --------------------------------------------------------------------
 function App() {
   const s = useStore(); const route = useRoute();
@@ -312,8 +320,13 @@ function App() {
     if (route.path === '/home/projects') go('/projects');
   }, [route.path]);
   useEffect(() => { document.title = 'LGTM Studio'; }, []);
+  // The live website opens Home once the engine says this browser is signed in.
+  useEffect(() => { if (live.on && s.session.status === 'in' && route.parts[0] === 'login') go('/home'); }, [s.session.status, route.path]);
   const top = route.parts[0] || 'home';
-  if (top === 'login' || (s.session.status !== 'in' && top !== 'setup')) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
+  // The live website asks the engine whether this browser is signed in before it shows anything.
+  if (s.session.status === 'checking') return html`<main class="auth" aria-busy="true"></main>`;
+  if (top === 'login' || (s.session.status !== 'in' && (top !== 'setup' || live.on))) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
+  if (top === 'setup' && live.on) return html`<main class="auth"><${NotConnected} what="The first run" /></main><${Toasts} s=${s} />`;
   if (top === 'setup') return html`<${FirstRun} s=${s} route=${route} /><${DialogHost} s=${s} /><${Toasts} s=${s} />`;
   const project = top === 'p' ? projectOf(s, route.parts[1]) : null;
   let content;
@@ -345,9 +358,11 @@ function App() {
 //   connection   receives every engine call and pushed update; see engine.js
 //   slots        components for the named places above, by name
 export { App };
-export function mount(el, { connection, slots: fills } = {}) {
+export function mount(el, { connection, slots: fills, mode = 'mock' } = {}) {
   engine.setConnection(connection);
   slots = fills || {};
+  live.on = mode === 'live';
+  if (live.on) return mountLive(el);
   const state = seed();
   state.ui = {};
   for (const add of [seedGit, seedTerminal, seedMocks, seedBoard, seedWorkflow, seedService, seedAuth]) add?.(state);
@@ -361,9 +376,51 @@ export function mount(el, { connection, slots: fills } = {}) {
   render(html`<${App} />`, el);
   return { store, act };
 }
+
+// ---- live mode -------------------------------------------------------------------
+// The page that loads the website chooses live mode with mount(el, { connection, mode: 'live' }).
+// The store starts empty, nothing from seed() is read, and the simulation never starts. The
+// connection fills the store from the engine. It calls the function it is given with a patch
+// of whole store keys, such as { repos, projects, agents } or { session } or { conn }, already
+// in the store's shape. See engine.js for what the connection provides.
+function mountLive(el) {
+  const state = emptyState();
+  state.ui = {};
+  seedTerminal(state);
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, notifications: [], workflow: {}, mocks: {}, design: {} });
+  store.state = guardStore(state);
+  act.applyPrefs();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
+  // A screen that changes an engine record outside update() is refused the same way.
+  addEventListener('error', onRefusedError);
+  addEventListener('unhandledrejection', onRefusedError);
+  engine.connection().open?.((patch) => {
+    // The Workflow and Mocks tabs keep one record per project. Each live project gets an
+    // empty one, frozen like the rest, so the tabs show their empty structure.
+    if (patch.projects) Object.assign(patch, {
+      workflow: Object.fromEntries(patch.projects.map((p) => [p.id, store.state.workflow[p.id] || emptyWorkflow()])),
+      mocks: Object.fromEntries(patch.projects.map((p) => [p.id, store.state.mocks[p.id] || emptyMocks()])),
+    });
+    // A harness the page has no words for is named by the engine's id for it.
+    for (const x of [...(patch.agents || []), ...(patch.subscriptions || [])]) {
+      if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
+    }
+    engineWrite(patch);
+    // The sidebar opens each repository the first time the engine names it, as the sample does.
+    if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
+  });
+  render(html`<${App} />`, el);
+  return { store, act };
+}
+function onRefusedError(e) {
+  const error = e.error || e.reason;
+  if (live.on && refusal(error)) { e.preventDefault(); refuse(); }
+}
+
 // Takes the website out of the element and returns to the default connection.
 export function unmount(el) {
   render(null, el);
+  if (live.on) { engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
   engine.setConnection(null);
   slots = {};
 }

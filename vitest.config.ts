@@ -2,7 +2,7 @@ import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-const packageNames = ["contracts", "client", "engine", "cli", "mcp", "testing", "web", "viewer"];
+const packageNames = ["contracts", "client", "engine", "cli", "mcp", "testing", "web", "viewer", "studio"];
 
 export default defineConfig({
   test: {
@@ -29,7 +29,7 @@ export default defineConfig({
       ...packageNames.map((name) => ({
         test: {
           name,
-          environment: name === "web" ? "jsdom" : "node",
+          environment: name === "web" || name === "studio" ? "jsdom" : "node",
           include: [`packages/${name}/**/*.{test,spec}.{ts,tsx}`],
           exclude: [`packages/${name}/e2e/**`, "**/node_modules/**"],
         },
