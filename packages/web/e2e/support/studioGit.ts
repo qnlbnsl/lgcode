@@ -81,6 +81,8 @@ export async function exerciseStudioGit(page: Page) {
           await expect(fileButton('Discard changes to discard.txt')).toBeEnabled()
           await fileClick('Discard changes to discard.txt')
           await page.getByRole('dialog').getByRole('button', { name: 'Discard', exact: true }).click()
+          // A removed row is published before the discard's complete readback.
+          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           await expect(page.getByRole('button', { name: 'Stage discard.txt', exact: true })).toHaveCount(0)
           await fileClick('Stage file.txt')
           await page.getByRole('textbox', { name: 'Commit message', exact: true }).fill('Browser committed change')

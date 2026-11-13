@@ -12404,3 +12404,17 @@ The sixteen-of-twenty-three run remains evidence from this worker and is not sub
 Exact wire assertions found that the blank reason, unavailable lead, invalid parent, and inactive merge cases reached the client as command refused.
 The public allowlist now includes their fixed messages and abort_blocked.
 No caller text, filesystem path, or subprocess diagnostic is exposed by these additions.
+
+
+## s4-git2-22. The Git journey staged a file before its preceding discard completed.
+
+The review's final full check again reproduced issue 689 at Stage file.txt.
+All 8256 unit tests and the other 52 browser tests passed.
+The five consecutive isolated Git journeys had also passed.
+Discard publishes the selected project's changed file list before finishing its reads of the other workspaces.
+The journey waited only for the discarded row to disappear.
+It could therefore attempt its next owner action while the preceding discard still held the owner's pending key.
+The journey now waits for that preceding action's existing aria-busy state to become false after confirmation.
+This is separate from the removed merge-review background-read wait.
+No timeout is raised and automatic reads still do not disable owner controls.
+The final full-check failure is retained in the handoff.
