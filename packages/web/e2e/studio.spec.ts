@@ -15,7 +15,7 @@ import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
-import { call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
+import { appendSetup, eventOf, ownerCredential, success, call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
@@ -57,6 +57,8 @@ test("live website: signs in through the engine, shows its real records, and kee
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
         yield* completedSetup(project.projectId)
+        const questionId = success(yield* call(project.leadCredential, "ask", { title: "Choose the release branch", text: "Which branch should the release use?", recommendation: "Keep one branch", proposedAnswer: "Use trunk" })).questionId
+        yield* appendSetup([eventOf({ _tag: "PermissionRequested", agentId: project.leadId, permissionRequestId: "studio-permission", holder: { _tag: "owner" }, deliveryId: `seed-turn-${project.leadId}`, toolCallId: "studio-check", description: "Run Studio checks", options: [{ id: "harness-once", name: "Run once", kind: "allow_once", level: "ask", persistent: false }, { id: "harness-never", name: "Refuse this check", kind: "reject_once", level: "read-only", persistent: false }], settingsWrite: false, toolKind: "execute", toolInput: { command: "pnpm test studio" } })])
         yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
@@ -81,12 +83,28 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
           for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
 
+          // Home answers real questions and harness permissions, including full input.
+          await expect(page.locator('.rq-table')).toContainText('Choose the release branch')
+          await page.getByRole('button', { name: 'Show Choose the release branch', exact: true }).click()
+          await page.getByRole('button', { name: 'Accept recommendation', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Show Choose the release branch', exact: true })).toHaveCount(0)
+          await page.getByRole('button', { name: 'Show Run Studio checks', exact: true }).click()
+          await expect(page.locator('.rq-detail')).toContainText('pnpm test studio')
+          await page.getByRole('button', { name: 'Run once', exact: true }).click()
+          await expect(page.getByRole('button', { name: 'Show Run Studio checks', exact: true })).toHaveCount(0)
+          await page.getByLabel('Show answered', { exact: true }).check()
+          await expect(page.locator('.rq-table')).toContainText('Use trunk')
+          await expect(page.locator('.rq-table')).toContainText('Run once')
+
           // The project's lead and its team come from the engine.
           await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/agents`)
           await expect(page.locator(".main")).toContainText("Build")
           await expect(page.locator(".main")).toContainText("Project lead")
           await expect(page.locator(".topbar")).toContainText("Project")
         })
+
+        const answered = success(yield* call(ownerCredential, "client.requests", { after: 0, limit: 100 }))
+        expect(answered.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: questionId, status: "answered", answer: "Use trunk" }), expect.objectContaining({ id: "studio-permission", status: "answered", optionId: "harness-once" })]))
 
         // A change in the engine reaches the open page through the stream.
         yield* call(project.leadCredential, "project.sprint.create", { projectId: project.projectId, label: "SP-2",

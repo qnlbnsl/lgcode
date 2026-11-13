@@ -1,3 +1,4 @@
+import * as chat from './live/chat.js';
 // Everything that changes the mock's state, and the small simulation that makes agents
 // answer and move. Nothing here talks to a service. Each change the real product sends to the
 // engine is also reported to engine.js, under the RPC tag the real client API uses.
@@ -86,7 +87,7 @@ function replyFor(a, text) {
 }
 export function setDraft(key, text) { S().drafts[key] = text; }
 export function sendMessage(agentId, text, context = [], files = []) {
-  if (refused()) return;
+  if (live.on) return chat.sendMessage(agentId, text, context, files);
   text = text.trim();
   if (!text && !files.length) return;
   const a = agentOf(S(), agentId);
@@ -113,7 +114,7 @@ export function sendMessage(agentId, text, context = [], files = []) {
 }
 // Stops the reply that is being written. The agent keeps running.
 export function stopReply(agentId) {
-  if (refused()) return;
+  if (live.on) return chat.stopReply(agentId);
   engine.call('cancel-reply', { agentId });
   update((s) => {
     clearTimeout(s.pending[agentId]); delete s.pending[agentId];
@@ -123,7 +124,7 @@ export function stopReply(agentId) {
   });
 }
 export function stopAgent(agentId) {
-  if (refused()) return;
+  if (live.on) return chat.stopAgent(agentId);
   const s = S(); const a = agentOf(s, agentId);
   const approvals = openRequests(s, { agent: agentId }).filter((r) => r.kind === 'approval');
   const doStop = () => update((st) => {
@@ -144,7 +145,7 @@ export function stopAgent(agentId) {
   } else doStop();
 }
 export function resumeAgent(agentId) {
-  if (refused()) return;
+  if (live.on) return chat.resumeAgent(agentId);
   engine.call('resume', { agentId });
   update((s) => {
     const a = agentOf(s, agentId);
@@ -154,11 +155,11 @@ export function resumeAgent(agentId) {
     threadOf(s, agentId).push({ id: uid('m'), type: 'note', ts: Date.now(), text: `You resumed ${a.name}.` });
   });
 }
-export function setAgentConfig(agentId, patch) { if (refused()) return; engine.call('configure', { agentId, ...patch }); update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
+export function setAgentConfig(agentId, patch) { if (live.on) return chat.setAgentConfig(agentId, patch); engine.call('configure', { agentId, ...patch }); update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
 
 // ---- requests ------------------------------------------------------------------
 export function answerRequest(requestId, optionId, text) {
-  if (refused()) return;
+  if (live.on) return chat.answerRequest(requestId, optionId, text);
   const s = S(); const r = byId(s.requests, requestId); if (!r || r.status !== 'open') return;
   const a = agentOf(s, r.agent); const opt = (r.options || []).find((o) => o.id === optionId);
   let answer;

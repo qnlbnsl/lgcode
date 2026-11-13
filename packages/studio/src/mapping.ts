@@ -58,6 +58,7 @@ export interface StoreAgent {
 }
 export interface StoreOption { readonly id: string; readonly label: string; readonly primary?: boolean }
 export interface StoreRequest {
+  readonly sourceSequence?: number
   readonly id: string; readonly kind: "approval" | "question"; readonly agent: string; readonly project: string
   readonly task: string | null; readonly title: string; readonly body: string; readonly command: string | null
   readonly folder: string; readonly tool: string | null; readonly recommendation: string | null
@@ -267,6 +268,7 @@ export function mapRequest(row: EngineRow, kind: "approval" | "question", agents
     id: option.id, label: option.name, ...(index === 0 ? { primary: true } : {})
   }))
   return {
+    sourceSequence: row.sourceSequence,
     id: row.id, kind, agent: row.agentId, project, task: display?.taskId ?? null, title, body: preview,
     command: null, folder: "", tool: display?.toolKind ?? null, recommendation: display?.recommendation ?? null,
     options, createdAt: row.openedAt ?? 0, status: "open", heldBy: row.holder._tag === "agent" ? row.holder.agentId : null

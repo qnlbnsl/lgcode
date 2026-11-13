@@ -1,6 +1,7 @@
+import { watchHome, loadRequest } from '../live/chat.js';
 // Home is one triage table: everything that needs the owner, across every project.
 // Project navigation lives in the sidebar and on the All projects page, not here.
-import { html, useState, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
+import { html, useState, useEffect, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
 import {
   openRequests, projectOf, repoOf, agentOf, teamOf, machineOf, KIND_LABEL, projectStatus, leadOf, agentStatus,
   agentsOfProject, byId, routeForRequest, STAGES,
@@ -63,6 +64,7 @@ function RequestRow({ s, r, now, ex, onToggle: toggle }) {
 }
 
 export function Home({ s, route }) {
+  useEffect(watchHome, []);
   const now = useNow();
   const [openId, setOpenId] = useState(null);
   const [q, setQ] = useState('');
@@ -116,10 +118,10 @@ export function Home({ s, route }) {
         <thead><tr>${COLS.map((c) => html`<th key=${c.id} class=${cx(c.num && 'num', 'h-' + c.id)} aria-sort=${sort.col === c.id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : null}>
           <button type="button" class="th-sort" onClick=${() => clickSort(c)}>${c.label}${sort.col === c.id && html`<${Icon} name=${sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'} size=${11} />`}</button></th>`)}</tr></thead>
         <tbody>
-          ${rows.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => setOpenId(openId === r.id ? null : r.id)} />`)}
+          ${rows.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => { if (openId !== r.id) void loadRequest(r.id); setOpenId(openId === r.id ? null : r.id); }} />`)}
           ${rows.length === 0 && html`<tr class="rq-none"><td colspan=${COLS.length} data-empty>${anyFilter ? html`No open request matches. <button type="button" class="link" onClick=${() => { setF({ repo: null, project: null }); setQ(''); setKind(null); }}>Clear the filters</button>` : 'Nothing needs you.'}</td></tr>`}
           ${done.length > 0 && html`<tr class="rq-group"><td colspan=${COLS.length}>Answered<span class="count">${done.length}</span></td></tr>`}
-          ${done.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => setOpenId(openId === r.id ? null : r.id)} />`)}
+          ${done.map((r) => html`<${RequestRow} key=${r.id} s=${s} r=${r} now=${now} ex=${openId === r.id} onToggle=${() => { if (openId !== r.id) void loadRequest(r.id); setOpenId(openId === r.id ? null : r.id); }} />`)}
         </tbody>
       </table>
     </div>

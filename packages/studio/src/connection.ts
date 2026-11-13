@@ -16,6 +16,7 @@ import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type Engin
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable"
 export interface StorePatch extends Partial<EngineRecords> {
+  readonly chatEvent?: unknown
   readonly session?: { readonly status: SessionStatus; readonly firstRun: boolean }
   readonly conn?: StoreConn
   readonly owner?: StoreOwner
@@ -26,6 +27,7 @@ export type Write = (patch: StorePatch) => void
 export interface LiveConnection {
   readonly kind: "engine"
   readonly label: string
+  request(tag: string, payload: object): Promise<unknown>
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
   open(write: Write): void
@@ -156,6 +158,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
                 + (timing.firstPushDeliveryMs === undefined ? "" : `, ${timing.firstPushDeliveryMs} ms after the engine recorded it`))
             }
             if (item.sequence <= after) return
+            if (!signal.aborted) write({ chatEvent: item })
             if ("event" in item) yield* apply(item, refresh)
             else if (item._tag === "client.Oversized" && needsRefresh(item.tag)) yield* refresh(item.sequence)
             after = Math.max(after, item.sequence) as EventSequence
@@ -196,6 +199,18 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     label: "the service",
     // Sending changes to the engine is step 2 of the plan. Until then the website refuses
     // each action before it reaches this point.
+    async request(tag, payload) {
+      if (closed || controller === undefined || controller.signal.aborted) throw new Error("The service is not connected.")
+      const signal = controller.signal
+      try {
+        return await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+          const client = yield* open({ url })
+          const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, { reason?: string }>>)[tag]
+          if (typeof method !== "function") return yield* Effect.fail(new Error(`Unknown request: ${tag}`))
+          return yield* method({ ...payload, requestId: requestId() }).pipe(Effect.mapError((error) => new Error(error.reason ?? String(error))))
+        })), { signal })
+      } catch (error) { throw error instanceof Error ? error : new Error(String(error)) }
+    },
     call() {},
     push() {},
     open(next) {

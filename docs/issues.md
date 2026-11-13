@@ -11067,3 +11067,17 @@ With a long `LGTM_HOME`, the engine's socket path exceeds 100 bytes, and the ser
 The service prints "socket path exceeds 100 bytes", but `serve --detach` discards the child's output.
 The launcher reports only "lgtm: service failed to start".
 Running `node packages/engine/src/service.ts` directly shows the reason.
+
+## s2-chat-1. Live request cards used the mock's fixed permission options.
+
+The mock's compact approval card always offered its own Allow and Deny identifiers.
+A harness can send different identifiers and persistent options.
+The live card now renders the engine's complete option list.
+The standalone mock keeps its original choices.
+The browser test answers a permission with a harness-specific identifier.
+
+## s2-chat-2. Reading an absent thread could write into the live store.
+
+The mock's thread reader created an empty thread when none existed.
+Live threads are engine records, so that read now returns an empty list without writing.
+The live connection clears thread records when the owner session ends.
