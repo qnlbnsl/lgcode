@@ -957,6 +957,8 @@ LGTM Studio's maker never sends the email.
 
 The engine and website support independent email and ntfy delivery as of 2026-11-13.
 Email uses the owner's Simple Mail Transfer Protocol (SMTP) server through Nodemailer.
+The owner can remove its settings and store its password from the terminal.
+Quiet hours expose a held state and allow an override for agent failures, account problems, and a web server outage.
 Each configured carrier has an enable switch and a test action.
 Tests report whether that carrier accepted the message.
 Quiet hours use a start, an end, and a named time zone.

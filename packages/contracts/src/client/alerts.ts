@@ -79,6 +79,7 @@ export const Alert = Schema.Struct({
   title: Schema.String, sourceSequence: EventSequence, baseline: Schema.optionalKey(Schema.Boolean),
   status: Schema.Literals(["open", "cleared"]),
   raisedAt: EpochMilliseconds, clearedAt: Schema.optionalKey(EpochMilliseconds),
+  held: Schema.optionalKey(Schema.Boolean),
   deliveries: Schema.optionalKey(Schema.Array(CarrierDelivery)),
   delivery: Schema.optionalKey(AlertDelivery)
 })

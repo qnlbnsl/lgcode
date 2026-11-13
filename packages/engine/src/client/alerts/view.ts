@@ -2,6 +2,7 @@ import {
   defaultQuietHours, type QuietHours, type CarrierName, alertPushDefaults, defaultWebSettings, type AlertKind, type CarrierSettings,
   type AlertDelivery, type ClientEvent, type Event, type EventSequence, type WebSettings,
 } from "@lgtm/contracts";
+import { sameDeliveryDestination } from "./destinations.ts";
 import type { PieceView } from "../../pieces/viewTables.ts";
 
 type Raised = Extract<ClientEvent, { _tag: "client.AlertRaised" }>;
@@ -52,9 +53,17 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
     }
     case "client.AlertDestinationChanged": {
       const previous = view.destinations[event.name];
+      if (event.carrier._tag === "none") {
+        const { [event.name]: _removed, ...destinations } = view.destinations;
+        return { ...view, destinations, retiredTokens: previous?.token
+          ? [...view.retiredTokens, previous.token.carrierGeneration] : view.retiredTokens };
+      }
+      const same = previous !== undefined && sameDeliveryDestination(previous.carrier, event.carrier);
       return { ...view, destinations: { ...view.destinations, [event.name]: {
-        carrier: event.carrier, enabled: true, tokenSet: previous?.tokenSet ?? false, token: previous?.token,
-        generation: sequence, delivery: {},
+        // Old destination events implied activation. New configuration plans
+        // explicitly disable a fresh carrier until its password is installed.
+        carrier: event.carrier, enabled: previous?.enabled ?? true, tokenSet: previous?.tokenSet ?? false, token: previous?.token,
+        generation: same ? previous.generation : sequence, delivery: same ? previous.delivery : {},
       } } };
     }
     case "client.AlertDestinationTokenSet":
@@ -62,7 +71,7 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
       const state = view.destinations[event.name]; if (!state) return view;
       const token = event._tag === "client.AlertDestinationTokenSet" ? { origin: event.origin, carrierGeneration: event.carrierGeneration } : undefined;
       return { ...view, retiredTokens: state.token ? [...view.retiredTokens, state.token.carrierGeneration] : view.retiredTokens,
-        destinations: { ...view.destinations, [event.name]: { ...state, token, tokenSet: token !== undefined, generation: sequence,
+        destinations: { ...view.destinations, [event.name]: { ...state, enabled: token === undefined ? false : state.enabled, token, tokenSet: token !== undefined, generation: sequence,
           delivery: Object.fromEntries(Object.entries(state.delivery).filter(([, mark]) => mark.status === "delivered").map(([id, mark]) => [id, { ...mark, generation: sequence }])) } } };
     }
     case "client.AlertPromptDismissed": return { ...view, pushPromptDismissed: true };
@@ -79,7 +88,11 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
       break;
     }
     case "client.AlertSettingsChanged": return { ...view, push: { ...view.push, [event.kind]: event.push } };
-    case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier, ntfyEnabled: true, generation: sequence, delivery: Object.create(null) };
+    case "client.AlertCarrierChanged": {
+      const same = sameDeliveryDestination(view.carrier, event.carrier);
+      return { ...view, carrier: event.carrier, generation: same ? view.generation : sequence,
+        delivery: same ? view.delivery : Object.create(null) };
+    }
     case "client.AlertCarrierTokenSet":
     case "client.AlertCarrierTokenCleared": {
       const delivery = Object.fromEntries(Object.entries(view.delivery).filter(([, mark]) => mark.status === "delivered")

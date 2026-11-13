@@ -1,9 +1,10 @@
 import { carrierNames, alertKindNames, type AlertKind, type QuietHours } from "@lgtm/contracts";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import { refused, type Input, type PiecePlan } from "../../commands/internal.ts";
 import type { ReadHandler } from "../../api/reads.ts";
-import { destinationState } from "./destinations.ts";
-import { validQuietHours } from "./quiet.ts";
+import { destinationState, enabledDestinations } from "./destinations.ts";
+import { quietNow, validQuietHours } from "./quiet.ts";
 import { clientView } from "./view.ts";
 
 const settings = ({ snapshot, actor }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
@@ -16,6 +17,7 @@ const settings = ({ snapshot, actor }: Input, payload: Record<string, unknown>) 
 const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
   if (actor._tag !== "owner") return yield* refused();
   const view = clientView(snapshot.client);
+  const now = yield* Clock.currentTimeMillis;
   const rows = Object.values(view.alerts).filter((row) => row.sequence > (payload.after as number)
     && (payload.status === undefined || row.status === payload.status)).sort((a, b) => a.sequence - b.sequence);
   const items = [];
@@ -46,6 +48,8 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
     };
     const item = { alertId: row.alertId, alertKey: row.alertKey, kind: row.kind, title: row.title,
       sourceSequence: row.sourceSequence, status: row.status,
+      held: row.status === "open" && !row.baseline && view.push[row.kind] && quietNow(view.quiet, row.kind, now)
+        && enabledDestinations(view).some((state) => state.delivery[row.alertId]?.status !== "delivered"),
       ...(delivery === undefined ? {} : { delivery }), deliveries,
       raisedAt: times.find((time) => time.sequence === row.sequence)!.occurred_at,
       ...(row.agentId === undefined ? {} : { agentId: row.agentId }),

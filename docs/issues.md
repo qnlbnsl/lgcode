@@ -11839,9 +11839,96 @@ The captured live screenshot preserves the temporary notice.
 ## s5-notify-4. Some notification kinds still use their contract identifiers as labels.
 
 Found: 2026-11-13, while inspecting the live Notifications screenshot.
-State: open.
+State: fixed after the review.
 
 The existing live page uses friendly labels for its five original sample kinds.
 Other engine kinds fall back to identifiers such as `board.post` and `roles.stall`.
 Their switches work through the client application programming interface.
-The additional kinds need friendly labels in the page.
+Every existing kind now has a plain label in the same voice as the sample kinds.
+The notification browser journey checks those labels.
+
+
+## s5-notify-5. Saving carrier settings changed its enabled state and repeated delivered alerts.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+Saving email settings enabled the carrier and reset every delivery mark.
+Saving ntfy settings also reset its enabled state.
+The reducer now preserves enabled state and delivery identity for an unchanged destination.
+A sender-only email change preserves completed deliveries.
+A destination change makes open alerts eligible again.
+Regression tests cover each destination field and an alert raised while a carrier is off.
+
+## s5-notify-6. Quiet hours held account problems and the web server security signal.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The override recognized only agent failures.
+The lead ruled that account problems and a web server outage must also pass through.
+One named engine list now defines the three urgent kinds.
+The page and notification guide describe all three.
+Regression tests exercise every urgent kind with the override on and off.
+
+## s5-notify-7. Changing email credentials could silently retire a password and leave email on.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The page now requires a replacement password before saving a different credential destination.
+Its hint explains that the stored password would be cleared.
+The engine disables email when its password association is cleared.
+The save reply reports whether a password is required.
+A new enable request is refused until a password is stored.
+The browser journey and engine regression tests cover the changed destination.
+Older destination events retain their implied activation during replay.
+New setup requests record an explicit disabled state until a password is installed.
+
+## s5-notify-8. The terminal could not store an email password, and email settings could not be removed.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The terminal accepts the email carrier name and reads its password only from standard input.
+The confirmation shows the actual mail destination.
+An owner request and page control now remove carrier settings and retire the password.
+The command-line tests reject secret values supplied as arguments.
+The engine and browser tests cover removal without changing ntfy.
+
+## s5-notify-9. Alerts held by quiet hours looked unsent without an explanation.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The list reply now includes a computed held state for pending alerts.
+The page shows "Held until quiet hours end".
+Restart tests cover both held and failed email deliveries.
+The browser journey checks the held wording.
+
+## s5-notify-10. Notification regression tests did not distinguish several wrong implementations.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The daylight-saving cases now require different offsets before and after both clock changes.
+An off-carrier case proves that an open alert sends once after enabling.
+Additional cases reject carriage returns and line feeds in email addresses.
+A retry case checks the quiet-hours refusal and real SMTP attempts after restart.
+The rejection assertions inspect an actual reply and captured logs rather than an event list that test sends never change.
+
+## s5-notify-11. Three existing browser journeys failed in the full notification follow-up check.
+
+Found: 2026-11-13, during the full check after the notification review fixes.
+State: open, with isolated passes and no established cause.
+
+The full check passed all TypeScript checks and 8,118 unit tests.
+Its browser stage passed 48 journeys and failed three.
+The conversation journey could not find its composer after logging in again.
+The stale Git evidence journey still showed a submitting review when its merge assertion timed out.
+The Studio Git journey could not find the approval-without-evidence button.
+The three journeys and the expanded email journey then passed together with one browser worker.
+The existing journey bodies and the conversation and Git implementations were unchanged by these fixes.
+An isolated pass does not establish why the full run failed.
+The full gate therefore remains failed.
+The output is recorded in `.foundry/fixes-check.log` and `.foundry/fixes-browser-recheck.log` in the notification worktree.

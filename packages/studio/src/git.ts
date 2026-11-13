@@ -48,7 +48,7 @@ export function mapAlerts(alerts: ReadonlyArray<Alert>, agents: ReadonlyArray<{ 
     const deliveries = a.deliveries ?? [];
     const mark = deliveries.find((d) => d.status === "failed") ?? deliveries[0] ?? a.delivery;
     return { id: a.alertId, ts: a.raisedAt, kind: a.kind === "failure" ? "failed" : a.kind, title: a.title, agent: agent?.id ?? null, project: agent?.project ?? null,
-      request, to, answer: row?.status === 'answered' ? row.answer ?? '' : '', read: a.status === "cleared", delivery: mark?.status === "delivered" ? "sent" : mark?.status ?? "off",
+      request, to, answer: row?.status === 'answered' ? row.answer ?? '' : '', read: a.status === "cleared", delivery: a.held ? "quiet" : mark?.status === "delivered" ? "sent" : mark?.status ?? "off",
       error: mark?.status === "failed" && "reason" in mark ? mark.reason : null, generation: mark?.generation, attempt: mark?.attempt, carrier: deliveries.find((d) => d.status === "failed")?.carrier ?? deliveries[0]?.carrier, deliveries }
   }).sort((a, b) => b.ts - a.ts)
 }

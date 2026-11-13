@@ -20,7 +20,9 @@ export const carrierPlanners = {
   "client.alerts.carrier.enabled.set": ({ actor, snapshot }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
     if (actor._tag !== "owner") return yield* refused();
     const name = payload.name as CarrierName;
-    if (destinationState(clientView(snapshot.client), name).carrier._tag === "none") return yield* refused("Configure this carrier first.");
+    const state = destinationState(clientView(snapshot.client), name);
+    if (state.carrier._tag === "none") return yield* refused("Configure this carrier first.");
+    if (name === "email" && payload.enabled === true && !state.tokenSet) return yield* refused("Set an email password before turning email on.");
     return { events: [{ _tag: "client.AlertCarrierEnabled" as const, name, enabled: payload.enabled as boolean }], reply: () => ({ requestId: payload.requestId }) };
   }),
   "client.alerts.carrier.set": ({ actor, snapshot }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
@@ -35,13 +37,25 @@ export const carrierPlanners = {
     if (carrier._tag !== "ntfy" && carrier._tag !== "none") {
       const name = carrier._tag;
       const previous = destinationState(view, name);
+      const tokenSet = previous.token !== undefined && previous.token.origin === carrierDestinationOrigin(carrier);
       return { events: [{ _tag: "client.AlertDestinationChanged" as const, name, carrier },
-        ...(previous.token && previous.token.origin !== carrierDestinationOrigin(carrier) ? [{ _tag: "client.AlertDestinationTokenCleared" as const, name }] : [])],
-        reply: () => ({ requestId: payload.requestId }) };
+        ...(previous.token && !tokenSet ? [{ _tag: "client.AlertDestinationTokenCleared" as const, name }] : []),
+        ...(!tokenSet ? [{ _tag: "client.AlertCarrierEnabled" as const, name, enabled: false }] : [])],
+        reply: () => ({ requestId: payload.requestId, enabled: tokenSet && previous.enabled, tokenSet, passwordRequired: !tokenSet }) };
     }
     const clear = view.token !== undefined && (carrier._tag === "none" || carrier.server !== view.token.origin);
     return { events: [{ _tag: "client.AlertCarrierChanged" as const, carrier },
       ...(clear ? [{ _tag: "client.AlertCarrierTokenCleared" as const }] : [])],
+      reply: () => ({ requestId: payload.requestId }) };
+  }),
+  "client.alerts.carrier.remove": ({ actor, snapshot }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
+    if (actor._tag !== "owner") return yield* refused();
+    const name = payload.name as CarrierName;
+    const state = destinationState(clientView(snapshot.client), name);
+    return { events: state.carrier._tag === "none" ? [] : name === "ntfy"
+      ? [{ _tag: "client.AlertCarrierChanged" as const, carrier: { _tag: "none" as const } },
+        ...(state.token ? [{ _tag: "client.AlertCarrierTokenCleared" as const }] : [])]
+      : [{ _tag: "client.AlertDestinationChanged" as const, name, carrier: { _tag: "none" as const } }],
       reply: () => ({ requestId: payload.requestId }) };
   }),
   "client.alerts.carrier.set-token": ({ actor, runtime, snapshot }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
@@ -59,7 +73,8 @@ export const carrierPlanners = {
     if (actor._tag !== "owner") return yield* refused();
     const name = (payload.name ?? "ntfy") as CarrierName;
     return { events: destinationState(clientView(snapshot.client), name).token === undefined ? []
-      : [name === "ntfy" ? { _tag: "client.AlertCarrierTokenCleared" as const } : { _tag: "client.AlertDestinationTokenCleared" as const, name }],
+      : name === "ntfy" ? [{ _tag: "client.AlertCarrierTokenCleared" as const }]
+        : [{ _tag: "client.AlertDestinationTokenCleared" as const, name }, { _tag: "client.AlertCarrierEnabled" as const, name, enabled: false }],
       reply: () => ({ requestId: payload.requestId }) };
   }),
 };

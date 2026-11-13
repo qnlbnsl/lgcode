@@ -43,20 +43,23 @@ const readInput = Effect.callback<string, string>((resume) => {
 })
 
 export const setCarrierToken = (args: readonly string[], environment: Readonly<Record<string, string | undefined>>): Effect.Effect<number> => {
-  if (args.length !== 0) {
-    err("set-token takes no arguments; confirm the server and provide the token on standard input\n")
+  if (args.length > 1 || (args[0] !== undefined && args[0] !== "email" && args[0] !== "ntfy")) {
+    err("set-token accepts only an optional carrier name, ntfy or email; provide its secret on standard input\n")
     return Effect.succeed(2)
   }
   return Effect.scoped(Effect.gen(function* () {
     const client = yield* connect({ environment })
     const settings = yield* client["client.alerts.settings"]({ requestId: randomUUID() } as never)
-    if (settings.carrier._tag !== "ntfy") { err("Set a carrier server before setting its token.\n"); return 2 }
-    const origin = settings.carrier.server
-    out(`Current carrier server: ${origin}\n`)
-    err("Confirm this server by typing yes, then enter the token on the next line: ")
+    const name = args[0] ?? "ntfy"
+    const carrier = name === "ntfy" ? settings.carrier : settings.carriers?.find((entry) => entry.name === name)?.carrier
+    if (!carrier || carrier._tag === "none") { err("Set a carrier server before setting its secret.\n"); return 2 }
+    const origin = carrier._tag === "email" ? JSON.stringify([carrier.host, carrier.port, carrier.security, carrier.username]) : carrier.server
+    out(carrier._tag === "email" ? `Current email server: ${carrier.host}:${carrier.port} (${carrier.security}), user ${carrier.username}\n`
+      : `Current carrier server: ${origin}\n`)
+    err("Confirm this server by typing yes, then enter the password or token on the next line: ")
     const value = yield* readInput
     if (value.length === 0) { err("Token unchanged.\n"); return 2 }
-    yield* client["client.alerts.carrier.set-token"]({ requestId: randomUUID(), origin, nonce: randomUUID(), value: Redacted.make(value, { label: "secret value" }) } as never)
+    yield* client["client.alerts.carrier.set-token"]({ requestId: randomUUID(), ...(name === "email" ? { name } : {}), origin, nonce: randomUUID(), value: Redacted.make(value, { label: "secret value" }) } as never)
     out("Carrier token stored.\n")
     return 0
   })).pipe(Effect.catchCause(() => Effect.sync(() => { err("Carrier token could not be stored.\n"); return 1 })))

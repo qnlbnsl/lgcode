@@ -363,10 +363,21 @@ const EVENTS = [
   ['approval', 'An approval waits for you', 'Sent when permission needs your approval.'],
   ['merge', 'A merge is ready', 'A project is done and reviewed, and the merge is yours.'],
   ['failed', 'An agent failed to start', 'A sign-in is missing or a machine is offline.'],
-  ['sprint', 'A sprint is done', 'Off by default. It tells you about progress, not about a wait.'],
+  ['sprint', 'A sprint is done', 'Sprint alerts stay here until you dismiss them.'],
+];
+const EXTRA_EVENTS = [
+  ['account', 'An account needs your attention'],
+  ['other', 'Something else needs your attention'],
+  ['client.web-down', 'The web server goes down'],
+  ['board.post', 'A board post needs your reply'],
+  ['board.no-answer', 'An agent has not answered your post'],
+  ['roles.stall', 'An agent has stalled'],
+  ['roles.replace', 'A worker needs replacement'],
+  ['roles.runaway', 'Work takes longer than expected'],
+  ['roles.rule-first-use', 'A permission rule is used for the first time'],
 ];
 const NOTE_KIND = { ...KIND_LABEL, sprint: 'Sprint done', test: 'Test' };
-const DELIVERY = { sent: ['Sent', 'muted'], off: ['Not sent', 'faint'], failed: ['Failed', 'error-text'], quiet: ['Held · quiet hours', 'muted'], muted: ['Not sent · turned off', 'faint'] };
+const DELIVERY = { sent: ['Sent', 'muted'], off: ['Not sent', 'faint'], failed: ['Failed', 'error-text'], quiet: ['Held until quiet hours end', 'muted'], muted: ['Not sent · turned off', 'faint'] };
 function sendTest(name = "ntfy") { if (live.on) return liveGit.sendTest(name);
   if (name === "email") { act.toast("Sample email accepted. No email was sent."); return; }
   const s = store.state; const server = s.settings.ntfyServer;
@@ -406,17 +417,20 @@ function EmailForm({ s }) {
   const values = { host: saved.host || '', port: saved.port || 465, security: saved.security || 'tls', username: saved.username || '', from: saved.from || '', to: saved.to || '' };
   const [f, setF] = useState({ ...values, secret: '' });
   const dirty = Object.keys(values).some((k) => String(f[k]) !== String(values[k])) || !!f.secret;
-  const can = ['host', 'username', 'from', 'to'].every((k) => f[k].trim()) && Number(f.port) > 0 && Number(f.port) <= 65535 && (dirty || !saved.host);
+  const credentialChanged = !!saved.host && ['host', 'port', 'security', 'username'].some((k) => String(f[k]).trim() !== String(values[k]));
+  const passwordRequired = !saved.tokenSet || credentialChanged;
+  const can = ['host', 'username', 'from', 'to'].every((k) => f[k].trim()) && Number(f.port) > 0 && Number(f.port) <= 65535 && (dirty || !saved.host) && (!passwordRequired || !!f.secret);
   const fld = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = async () => {
     if (!can) return;
     const form = { ...f }; setF({ ...f, secret: '' });
     if (live.on) return liveGit.saveEmail(form);
-    setS({ email: { ...values, ...form, port: Number(form.port), secret: undefined, tokenSet: !!form.secret || saved.tokenSet, enabled: true } });
+    setS({ email: { ...values, ...form, port: Number(form.port), secret: undefined, tokenSet: !!form.secret || saved.tokenSet, enabled: saved.host ? saved.enabled : true } });
     act.toast('Email settings saved.');
   };
   const enabled = (v) => live.on ? liveGit.carrierEnabled('email', v) : setS({ email: { ...saved, enabled: v } });
-  const clear = () => live.on ? liveGit.clearEmailSecret() : setS({ email: { ...saved, tokenSet: false } });
+  const clear = () => live.on ? liveGit.clearEmailSecret() : setS({ email: { ...saved, tokenSet: false, enabled: false } });
+  const remove = () => act.confirm({ title: 'Remove email settings?', body: 'The mail server settings and stored password are forgotten. Other delivery carriers stay as they are.', action: 'Remove email', onConfirm: () => live.on ? liveGit.removeEmail() : setS({ email: {} }) });
   return html`<form class="svc-form" aria-label="Email delivery" onSubmit=${(e) => { e.preventDefault(); save(); }}>
     <p class="hint">Use your own mail server and account. Your mail server sends these emails.</p>
     ${saved.host && html`<${Row} label="Email delivery"><${Switch} on=${saved.enabled} label="Email enabled" onChange=${enabled} /><//>`}
@@ -424,12 +438,13 @@ function EmailForm({ s }) {
     <div class="field"><label for="em-port">SMTP port</label><input id="em-port" class="input mono" type="number" min="1" max="65535" value=${f.port} onInput=${fld('port')} /></div>
     <div class="field"><label for="em-security">Connection security</label><select id="em-security" class="input" value=${f.security} onChange=${fld('security')}><option value="tls">TLS from connection (usually 465)</option><option value="starttls">Require STARTTLS (usually 587)</option><option value="plain">Plain connection on 127.0.0.1 only</option></select></div>
     <div class="field"><label for="em-username">Mail user name</label><input id="em-username" class="input" value=${f.username} onInput=${fld('username')} autocomplete="off" spellcheck="false" /></div>
-    <div class="field"><label for="em-secret">Password or app key</label><input id="em-secret" class="input mono" type="password" value=${f.secret} onInput=${fld('secret')} placeholder=${saved.tokenSet ? 'Password is set. Enter a replacement.' : 'Enter a password or app key'} autocomplete="new-password" spellcheck="false" /><span class="hint">A stored password is never shown. Leave this blank to keep it.</span></div>
+    <div class="field"><label for="em-secret">Password or app key</label><input id="em-secret" class="input mono" type="password" required=${passwordRequired} value=${f.secret} onInput=${fld('secret')} placeholder=${saved.tokenSet ? 'Password is set. Enter a replacement.' : 'Enter a password or app key'} autocomplete="new-password" spellcheck="false" /><span class="hint">${credentialChanged && saved.tokenSet ? 'Changing the mail server or user name will clear the stored password. Enter a password or app key before saving.' : 'A stored password is never shown. Leave this blank to keep it for the same mail server and user name.'}</span></div>
     <div class="field"><label for="em-from">Sender address</label><input id="em-from" class="input" type="email" value=${f.from} onInput=${fld('from')} autocomplete="off" /></div>
     <div class="field"><label for="em-to">Recipient address</label><input id="em-to" class="input" type="email" value=${f.to} onInput=${fld('to')} autocomplete="off" /></div>
     <div class="row" style="flex-wrap:wrap"><button type="submit" class="btn primary" disabled=${!can}>Save email</button>
       <button type="button" class="btn" disabled=${!saved.enabled || !saved.tokenSet || dirty} onClick=${() => sendTest('email')}><${Icon} name="send" size=${13} />Send a test</button>
-      ${saved.tokenSet && html`<button type="button" class="btn ghost" onClick=${clear}>Clear password</button>`}</div>
+      ${saved.tokenSet && html`<button type="button" class="btn ghost" onClick=${clear}>Clear password</button>`}
+      ${saved.host && html`<button type="button" class="btn ghost" onClick=${remove}>Remove email</button>`}</div>
   </form>`;
 }
 function QuietForm({ s }) {
@@ -443,7 +458,7 @@ function QuietForm({ s }) {
     <div class="field"><label for="q-from">From</label><input id="q-from" class="input" type="time" value=${f.from} onInput=${(e) => patch({ from: e.target.value })} /></div>
     <div class="field"><label for="q-to">Quiet hours end</label><input id="q-to" class="input" type="time" value=${f.to} onInput=${(e) => patch({ to: e.target.value })} /></div>
     <div class="field"><label for="q-zone">Time zone</label><input id="q-zone" class="input" value=${f.timeZone || ''} onInput=${(e) => patch({ timeZone: e.target.value })} placeholder="America/Chicago" spellcheck="false" /></div>
-    <${Row} label="Let failure alerts through" hint="A failure alert can reach you during quiet hours."><${Switch} on=${f.failed} label="Let failure alerts through" onChange=${(failed) => patch({ failed })} /><//>
+    <${Row} label="Let urgent alerts through" hint="Agent failures, account problems, and a web server outage can reach you during quiet hours."><${Switch} on=${f.failed} label="Let urgent alerts through" onChange=${(failed) => patch({ failed })} /><//>
     <button type="submit" class="btn primary" disabled=${!dirty || !f.from || !f.to || !f.timeZone}>Save quiet hours</button>
   </form>`;
 }
@@ -470,7 +485,7 @@ export function Notifications({ s }) {
         <//>
         <${Section} title="Email" sub="Send through your own mail server">${(!live.on || Object.keys(set.notifyOn || {}).length > 0) && html`<${EmailForm} key=${JSON.stringify(set.email || {})} s=${s} />`}<//>
         <${Section} title="Notify me when">
-          <div class=${cx('svc-rows', !on && 'svc-off')}>${(live.on ? Object.keys(set.notifyOn).map((k) => [k, EVENTS.find((x) => x[0] === k)?.[1] || k, '']) : EVENTS).map(([k, label, hint]) => html`<${Row} key=${k} label=${label} hint=${hint}><${Switch} on=${set.notifyOn[k]} label=${label} onChange=${(v) => setOn(k, v)} /><//>`)}</div>
+          <div class=${cx('svc-rows', !on && 'svc-off')}>${(live.on ? Object.keys(set.notifyOn).map((k) => [k, [...EVENTS, ...EXTRA_EVENTS].find((x) => x[0] === k)?.[1] || 'Your attention is needed', EVENTS.find((x) => x[0] === k)?.[2] || '']) : EVENTS).map(([k, label, hint]) => html`<${Row} key=${k} label=${label} hint=${hint}><${Switch} on=${set.notifyOn[k]} label=${label} onChange=${(v) => setOn(k, v)} /><//>`)}</div>
         <//>
         <${Section} title="Quiet hours">
           ${(!live.on || Object.keys(set.notifyOn || {}).length > 0) && html`<${QuietForm} key=${JSON.stringify(set.quiet)} s=${s} />`}

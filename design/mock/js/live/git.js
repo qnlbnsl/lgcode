@@ -154,10 +154,18 @@ export const sendTest = (name = 'ntfy') => run('notifications', async () => {
 export const saveEmail = (form) => run('notifications', async () => {
   const { secret, enabled, tokenSet, ...fields } = form;
   const carrier = { _tag: 'email', host: fields.host.trim(), port: Number(fields.port), security: fields.security, username: fields.username.trim(), from: fields.from.trim(), to: fields.to.trim() };
-  await request('client.alerts.carrier.set', { carrier });
+  const saved = S().settings.email || {};
+  const credentialChanged = ['host', 'port', 'security', 'username'].some((key) => String(saved[key]) !== String(carrier[key]));
+  if (saved.tokenSet && credentialChanged && !secret) throw new Error('Changing the mail server or user name will clear the stored password. Enter a password or app key before saving.');
+  if (!saved.tokenSet && !secret) throw new Error('Enter a password or app key before saving email.');
+  const result = await request('client.alerts.carrier.set', { carrier });
   if (secret) await request('client.alerts.carrier.set-token', { name: 'email', origin: JSON.stringify([carrier.host, carrier.port, carrier.security, carrier.username]), nonce: crypto.randomUUID(), value: secret });
+  // Initial setup turns email on after its password is stored. An edited
+  // destination restores only a carrier that the owner previously had on.
+  if (secret && (!saved.host || saved.enabled && result.enabled === false)) await request('client.alerts.carrier.enabled.set', { name: 'email', enabled: true });
   await loadService('notifications');
 });
+export const removeEmail = () => run('notifications', async () => { await request('client.alerts.carrier.remove', { name: 'email' }); await loadService('notifications'); });
 export const carrierEnabled = (name, enabled) => run('notifications', async () => { await request('client.alerts.carrier.enabled.set', { name, enabled }); await loadService('notifications'); });
 export const clearEmailSecret = () => run('notifications', async () => { await request('client.alerts.carrier.clear-token', { name: 'email' }); await loadService('notifications'); });
 export const saveQuiet = (quiet) => run('notifications', async () => {

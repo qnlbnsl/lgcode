@@ -69,7 +69,9 @@ export const ClientRpcGroup = RpcGroup.make(
   Rpc.make("alerts.settings.set", { payload: { ...request, kind: AlertKind, push: Schema.Boolean }, success: Ack, error: Refused }),
   Rpc.make("alerts.quiet.set", { payload: { ...request, quiet: QuietHours }, success: Ack, error: Refused }),
   Rpc.make("alerts.carrier.enabled.set", { payload: { ...request, name: CarrierName, enabled: Schema.Boolean }, success: Ack, error: Refused }),
-  Rpc.make("alerts.carrier.set", { payload: { ...request, carrier: CarrierSettings }, success: Ack, error: Refused }),
+  Rpc.make("alerts.carrier.set", { payload: { ...request, carrier: CarrierSettings },
+    success: Schema.Struct({ ...request, enabled: Schema.optionalKey(Schema.Boolean), tokenSet: Schema.optionalKey(Schema.Boolean), passwordRequired: Schema.optionalKey(Schema.Boolean) }), error: Refused }),
+  Rpc.make("alerts.carrier.remove", { payload: { ...request, name: CarrierName }, success: Ack, error: Refused }),
   Rpc.make("alerts.carrier.set-token", {
     payload: { ...request, name: Schema.optionalKey(CarrierName), origin: Schema.NonEmptyString, nonce: Schema.NonEmptyString,
       value: Schema.RedactedFromValue(Schema.NonEmptyString, { label: "secret value" }) },
@@ -88,7 +90,7 @@ export const clientCommandAccess = {
   "client.alerts.retry": ["owner"], "client.alerts.test": ["owner"], "client.alerts.prompt.dismiss": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"], "client.alerts.settings": ["owner"],
   "client.alerts.settings.set": ["owner"], "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
-  "client.alerts.quiet.set": ["owner"], "client.alerts.carrier.enabled.set": ["owner"],
+  "client.alerts.carrier.remove": ["owner"], "client.alerts.quiet.set": ["owner"], "client.alerts.carrier.enabled.set": ["owner"],
   "client.alerts.carrier.clear-token": ["owner"], "client.web.settings": ["owner"], "client.web.settings.set": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof ClientRpcGroup>>, ReadonlyArray<CallerKind>>
 
