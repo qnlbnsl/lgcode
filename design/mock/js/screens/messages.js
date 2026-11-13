@@ -1,3 +1,4 @@
+import * as chatLive from '../live/chat.js';
 // The Messages tab and the Agents tab.
 // Messages is the board the agents post on: team channels, the leads channel and direct
 // messages. The owner reads all of it and can post. Agents is the roster, sorted by situation.
@@ -23,7 +24,7 @@ const POST_KINDS = {
   note: { label: 'Note', icon: 'message-square' },
 };
 const KIND_ORDER = ['question', 'blocked', 'handoff', 'done', 'decision', 'note'];
-const WORK_STATES = { off: 'Off', assigned: 'Assigned', working: 'Working', waiting: 'Waiting', done: 'Done' };
+const WORK_STATES = { ready: 'Ready', reviewing: 'Reviewing', off: 'Off', assigned: 'Assigned', working: 'Working', waiting: 'Waiting', done: 'Done' };
 const STALL_AFTER = 10 * MIN;
 const CANNED = {
   question: 'Short answer: yes. I put the detail on the task and I am carrying on.',
@@ -141,6 +142,7 @@ function sendPost({ channel, kind, action, to, text, replyTo }) {
 }
 const setClosed = (id, closed) => live.on ? board.setClosed(id, closed) : update((s) => { byId(s.posts, id).closed = closed; });
 function nudge(agentId) {
+  if (live.on) return chatLive.nudge(agentId);
   const s0 = store.state; const a = agentOf(s0, agentId);
   const ch = s0.channels.find((c) => c.team === a.team) || s0.channels.find((c) => c.project === a.project && c.kind === 'leads') || s0.channels.find((c) => c.project === a.project);
   const wasStalled = a.stalled; const id = uid('p');
@@ -395,41 +397,41 @@ function situation(s, a, now) {
   if (a.state === 'failed') return { lane: 'needs', why: a.failure?.reason || 'Failed to start', tone: 'error' };
   if (reqs.length) return { lane: 'needs', why: `${KIND_LABEL[reqs[0].kind]}: ${reqs[0].title}`, tone: 'warn', req: reqs[0] };
   if (a.state === 'stopped') return { lane: 'idle', why: a.activity || 'Stopped' };
-  if (a.stalled) return { lane: 'blocked', why: `No output for ${ago(a.lastOutputAt, now)}`, tone: 'warn', stalled: true };
+  if (a.stalled) return { lane: 'blocked', why: `No output for ${live.on && !a.lastOutputAt ? '—' : ago(a.lastOutputAt, now)}`, tone: 'warn', stalled: true };
   if (a.state === 'waiting') {
     const scope = a.role === 'project-lead' ? openRequests(s, { project: a.project }) : a.team ? openRequests(s, { team: a.team }) : [];
     return { lane: 'blocked', why: scope.length ? `Waiting on ${plural(scope.length, 'request')} its ${a.role === 'project-lead' ? 'teams' : 'team'} sent you` : a.activity || 'Waiting on another agent', tone: 'warn' };
   }
   if (a.state === 'working') return { lane: 'working', why: a.activity, quiet };
   if (a.workState === 'done') return { lane: 'done', why: 'Finished its work items' };
-  return { lane: 'idle', why: a.workState === 'assigned' ? 'Assigned, not started' : 'Nothing assigned' };
+  return { lane: 'idle', why: live.on ? '' : a.workState === 'assigned' ? 'Assigned, not started' : 'Nothing assigned' };
 }
-const workState = (a) => (a.state === 'stopped' || a.state === 'failed' ? 'off' : a.state === 'working' ? 'working' : a.workState || 'off');
+const workState = (a) => (live.on ? a.workState || 'off' : a.state === 'stopped' || a.state === 'failed' ? 'off' : a.state === 'working' ? 'working' : a.workState || 'off');
 const fmtTokens = (m) => (m >= 1 ? m.toFixed(1) + 'M' : Math.round(m * 1000) + 'k');
 
 function agentMenu(s, a) {
   const h = HARNESSES[a.harness]; const off = a.state === 'stopped' || a.state === 'failed';
   return [
     { label: 'Open chat', icon: 'message-square', onSelect: () => go(routeForAgent(s, a)) },
-    { label: 'Nudge', icon: 'bell-ring', hint: 'Posts a status check that wakes it', onSelect: () => nudge(a.id) },
-    off ? { label: 'Resume', icon: 'play', onSelect: () => { act.resumeAgent(a.id); act.toast(`Resumed ${a.name}`); } } : { label: 'Stop', icon: 'square', danger: true, onSelect: () => act.stopAgent(a.id) },
+    { label: 'Nudge', disabled: chatLive.busy('agent:' + a.id), icon: 'bell-ring', hint: 'Posts a status check that wakes it', onSelect: () => nudge(a.id) },
+    off ? { label: 'Resume', disabled: chatLive.busy('agent:' + a.id), icon: 'play', onSelect: () => { act.resumeAgent(a.id); if (!live.on) act.toast(`Resumed ${a.name}`); } } : { label: 'Stop', disabled: chatLive.busy('agent:' + a.id), icon: 'square', danger: true, onSelect: () => act.stopAgent(a.id) },
     { sep: true }, { heading: 'Permission' },
-    ...PERMISSION_MODES.map((m) => ({ label: m, checked: m === a.permission, onSelect: () => { act.setAgentConfig(a.id, { permission: m }); act.toast(`${a.name}: ${m.toLowerCase()}`); } })),
+    ...PERMISSION_MODES.map((m) => ({ label: m, checked: m === a.permission, onSelect: () => { act.setAgentConfig(a.id, { permission: m }); if (!live.on) act.toast(`${a.name}: ${m.toLowerCase()}`); } })),
     { sep: true }, { heading: `Model, from the next turn` },
-    ...h.models.map((m) => ({ label: m, checked: m === a.model, onSelect: () => { act.setAgentConfig(a.id, { model: m }); act.toast(`${a.name} uses ${m} from its next turn`); } })),
+    ...(live.on ? a.models || [] : h.models).map((m) => ({ label: m.label || m.id || m, checked: (m.id || m) === a.model, disabled: chatLive.busy('agent:' + a.id), onSelect: () => { act.setAgentConfig(a.id, { model: m.id || m }); if (!live.on) act.toast(`${a.name} uses ${m} from its next turn`); } })),
   ];
 }
 function RowActions({ s, a }) {
   const off = a.state === 'stopped' || a.state === 'failed';
   return html`<span class="ag-acts" onClick=${(e) => e.stopPropagation()}>
     <a class="icon-btn sm" href=${href(routeForAgent(s, a))} aria-label=${'Open chat with ' + a.name} data-tip="Open chat" data-tip-side="top"><${Icon} name="message-square" size=${14} /></a>
-    ${off ? html`<button type="button" class="icon-btn sm" aria-label=${'Resume ' + a.name} data-tip="Resume" data-tip-side="top" onClick=${() => { act.resumeAgent(a.id); act.toast(`Resumed ${a.name}`); }}><${Icon} name="play" size=${14} /></button>`
-      : html`<button type="button" class="icon-btn sm" aria-label=${'Stop ' + a.name} data-tip="Stop" data-tip-side="top" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${12} /></button>`}
+    ${off ? html`<button type="button" disabled=${chatLive.busy('agent:' + a.id)} class="icon-btn sm" aria-label=${'Resume ' + a.name} data-tip="Resume" data-tip-side="top" onClick=${() => { act.resumeAgent(a.id); if (!live.on) act.toast(`Resumed ${a.name}`); }}><${Icon} name="play" size=${14} /></button>`
+      : html`<button type="button" disabled=${chatLive.busy('agent:' + a.id)} class="icon-btn sm" aria-label=${'Stop ' + a.name} data-tip="Stop" data-tip-side="top" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${12} /></button>`}
     <${Menu} class="icon-btn sm" align="end" label=${'More for ' + a.name} items=${() => agentMenu(s, a)} trigger=${html`<${Icon} name="ellipsis" size=${15} />`} />
   </span>`;
 }
 function Context({ a }) {
-  return html`<span class=${cx('meter ctx', a.context >= 70 && 'high')} title="Share of the context window in use"><span class="progress"><i class=${a.context >= 70 ? 'warn' : ''} style=${`width:${a.context}%`}></i></span><span class="num">${a.context}%</span></span>`;
+  return html`<span class=${cx('meter ctx', a.context >= 70 && 'high')} title="Share of the context window in use"><span class="progress"><i class=${a.context >= 70 ? 'warn' : ''} style=${`width:${a.context}%`}></i></span><span class="num">${live.on && a.context == null ? '—' : a.context + '%'}</span></span>`;
 }
 function TaskLink({ s, a }) {
   const task = a.task && taskByLabel(s, a.project, a.task);
@@ -446,9 +448,9 @@ function LaneRow({ s, a, sit, now }) {
       <span class="line1"><${TaskLink} s=${s} a=${a} />${task && html`<span class="truncate task-title">${task.title}</span>`}${!task && html`<span class="faint">No task</span>`}</span>
       <span class=${cx('line2 truncate', sit.tone === 'warn' && 'warn-text', sit.tone === 'error' && 'error-text')}>${sit.stalled && html`<${Icon} name="triangle-alert" size=${12} />`}${sit.why}${sit.stalled && a.activity ? ` · ${a.activity}` : ''}</span>
     </div>
-    <span class="ag-last num" title="Last output">${ago(a.lastOutputAt, now)}${ago(a.lastOutputAt, now) === 'now' ? '' : ' ago'}</span>
+    <span class="ag-last num" title="Last output">${live.on && !a.lastOutputAt ? '—' : ago(a.lastOutputAt, now)}${live.on && !a.lastOutputAt || ago(a.lastOutputAt, now) === 'now' ? '' : ' ago'}</span>
     <${Context} a=${a} />
-    <span class="ag-use num"><b>${a.turns}</b> turns<br /><b>${fmtTokens(a.tokens)}</b> tokens</span>
+    <span class="ag-use num"><b>${live.on ? '—' : a.turns}</b> turns<br /><b>${live.on ? '—' : fmtTokens(a.tokens)}</b> tokens</span>
     <span class="ag-run"><span class="truncate">${HARNESSES[a.harness].name} · ${a.model}</span><span class="truncate faint">${machineOf(s, byId(s.projects, a.project).machine).name} · ${a.effort}</span></span>
     <${RowActions} s=${s} a=${a} />
   </li>`;
@@ -473,9 +475,9 @@ function AgentTable({ s, agents, now, sits }) {
         <td><span class=${cx('ws', ws)}>${WORK_STATES[ws]}</span></td>
         <td>${html`<${TaskLink} s=${s} a=${a} />` }${!a.task && html`<span class="faint">—</span>`}</td>
         <td class=${cx('truncate', sit.tone === 'warn' ? 'warn-text' : sit.tone === 'error' ? 'error-text' : 'muted')} style="max-width:300px">${sit.why || '—'}</td>
-        <td class="num muted">${ago(a.lastOutputAt, now)}</td>
+        <td class="num muted">${live.on && !a.lastOutputAt ? '—' : ago(a.lastOutputAt, now)}</td>
         <td class="num"><${Context} a=${a} /></td>
-        <td class="num">${a.turns}</td><td class="num">${fmtTokens(a.tokens)}</td>
+        <td class="num">${live.on ? '—' : a.turns}</td><td class="num">${live.on ? '—' : fmtTokens(a.tokens)}</td>
         <td class="muted">${HARNESSES[a.harness].name} · ${a.model} · ${a.effort}</td>
         <td class="muted">${machineOf(s, byId(s.projects, a.project).machine).name}</td>
         <td class="muted">${a.permission}</td>
@@ -483,6 +485,7 @@ function AgentTable({ s, agents, now, sits }) {
 }
 
 export function AgentsTab({ s, project }) {
+  useEffect(() => chatLive.watchRoster(project.id), [project.id]);
   const now = useNow(15_000);
   const [view, setView] = useState(() => persist('agentsView', 'lanes')); const [team, setTeam] = useState(null);
   const pick = (v) => { setView(v); remember('agentsView', v); };
@@ -498,9 +501,9 @@ export function AgentsTab({ s, project }) {
     <dl class="ag-totals" aria-label="Totals">
       <div><dt>Working</dt><dd><b>${working}</b><span>of ${all.length} agents</span></dd></div>
       <div class=${needs ? 'warn' : ''}><dt>Waiting on you</dt><dd><b>${needs}</b><span>${needs === 1 ? 'agent' : 'agents'}</span></dd></div>
-      <div class=${stuck ? 'warn' : ''}><dt>May be stuck</dt><dd><b>${stuck}</b><span>${stuck ? 'no output for 10 min' : 'all printing'}</span></dd></div>
-      <div><dt>Tokens so far</dt><dd><b>${fmtTokens(tokens)}</b><span>${turns.toLocaleString('en-GB')} turns</span></dd></div>
-      <div class="subs"><dt>Subscriptions in use</dt><dd>${subs.map((id) => { const x = byId(s.subscriptions, id); return html`<a key=${id} class=${cx('sub-use', x.usage && x.usage.pct >= 85 && 'high')} href=${href('/subscriptions')} title="Weekly usage">${subLabel(s, id)} <b class="num">${x.usage ? x.usage.pct + '%' : 'signed out'}</b></a>`; })}</dd></div>
+      <div class=${stuck ? 'warn' : ''}><dt>May be stuck</dt><dd><b>${stuck}</b><span>${live.on ? '' : stuck ? 'no output for 10 min' : 'all printing'}</span></dd></div>
+      <div><dt>Tokens so far</dt><dd><b>${live.on ? '—' : fmtTokens(tokens)}</b><span>${live.on ? '' : turns.toLocaleString('en-GB') + ' turns'}</span></dd></div>
+      <div class="subs"><dt>Subscriptions in use</dt><dd>${subs.map((id) => { const x = byId(s.subscriptions, id); return html`<a key=${id} class=${cx('sub-use', x.usage && x.usage.pct >= 85 && 'high')} href=${href('/subscriptions')} title="Weekly usage">${subLabel(s, id)} <b class="num">${x.usage ? x.usage.pct + '%' : live.on ? (x.signedIn ? '' : 'signed out') : 'signed out'}</b></a>`; })}</dd></div>
     </dl>
     <div class="ag-bar">
       <div class="seg" role="group" aria-label="Layout">

@@ -56,7 +56,7 @@ const subAgents = (s, sid) => s.agents.filter((a) => a.subscription === sid && !
 
 let savedTimer = null;
 function markSaved() {
-  store.state.ui.saved = Date.now();
+  update((s) => { s.ui.saved = Date.now(); });
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => update((s) => { s.ui.saved = null; }), 1800);
 }
@@ -173,7 +173,7 @@ export function Machines({ s }) {
                 { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: `Rename ${m.name}`, value: m.name, taken: s.machines.map((x) => x.name), onRename: (v) => { update(() => { m.name = v; }); act.toast('Machine renamed'); } }) },
                 { label: 'Scan harnesses again', icon: 'scan-search', disabled: off || live.on && mocks.busy('read-machines'), why: off ? `${m.name} is offline.` : null, onSelect: () => live.on ? mocks.loadMachines() : act.toast(`Scanned ${m.name}. Nothing changed.`) },
                 { label: 'Add repository', icon: 'folder-git-2', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.openDialog({ type: 'add-repository', machine: m.id }) },
-                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
+                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { if (act.refused()) return; act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
                 { sep: true },
                 { label: 'Remove machine', icon: 'trash-2', danger: true, disabled: !live.on && m.role === 'master', why: !live.on && m.role === 'master' ? 'The master runs the service and cannot be removed.' : null, onSelect: () => live.on ? refuse() : remove(m) },
               ].filter(Boolean)} /></td>
@@ -221,7 +221,7 @@ function AddRepository({ s, d }) {
   const [machine, setMachine] = useState(live.on ? 'local' : d.machine || 'studio'); const m = machineOf(s, machine);
   const [path, setPath] = useState(() => `${machineOf(s, live.on ? 'local' : d.machine || 'studio').workspace}/${known ? known.name : ''}`);
   const [found, setFound] = useState(null);
-  useEffect(() => { if (!known) return; setPath(`${live.on ? details?.workspace : m.workspace}/${known.name}`); }, [machine]);
+  useEffect(() => { if (!known) return; setPath(live.on ? known.folders[machine] || '' : `${m.workspace}/${known.name}`); }, [machine]);
   const name = path.replace(/\/+$/, '').split('/').pop() || '';
   const valid = /^(~|\/)/.test(path.trim()) && name && name !== '~' && path.trim() !== m.workspace;
   useEffect(() => {
@@ -397,7 +397,7 @@ export function Notifications({ s }) {
   const list = s.notifications; const unread = list.filter((n) => !n.read).length; const failed = list.filter((n) => n.delivery === 'failed').length;
   const [showAll, setShowAll] = useState(false); const shown = showAll ? list : list.slice(0, 12);
   const open = (n) => { update(() => { n.read = true; }); const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); };
-  const retry = (n) => { act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
+  const retry = (n) => { if (act.refused()) return; act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
   const setOn = (k, v) => setS({ notifyOn: { ...set.notifyOn, [k]: v } });
   const setQuiet = (patch) => setS({ quiet: { ...set.quiet, ...patch } });
   let lastDay = null;
@@ -551,7 +551,7 @@ function WorkflowSettings({ s }) {
       <span class="row"><b style="font-weight:var(--weight-medium)">Build loop</b><span class="badge outline">Default</span></span><//>
     <${Row} label="Your overrides" id="wf-path" hint="Files here replace the default workflow for every repository." top>
       <span class="row"><input id="wf-path" class="input mono grow" value=${set.workflowPath} onInput=${(e) => setS({ workflowPath: e.target.value })} spellcheck="false" />
-        <button type="button" class="btn" onClick=${() => { setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
+        <button type="button" class="btn" onClick=${() => { if (act.refused()) return; setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
       <ul class="svc-lines" style="margin-top:8px">
         <li><${Icon} name="circle" size=${14} class="faint" /><span class="mono">${set.workflowPath}/workflow.md</span><span class="muted">Not found. The default is used.</span></li>
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span class="mono">${set.workflowPath}/roles/reviewer.md</span><span class="muted">Replaces the Reviewer's instructions.</span></li>
@@ -581,7 +581,7 @@ function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
     <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGTM Studio ${set.version}</b><span class="tag">${set.commit}</span>
-      <button type="button" class="btn sm" onClick=${() => { setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
+      <button type="button" class="btn sm" onClick=${() => { if (act.refused()) return; setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
       ${chk === 'done' && html`<span class="row success-text" style="gap:4px;font-size:var(--text-sm)"><${Icon} name="check" size=${13} />Up to date</span>`}</span><//>
     <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? `Running on ${master.name}` : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
     <${Row} label="Data folder"><span class="mono">${set.dataFolder}</span><//>
@@ -589,7 +589,7 @@ function About({ s }) {
     <${Row} label="Licence"><span>Apache License 2.0</span><//>
     <${Row} label="Restart the service" hint="Agents keep their place. Web connections close and reconnect.">
       <button type="button" class="btn" onClick=${() => act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
-        onConfirm: () => { act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
+        onConfirm: () => { if (act.refused()) return; act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
   </div>`;
 }
 const SECTIONS = [

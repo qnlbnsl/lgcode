@@ -1,3 +1,4 @@
+import * as chat from './live/chat.js';
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
   html, render, useState, useEffect, useRef, Icon, cx, store, update, useStore, useRoute, go, href, ago, useNow, useKey, useMedia,
@@ -185,8 +186,8 @@ function Live({ s }) {
   const word = { live: 'Live', reconnecting: 'Reconnecting', offline: 'Offline' }[c.status];
   return html`<${Menu} class=${cx('live', c.status)} align="end" width=${280} label=${'Connection: ' + word}
     trigger=${html`<i class=${cx('dot', c.status === 'live' ? 'working' : c.status === 'reconnecting' ? 'waiting' : 'failed')}></i><span class="not-phone">${word}</span>`}
-    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? `Connected to the service on ${(s.machines.find((m) => m.here) || s.machines[0])?.name || 'this computer'}.` : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
-    items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); act.toast('Connected'); } }]} />`;
+    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? `Connected to the service on ${(s.machines.find((m) => m.here) || s.machines[0])?.name || 'this computer'}.` : c.lastHeard ? `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.` : 'The service has not answered yet.'}</div></div>`}
+    items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); if (!live.on) act.toast('Connected'); } }]} />`;
 }
 function Inspecting({ s, project }) {
   const wts = (s.worktrees || []).filter((w) => w.repo === project.repo && (!w.project || w.project === project.id));
@@ -396,6 +397,11 @@ function mountLive(el) {
   addEventListener('error', onRefusedError);
   addEventListener('unhandledrejection', onRefusedError);
   engine.connection().open?.((patch) => {
+    if (patch.session && patch.session.status !== 'checking' && patch.session.status !== 'in') {
+      chat.reset(); engineWrite({ threads: {}, pending: {} });
+    }
+    if (patch.chatEvent) { chat.receive(patch.chatEvent); return; }
+    chat.enrich(patch);
     // The Workflow and Mocks tabs keep one record per project. Each live project gets an
     // empty one, frozen like the rest, so the tabs show their empty structure.
     if (patch.projects) Object.assign(patch, {
@@ -407,6 +413,7 @@ function mountLive(el) {
       if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
     }
     engineWrite(patch);
+    if (patch.conn?.status === 'live') chat.connected();
     // The sidebar opens each repository the first time the engine names it, as the sample does.
     if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
   });
@@ -421,7 +428,7 @@ function onRefusedError(e) {
 // Takes the website out of the element and returns to the default connection.
 export function unmount(el) {
   render(null, el);
-  if (live.on) { engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
+  if (live.on) { chat.reset(); engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
   engine.setConnection(null);
   slots = {};
 }

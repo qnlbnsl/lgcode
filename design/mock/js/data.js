@@ -1,7 +1,7 @@
 // The mock's sample data and the functions that read it.
 // The data is plain objects. It is a design aid, not a contract for the engine.
 // Agents have no personal names: an agent is known by its role and its team.
-import { MIN, HOUR, DAY, persist, FRAMED } from './lib.js';
+import { MIN, HOUR, DAY, persist, FRAMED, live } from './lib.js';
 
 const T = Date.now();
 const at = (msAgo) => T - msAgo;
@@ -455,7 +455,7 @@ export function sprintProgress(s, sp) {
   const ts = tasksOfSprint(s, sp.id);
   return { total: ts.length, done: ts.filter((t) => t.state === 'done').length, active: ts.filter((t) => t.state === 'active' || t.state === 'review').length };
 }
-export const threadOf = (s, aid) => s.threads[aid] || (s.threads[aid] = []);
+export const threadOf = (s, aid) => s.threads[aid] || (live.on ? [] : (s.threads[aid] = []));
 export const routeForAgent = (s, a) => `/p/${a.project}/chat/${a.id}`;
 export const routeForRequest = (s, r) => `/p/${r.project}/chat/${r.agent}?req=${r.id}`;
 export const taskByLabel = (s, pid, label) => s.tasks.find((t) => t.project === pid && t.label === label);

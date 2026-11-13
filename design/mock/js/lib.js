@@ -59,7 +59,8 @@ export function update(fn) {
 // preferences, the open dialog and the drafts, stays writable.
 export const ENGINE_OWNED = new Set([
   'session', 'conn', 'owner', 'machines', 'subscriptions', 'repos', 'projects', 'teams', 'agents', 'epics', 'sprints', 'tasks',
-  'machineDetails', 'boardUnread', 'boardRevision', 'boardDetails', 'taskDetails', 'setupData', 'boardAgents', 'requests', 'channels', 'posts', 'worktrees', 'workflow', 'mocks', 'design', 'notifications', 'settings',
+  'machineDetails', 'phoneOffer', 'threads', 'pending',
+  'boardUnread', 'boardRevision', 'boardDetails', 'taskDetails', 'setupData', 'boardAgents', 'requests', 'channels', 'posts', 'worktrees', 'workflow', 'mocks', 'design', 'notifications', 'settings',
 ]);
 export const live = { on: false, refusedTurn: false, onRefuse: null };
 let engineWriting = false;
@@ -95,7 +96,7 @@ export function refuse() {
 }
 export function useStore() {
   const [, bump] = useReducer((n) => n + 1, 0);
-  useEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
+  useLayoutEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
   return store.state;
 }
 

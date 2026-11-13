@@ -11128,7 +11128,280 @@ The registered component preview case did not observe the expected document resp
 The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
 The result file records the baseline checks for these failures.
 
-## s2-mocks-1. The live Mocks tab did not read recorded bundles.
+## 635. A failed logout claimed that the engine had ended the session.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The connection treated every logout response as a confirmed session revocation.
+It now removes the records immediately and shows a persistent warning unless the engine confirms the logout.
+An older session probe could also restore the records after logout.
+Session attempts now invalidate older replies.
+
+## 636. Truncated snapshots left references to missing records.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The mapping retained requests whose agents were absent from the mapped roster.
+Other bounded lists could leave missing repositories, projects, teams, sprints, tasks, or request holders.
+The mapping now recovers agent membership from unambiguous retained evidence.
+It omits children with missing required parents and clears optional links to omitted records.
+It does not turn a missing request holder into an owner-held request.
+
+## 637. Account and configuration events left the website stale.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Four account and configuration event types advanced the subscription cursor without refreshing mapped records.
+Those events now request a fresh snapshot before advancing the cursor.
+Oversized event markers use the same refresh rule.
+
+## 638. Lifecycle updates kept the previous activity text.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+An agent could resume working while its activity still said that it was signed out.
+The connection now recomputes the display state with the contracts helper.
+
+## 639. Failed retries postponed the offline deadline.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Every failed attempt restarted the offline timer and claimed a new contact time.
+Retries now share one outage deadline.
+Only a successful connection or a received stream item updates the last contact time.
+
+## 640. Refused settings changes still displayed Saved.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The Saved indicator bypassed the store's refusal guard.
+Its write now passes through the guarded update function.
+
+## 641. Unconnected controls simulated successful service actions.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Reconnect now claimed success before the connection answered.
+Update checks, workflow checks, restarts, and harness scans also simulated successful work.
+The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
+Unconnected actions now show the required refusal notice before their simulation starts.
+Reconnect now leaves its status to the real connection.
+The standalone mock retains its simulation.
+
+## 642. The logout test supplied its own record cleanup.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The previous rendering test supplied an ended session and empty records itself.
+Its name now describes that limited assertion.
+New tests invoke the actual logout control through the real connection.
+They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## 643. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: open.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
+
+## 644. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.
+
+## 645. Live request cards used the mock's fixed permission options.
+
+The mock's compact approval card always offered its own Allow and Deny identifiers.
+A harness can send different identifiers and persistent options.
+The live card now renders the engine's complete option list.
+The standalone mock keeps its original choices.
+The browser test answers a permission with a harness-specific identifier.
+
+## 646. Reading an absent thread could write into the live store.
+
+The mock's thread reader created an empty thread when none existed.
+Live threads are engine records, so that read now returns an empty list without writing.
+The live connection clears thread records when the owner session ends.
+
+## 647. A snapshot refresh could skip queued conversation events.
+
+The live connection advanced its stream cursor when it published a refreshed snapshot.
+A lifecycle event could trigger a snapshot that already included later prompt and reply events.
+Those events were then skipped when they arrived on the stream.
+The connection now advances the stream cursor only after processing each stream item.
+The first snapshot still anchors the initial subscription.
+The browser test verifies that a sent prompt appears before any reload.
+
+## 648. A fast session check could leave the page on its loading screen.
+
+The store subscribed its rendering listener in a delayed effect.
+A fast session check and snapshot could publish before that listener existed.
+The store now subscribes in a layout effect, before browser responses can arrive.
+The browser journey checks a signed-in reload after live actions.
+
+## 649. Context selection needs the registered worktree identity.
+
+A team's worktree can also be the project's registered checkout.
+The live context picker now uses the engine's worktree identifiers from the project and team records.
+It maps the search reply's result before displaying tasks and files.
+The browser test attaches a task identity to a real prompt in a temporary Git repository.
+
+## 650. Reads could start before the live connection was ready.
+
+Home could try its request and phone-offer reads before the transport became available.
+Home now starts those reads when the connection reports that it is live.
+A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.
+
+## 651. Some supplied labels were still shown as identifiers.
+
+The live composer showed an account identifier instead of its display name.
+Prompt context showed a task identifier instead of its available label.
+The roster did not distinguish an agent whose task was under review.
+The open screens now read account names and map task labels and the Reviewing state.
+The account reader retains only the identifier, harness, and display name.
+
+## 652. The live idle lane could claim that no work was assigned.
+
+An idle agent can still own an active task.
+The mock's fallback reason said "Nothing assigned" for that agent.
+The live lane now leaves the reason empty when the engine supplies no reason.
+The linked task remains visible.
+The standalone mock keeps its original wording.
+
+## 653. The existing project-creation logout journey can time out.
+
+Found: 2026-11-13, during the full remote check of `8577d48`.
+State: open.
+
+The case at `packages/web/e2e/new-project.spec.ts:225` reached its unchanged 30-second limit.
+The other 45 browser cases passed.
+The captured page showed the Machines registration form with its default values after login.
+The snapshot does not establish which awaited operation exhausted the limit.
+The same case passed alone at the required baseline, `8f9f321`.
+A bounded five-run comparison at that baseline then produced four identical timeouts and one pass.
+The production web source, engine source, and affected test file are unchanged from that baseline.
+The cause remains unproved.
+The task result records the complete checks and baseline comparisons.
+
+## 654. The Nudge regression test still expected an unconnected control after the merge.
+
+Found: 2026-11-13, while merging the area branch into the chat worker branch.
+State: fixed in this merge.
+
+The area regression test expected Nudge to refuse before sending any request.
+The chat implementation connects Nudge to the engine's direct board post request.
+The merged test now checks that the request reaches the connection.
+It also checks that an engine refusal appears and leaves the local posts empty.
+The other unconnected controls keep their original refusal checks.
+
+## 655. The merged Messages module imported the live binding twice.
+
+Found: 2026-11-13, during the remote browser check of this merge.
+State: fixed in this merge.
+
+Both branches added the live binding to the Messages module's imports.
+Git kept both declarations when it merged the import lists.
+The browser rejected the module and left both the live page and the standalone mock blank.
+The test transformer accepted the declarations, so the Studio tests did not expose the error.
+Removing the redundant import lets the browser parse the module.
+
+## 656. The board mapping replaced worker names with role labels.
+
+Found: 2026-11-13, during the merged chat browser journey.
+State: fixed in this merge.
+
+The area board mapping replaced each worker's engine name with its role label.
+The chat roster needs the engine name to identify a worker and its controls.
+The merged mapping keeps worker names and retains the area's project lead and team lead labels.
+The browser journey checks the same worker in the blocked lane and the table.
+
+## 654. The snapshot could not be read once an account was added without an enabled flag
+
+Found: 2026-11-13, while setting up the first real project on LGTM Studio itself.
+State: fixed in the same change.
+
+An account added with `lgtm accounts` and no `enabled` field is stored without that field.
+The `client.snapshot` reply requires a true or false value for each account.
+The engine sent the unset value, so the reply could not be encoded and every snapshot failed.
+The current website and the live website both stayed on "Reconnecting", with no error shown.
+The engine now reports such an account as enabled, which is how account picking already treats it.
+The test is case 3.1a in `packages/engine/test/client/snapshot.test.ts`.
+
+## 655. The live website stays on "Reconnecting" when the snapshot fails, and says nothing
+
+Found: 2026-11-13, in the same check as issue 654.
+State: open.
+
+When `client.snapshot` fails for a reason other than a lost connection, the live website retries without end.
+It shows "Reconnecting" and gives the owner no reason.
+The connection in `packages/studio/src/connection.ts` drops the error.
+The owner should see that the service answered and what it said.
+
+## 656. The live approval card overflowed, and a delivered answer showed the engine's wrapper
+
+Found: 2026-11-13, by the owner, on the first real project.
+State: fixed in the same change.
+
+The live approval card showed each of the harness's options as its own button.
+A long standing option, such as "Yes, and don't ask again for commands that start with ...", ran past the card's edge.
+The card now has "Allow" and "Deny", as the mock designed it.
+A standing option from the harness sits in the menu beside its button, with the harness's wording as the note.
+An option of a kind the page does not know stays a button, and its text now wraps.
+A delivered answer appeared in the thread as "Data from another agent [...] (delivery ...): Answer to question ...".
+That text is the wrapper the engine puts around data for an agent's safety.
+The thread now shows one short line, "Answer delivered: ...", and shows other passed data without the wrapper.
+The context figure in the composer showed fifteen decimal places, and is now a whole percentage.
+
+## 657. The engine labels the owner's answer as "Data from another agent"
+
+Found: 2026-11-13, in the same check as issue 656.
+State: open.
+
+The wrapper around an answer the owner gave begins "Data from another agent" (`packages/engine/src/routing/envelope.ts:18`).
+The agent that asked is told the answer came from an agent, when it came from the owner.
+
+## 658. An open live page stays on "Offline" after the service restarts
+
+Found: 2026-11-13, by hand on the first real project.
+State: open.
+
+A restart of the service ends the browser's session.
+An open page of the live website then shows "Offline" and stays there.
+Only a reload brings up the Login page.
+The page should notice that the service answers again and ask the owner to sign in.
+
+## 659. The live Mocks tab did not read recorded bundles.
 
 The first live connection left each project's mock record empty.
 It also hid the Mocks tab because the snapshot does not carry a bundle flag.
@@ -11137,7 +11410,7 @@ It shows the Design stage tab and preserves whole revision approval semantics.
 A browser test covers current artifacts, stale artifact refusal, approval, and reload.
 This problem is fixed on the worker branch.
 
-## s2-mocks-2. The live repository design page used the sample's fixed sheets.
+## 660. The live repository design page used the sample's fixed sheets.
 
 The page did not read the registered design, components, or tokens.
 The step 2 adapter now loads those records when the page opens.
@@ -11149,7 +11422,7 @@ The expanded standalone test also caught and verified a palette regression intro
 while connecting this page.
 This problem is fixed on the worker branch.
 
-## s2-mocks-3. Machines displayed unsupported capacity and installation placeholders.
+## 661. Machines displayed unsupported capacity and installation placeholders.
 
 The live page treated a zero slot limit as real capacity.
 It also showed a persistent scanning state without reading harness discovery.
@@ -11160,7 +11433,7 @@ Pairing, renaming, removing, and changing the limit retain the existing refusal.
 Browser tests cover these refusals, discovery, rescanning, and repository registration.
 This problem is fixed on the worker branch.
 
-## s2-mocks-4. Search treated unavailable repository metadata as known.
+## 662. Search treated unavailable repository metadata as known.
 
 The switcher showed "No remote" when the engine had not supplied a remote.
 Its wider agent text also used a lifecycle display word as activity.
@@ -11172,7 +11445,7 @@ The browser test covers navigation, empty results, and archived project exclusio
 No search request is made to the engine.
 This problem is fixed on the worker branch.
 
-## s2-mocks-5. Display cleanup depended on a live socket.
+## 663. Display cleanup depended on a live socket.
 
 The new display adapter initially applied the socket guard to closing a frame.
 A lost socket could therefore prevent navigation cleanup from reaching the
@@ -11183,7 +11456,7 @@ Opening a frame still requires the live connection.
 A focused test verifies both cleanup cases and the authenticated request options.
 This problem is fixed on the worker branch.
 
-## s2-mocks-6. A legacy Git browser case retained its initial uncertainty message.
+## 664. A legacy Git browser case retained its initial uncertainty message.
 
 The full check on `c8f7009` passed all 529 unit test files.
 Its browser run failed the existing lost-reply case at `git.spec.ts:271`.
@@ -11193,3 +11466,12 @@ Six focused repetitions of this case passed on baseline `803db7f`.
 The affected website source, engine source, and test body are unchanged.
 The cause has not been established.
 The worker result records the full check and baseline comparison outcomes.
+
+## 665. The known repository dialog referenced an unavailable local variable.
+
+The merge review found that opening the live dialog for a known repository
+referenced a `details` variable that the dialog did not define.
+The dialog now uses the repository's recorded local folder.
+It does not construct a folder from an unknown workspace setting.
+A regression test opens the dialog and checks the actual registered path.
+This problem is fixed in the merge.
