@@ -11775,7 +11775,11 @@ The engine learns a harness's models only from a running agent, through `client.
 The page therefore has nothing to offer before an agent of that harness runs.
 The page also does not say why the list is empty.
 A fix needs the engine to ask a harness for its models without a running agent.
-This is not fixed.
+This is fixed by the s4-models change.
+The authenticated `client.harness.choices` request opens a temporary session on a registered account.
+The request returns the reported models and efforts before any persistent agent exists.
+The request closes its harness before it replies.
+The live website uses these reports and shows a plain reason when choices are unavailable.
 
 ## 685. The Messages tab shows no board on a project without teams.
 
@@ -11802,3 +11806,72 @@ The owner reported this on 2026-11-13.
 The owner said that "Service settings" needs a lot of work and is acceptable for now.
 The owner said that "Subscriptions" needs work before a release.
 The owner did not yet say what is missing on either page.
+
+
+## s4-models-1. Legacy session model reports were not exposed as choices.
+
+The model-choice reader used only configuration selectors.
+Gemini reports its models through the legacy model list in the new-session reply.
+The engine now reads that list when there is no model configuration report.
+A scripted protocol-version-one test covers the complete discovery request.
+This is fixed in this change.
+
+## s4-models-2. The new discovery read exposed a module initialization cycle.
+
+The native Node.js alert-restart fixtures failed while importing the new read.
+The client read registry tried to read the handler before its module finished initializing.
+The registry now calls the handler through a deferred function.
+The alert-restart tests cover that import path.
+This is fixed in this change.
+
+## s4-models-3. The setup Git-message model selector has no write action.
+
+The first-run page calls the existing unavailable-action handler when its Git-message model changes.
+The service Git-message model setting has no persisted engine field either.
+This change supplies reported choices to those controls.
+It does not add a Git-message generator or a new stored setting.
+The New project dialog inherits the service lead defaults instead of offering a separate model selector.
+Those existing product limits remain.
+
+## s4-models-4. Effort discovery must follow the selected model.
+
+A model change can replace the harness's effort choices.
+A report for the default session model cannot describe every model's efforts.
+The discovery request now accepts a model identifier.
+The engine applies that identifier before reading choices.
+The cache separates reports by selected model.
+The service page requests efforts for its selected model.
+This is fixed in this change.
+
+## s4-models-5. Subscription model choices must belong to the named account.
+
+Two accounts on one harness can report different models.
+The subscription page now requests each account's choices.
+A row uses that account's report and unavailable reason.
+The default-harness report no longer supplies another account's choices.
+This is fixed in this change.
+
+## s4-models-6. A stopped agent needs reported choices to save a new configuration.
+
+The old command validated stopped-agent choices against configured harness lists.
+Those lists are empty for the built-in harnesses.
+The command now validates against the account's discovery report when the agent has no process.
+A model that is no longer reported does not hide the current model list.
+The stopped-agent regression checks the read and the saved choice.
+This is fixed in this change.
+
+## s4-models-7. A starting agent needs discovery until its model report arrives.
+
+The full check found that the failed-start remedy lost its model choices during startup.
+An unavailable live report was hiding the account's discovery result.
+The read now uses discovery while the agent is starting and has not reported models.
+The existing model-refused and effort-refused remedy tests cover this behavior.
+This is fixed in this change.
+
+## s4-models-8. A discovery failure must use one unavailable sentence.
+
+The initial generic discovery error had two sentences.
+The requested empty state allows one plain sentence.
+The error now uses one sentence.
+A session-failure regression checks that sentence and the child's cleanup.
+This is fixed in this change.

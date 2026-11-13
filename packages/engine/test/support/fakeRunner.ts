@@ -197,6 +197,12 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       ...(input.effort === undefined ? {} : { effort: input.effort }),
     });
     const defaults: Script = {
+      // The fake peer advertises the fixture's model lists on discovery. Live
+      // agent reads remain unavailable unless a test scripts them explicitly.
+      discover: ({ harness }) => Effect.succeed({
+        models: { source: "negotiated", options: harness.models.map((id) => ({ id, label: id })) },
+        efforts: { source: "negotiated", options: harness.efforts.map((id) => ({ id, label: id })) },
+      }),
       start: (input) => Effect.succeed({ ...sessionFor(input.agentId), configuration: configurationFor(input) }),
       load: (input) => Effect.succeed({ ...sessionFor(input.agentId), session: input.session, configuration: configurationFor(input) }),
       prompt: () => Effect.void,
@@ -263,6 +269,7 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
     }) as ReturnType<Methods[M]>;
 
     const service: RunnerShape = {
+      discover: call("discover"),
       start: call("start"),
       load: call("load"),
       prompt: call("prompt"),

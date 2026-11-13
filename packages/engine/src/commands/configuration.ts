@@ -1,3 +1,4 @@
+import { discoverHarnessChoices } from "../client/reads/harnessChoices.ts";
 import { randomUUID } from "node:crypto";
 import { type AgentChoice, type AgentChoices, type AgentConfiguration, type AgentId } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
@@ -15,19 +16,30 @@ export const liveToken = (input: Input, agentId: string) => input.runtime.sql<{ 
   SELECT token_hash FROM agent_tokens WHERE agent_id = ${agentId} AND revoked_at IS NULL ORDER BY rowid DESC LIMIT 1`.pipe(
   Effect.map((rows) => rows[0]?.token_hash), Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))));
 
-export const choicesFor = (input: Input, agent: Agent): Effect.Effect<AgentChoices, LogWriteFailed> => Effect.gen(function* () {
-  const harness = (yield* readHarnesses(input.runtime)).find((item) => item.id === agent.harness);
-  const configured = yield* configuredChoices(harness?.models ?? [], harness?.efforts ?? [], input.runtime.log.redactText);
+export const choicesFor = (input: Input, agent: Agent, allowConfigured = false, model = configurationOf(agent).desired.model): Effect.Effect<AgentChoices, LogWriteFailed> => Effect.gen(function* () {
   const incarnation = yield* liveToken(input, agent.agentId);
   const live = incarnation === undefined ? undefined : yield* input.runtime.runner.choices({ agentId: agent.agentId, incarnation }).pipe(
     Effect.catchTag("RunnerRejected", () => Effect.succeed(undefined)));
-  return { models: live?.models.source === "negotiated" ? live.models : configured.models,
-    efforts: live?.efforts.source === "negotiated" ? live.efforts : configured.efforts };
+  if (allowConfigured && (live !== undefined || agent.state._tag === "starting")) {
+    const harness = (yield* readHarnesses(input.runtime)).find((item) => item.id === agent.harness);
+    const configured = yield* configuredChoices(harness?.models ?? [], harness?.efforts ?? [], input.runtime.log.redactText);
+    return { models: live?.models.source === "negotiated" ? live.models : configured.models,
+      efforts: live?.efforts.source === "negotiated" ? live.efforts : configured.efforts };
+  }
+  if (live !== undefined && !(agent.state._tag === "starting" && live.models.source === "unavailable")) return {
+    models: live.models.options.length ? live.models : { ...live.models, reason: "This harness did not report model choices." },
+    efforts: live.efforts.options.length ? live.efforts : { ...live.efforts, reason: "This harness did not report effort choices." }
+  };
+  const base = yield* discoverHarnessChoices(input, agent.harness, agent.account);
+  const report = model !== undefined && base.models.options.some((o) => o.id === model)
+    ? yield* discoverHarnessChoices(input, agent.harness, agent.account, false, model) : base;
+  return { models: { ...report.models, ...(report.reason ? { reason: report.reason } : {}) },
+    efforts: { ...report.efforts, ...(report.effortReason ? { reason: report.effortReason } : {}) } };
 });
 export const configure = (input: Input, payload: Payload<"configure">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> => Effect.gen(function* () {
   const agent = input.snapshot.agents[payload.agentId];
   if (input.actor._tag !== "owner" || agent === undefined || (payload.model === undefined && payload.effort === undefined)) return yield* refused();
-  const choices = yield* choicesFor(input, agent);
+  const choices = yield* choicesFor(input, agent, true, payload.model ?? configurationOf(agent).desired.model);
   for (const [axis, list] of [["model", choices.models], ["effort", choices.efforts]] as const) {
     const value = payload[axis];
     if (value !== undefined && (!list.options.some((choice) => choice.id === value) || (yield* input.runtime.log.redactText(value)) !== value)) {

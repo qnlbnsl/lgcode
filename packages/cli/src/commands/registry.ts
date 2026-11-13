@@ -51,6 +51,7 @@ const summaries: Record<CommandName, string> = {
   "client.alerts.settings.set": "Change an alert kind's push setting.",
   start: "Start an agent.",
   configure: "Choose an agent's model and/or effort for its next turn. Read client.agent.configuration for acknowledgement or refusal.",
+  "client.harness.choices": "Discover a harness account’s reported models and effort choices.",
   "client.agent.configuration": "Read an agent's desired and applied configuration and available choices.",
   "client.agent.context": "Read the latest reported context usage, or its unavailable state.",
   prompt: "Send a prompt to an agent.",

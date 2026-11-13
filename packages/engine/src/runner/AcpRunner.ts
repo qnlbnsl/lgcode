@@ -101,6 +101,7 @@ interface Process {
   dead: boolean;
   mode: string;
   options: ReadonlyArray<ConfigOption>;
+  legacyModels?: unknown;
   applied: AgentChoice;
   configuring: boolean;
   configurationUncertain: boolean;
@@ -747,6 +748,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* drainTerminals(processEntry);
       processEntry.loading = false;
       processEntry.options = (opened.configOptions ?? []) as ReadonlyArray<ConfigOption>;
+      processEntry.legacyModels = opened.models;
       if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input.model, processEntry.version);
       if (input.effort !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "thought_level", input.effort, processEntry.version);
       yield* setMode(processEntry, input.permission);
@@ -877,12 +879,20 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     yield* Deferred.await(sent).pipe(Effect.ensuring(Effect.sync(() => { if (entry.sent === sent) delete entry.sent; })));
   });
   return Runner.of({
+    discover: (input) => Effect.gen(function* () {
+      yield* spawn(input);
+      const entry = yield* live(input.agentId, sha256Hex(Redacted.value(input.token)));
+      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered), entry.legacyModels);
+    }).pipe(Effect.ensuring(Effect.suspend(() => {
+      const entry = processes.get(input.agentId);
+      return entry === undefined ? Effect.void : close(entry);
+    }).pipe(Effect.orDie))),
     start: (input) => spawn(input), load: (input) => spawn(input, input.session),
     prompt: (input) => send(input, false), compact: (input) => send(input, true),
     configure,
     choices: ({ agentId, incarnation }) => Effect.gen(function* () {
       const entry = yield* live(agentId, incarnation);
-      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered));
+      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered), entry.legacyModels);
     }),
     context: ({ agentId, incarnation }) => live(agentId, incarnation).pipe(Effect.map((entry) => entry.context)),
     cancel: ({ agentId, deliveryId, sentSequence }) => Effect.gen(function* () {

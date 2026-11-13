@@ -146,6 +146,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const WebRpcGroup = ClientRpcGroup.omit(
+  "client.harness.choices",
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
@@ -172,6 +173,7 @@ export const commandAccess = {
   "cancel-reply": ["owner", "agent"], stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
+  "client.harness.choices": ["owner"],
   "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
   "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],

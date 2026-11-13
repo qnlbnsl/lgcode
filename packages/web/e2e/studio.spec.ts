@@ -903,3 +903,9 @@ test("live website: subscriptions, notifications and service settings persist th
 
 
 test('live website: Git changes, history, remotes, integration and owner approval', async ({ page }) => { test.setTimeout(360_000); await exerciseStudioGit(page) })
+
+test('live website: Service settings discovers models when the default harness changes and explains a missing account', async ({ page }) => {
+  test.setTimeout(90_000)
+  const { exerciseStudioModels } = await import('./support/studioModels.ts')
+  await exerciseStudioModels(page)
+})
