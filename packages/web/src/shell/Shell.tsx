@@ -35,7 +35,7 @@ import { NavigationTree } from "./NavigationTree.tsx"
 import { panelWidth, readPreference, savedPanelWidth, writePreference } from "./preferences.ts"
 import { QuickSwitcher } from "./QuickSwitcher.tsx"
 
-const serviceNames = { alerts: "Phone notifications", machines: "Machines", subscriptions: "Subscriptions", settings: "Service settings" } as const
+const serviceNames = { alerts: "Notifications", machines: "Machines", subscriptions: "Subscriptions", settings: "Service settings" } as const
 const serviceIcons: Record<keyof typeof serviceNames, IconName> = { alerts: "phone", machines: "machines", subscriptions: "subscriptions", settings: "settings" }
 const tabNames: Record<WorkspaceTab, string> = { board: "Board", chat: "Chat", terminal: "Terminal", git: "Git", mocks: "Mocks", settings: "Project settings", tasks: "Tasks" }
 

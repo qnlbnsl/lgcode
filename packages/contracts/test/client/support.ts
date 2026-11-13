@@ -4,6 +4,7 @@ import { expect } from "vitest";
 
 export const clientCommands = [
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests",
+  "client.alerts.quiet.set", "client.alerts.carrier.enabled.set",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
   "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
@@ -11,6 +12,7 @@ export const clientCommands = [
   "client.web.settings", "client.web.settings.set",
 ] as const;
 export const clientTags = [
+  "client.AlertDestinationChanged", "client.AlertDestinationTokenSet", "client.AlertDestinationTokenCleared", "client.AlertCarrierEnabled", "client.AlertQuietChanged",
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",

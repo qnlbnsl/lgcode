@@ -99,7 +99,7 @@ This folder's own page starts the mock the same way, through `js/main.js`.
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
 | Repository design page, the design file on a canvas | `/r/lgtm/design`, and `/r/<repository>/design/<category>/<item>` |
-| Machines, Subscriptions, Phone notifications, Service settings | `/machines`, `/subscriptions`, `/notifications`, `/settings` |
+| Machines, Subscriptions, Notifications, Service settings | `/machines`, `/subscriptions`, `/notifications`, `/settings` |
 | Login and first run | `/login`, `/setup` |
 
 A repository without a design file, such as `atlas-docs`, shows the Design page's empty
@@ -131,3 +131,15 @@ Agents are named by their role, such as Project lead and Builder 1. No agent has
 invented personal name. The page's own text never says that it is a mock or a sample. The
 layout and density rules are in the "Layout and density" section of
 [../DESIGN.md](../DESIGN.md).
+
+## Notifications in sample and live mode
+
+The Notifications page configures ntfy and email independently.
+Email uses the owner's mail server.
+Both carriers have an enable switch and a test action.
+Quiet hours have a start, an end, a time zone, and a failure override.
+Merge reviews and sprint completions use the engine's existing events.
+The sample mode simulates delivery without a network request.
+The live website sends each action through the authenticated client application programming interface (API).
+Secret fields never contain a stored secret.
+See [the notification guide](../../docs/notifications.md) for the transport and API details.

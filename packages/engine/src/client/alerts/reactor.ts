@@ -56,6 +56,7 @@ const resumed = (envelope: EventEnvelope, snapshot: Snapshot): string | undefine
 };
 
 const touchesSubject = (row: AlertRow, event: Event): boolean => {
+  if (row.kind === "merge") return event._tag === "project.MainReviewOpened" || event._tag === "project.MainReviewDecided";
   if (row.kind === "client.web-down") return event._tag === "client.WebServerUp" || event._tag === "client.WebSettingsChanged";
   const subject = row.subject;
   if (subject?._tag === "account") return "accountId" in event && event.accountId === subject.id;

@@ -39,6 +39,8 @@ const summaries: Record<CommandName, string> = {
   "project.conflict.choose": "Choose a canonical conflict hunk after checking its fingerprint.",
   "project.conflict.resolve": "Resolve canonical conflict hunks from current confirmed choices.",
 
+  "client.alerts.quiet.set": "Set quiet hours, their time zone and the failure override.",
+  "client.alerts.carrier.enabled.set": "Enable or disable one configured notification carrier.",
   "client.alerts.carrier.set": "Change the alert carrier.",
   "client.alerts.carrier.set-token": "Store the carrier token from standard input, after confirming the server.",
   "client.alerts.carrier.clear-token": "Clear the carrier token.",

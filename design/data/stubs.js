@@ -542,7 +542,7 @@ const api={
   // The token never reaches a file or an event, as in the engine.
   async setToken(){emit('client.AlertCarrierTokenSet',{origin:S.settings.carrier.server,carrierGeneration:'generation-1'})},
   async clearToken(){emit('client.AlertCarrierTokenCleared',{})},
-  // Proposed. Records that the owner declined phone notifications when the first request waited, so the page does not offer them again.
+  // Proposed. Records that the owner declined notifications when the first request waited, so the page does not offer them again.
   async dismissPushPrompt(){emit('client.AlertPromptDismissed',{},{caller:'owner'})},
   // Proposed. Sends one notification through the service now and stores nothing, so it says only whether the service took it.
   async sendTest(){const s=S.settings;await new Promise(done=>setTimeout(done,300));return s.carrier&&s.tokenSet?{sent:true,at:nowAt()}:{sent:false,reason:s.carrier?'Set the notification service token first.':'Set the notification service first.'}},

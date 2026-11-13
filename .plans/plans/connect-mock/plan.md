@@ -128,7 +128,7 @@ mean the request returns everything the screen shows.
 | Repository Design page | `design.record`, `design.read`, the OpenPencil start-up | Saving the design file into the repository |
 | Machines | `workspaces`, `workspace.register` | Pairing, and the load figures |
 | Subscriptions | `accounts`, `harnesses` | Usage meters, to be checked |
-| Phone notifications | `alerts.*` | Nothing found yet |
+| Notifications | `alerts.*` | Nothing found yet |
 | Service settings | `settings.get`, `settings.set`, `web.settings` | The Git message model |
 | Search | `context.search` | Ranking across repositories, projects and agents |
 
@@ -165,7 +165,7 @@ This step uses only requests the engine already has.
 - Board, sprint and task pages, on the engine's sprints and tasks.
 - Messages and Agents.
 - Git: changes, staging, diffs, commit, history, conflicts, and the merge review.
-- New project, first run, Project settings, Service settings and Phone notifications.
+- New project, first run, Project settings, Service settings and Notifications.
 
 Every action in these screens stops changing the browser's memory. It makes its call and
 waits for the engine's update.

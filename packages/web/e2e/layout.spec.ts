@@ -25,7 +25,7 @@ for (const [name, path, ready] of [
   ["Login", "/", "Log in"],
   ["Home", "/", "Home"],
   ["Thread", "/#/thread/phone-worker", "Thread"],
-  ["Alerts", "/?page=alerts", "Phone notifications"],
+  ["Alerts", "/?page=alerts", "Notifications"],
   ["Settings", "/?page=settings", "Service settings"],
 ] as const) test(`7.3 production width: ${name} fits 360 pixels`, async ({ page }) => {
   const rig = makeRig()
@@ -61,7 +61,7 @@ for (const [name, path, ready] of [
             if (name === "Thread") await expect(page.getByRole("region", { name: "Question", exact: true })).toContainText("Which branch should I use?")
             if (name === "Alerts") await expect(async () => {
               await page.getByRole("button", { name: "Refresh alerts" }).click()
-              await expect(page.getByRole("region", { name: "Phone notifications", exact: true })).toContainText("A question needs your answer")
+              await expect(page.getByRole("region", { name: "Notifications", exact: true })).toContainText("A question needs your answer")
             }).toPass()
             if (name === "Settings") await expect(page.getByRole("form", { name: "Web server settings", exact: true })).toBeVisible()
           }

@@ -9923,7 +9923,7 @@ The original browser cases for conversation history and phone thread answering s
 The replacement shell keeps its closed phone navigation inert.
 The agent links also include their displayed state in their accessible name.
 The original Alerts and Settings layout cases waited for regions named Alerts and Settings.
-The actual service regions are named Phone notifications and Service settings.
+The actual service regions are named Notifications and Service settings.
 All four original browser failures and their complete contexts remain preserved.
 
 The two agent cases now open the actual navigation with its existing helper and click the named agent inside the Projects navigation.
@@ -11046,7 +11046,7 @@ The gap table is `.plans/plans/connect-mock/gap-table.md`.
 ## 623. The live website shows the page's default settings, not the engine's
 
 Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
-State: fixed for Service settings and Phone notifications in step 2.
+State: fixed for Service settings and Notifications in step 2.
 
 These pages now read their settings from the engine when opened.
 The Home notification offer reads the same carrier and dismissal settings.
@@ -11802,3 +11802,46 @@ The owner reported this on 2026-11-13.
 The owner said that "Service settings" needs a lot of work and is acceptable for now.
 The owner said that "Subscriptions" needs work before a release.
 The owner did not yet say what is missing on either page.
+
+## s5-notify-1. Notification forms appeared before their live settings finished loading.
+
+Found: 2026-11-13, while adding email notifications.
+State: fixed in this change.
+
+The email browser journey could type into an empty form before the first settings reply arrived.
+The reply then replaced the form and discarded the input.
+The live page now waits for the notification settings before mounting its carrier and quiet-hours forms.
+The email browser journey covers saving and reloading the settings.
+
+## s5-notify-2. Merge notifications needed to end when their owner review was decided.
+
+Found: 2026-11-13, while adding the merge alert kind.
+State: fixed in this change.
+
+An alert raised from an opened merge review needed a matching close condition.
+The alert now clears when its review is decided or replaced.
+An existing open review enters the first alert baseline without a new push.
+The lifecycle test covers an opened and then refused review.
+
+
+## s5-notify-3. A service-page read can show a connection notice during reload.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: open.
+
+The live page can briefly show "The service is not connected" after a reload.
+The settings then load and the controls work.
+The service-page reader starts when the session is signed in, before the transport necessarily reports a live connection.
+Issue 650 fixed the same ordering for Home reads.
+The notification browser journey verifies that saved settings survive this reload.
+The captured live screenshot preserves the temporary notice.
+
+## s5-notify-4. Some notification kinds still use their contract identifiers as labels.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: open.
+
+The existing live page uses friendly labels for its five original sample kinds.
+Other engine kinds fall back to identifiers such as `board.post` and `roles.stall`.
+Their switches work through the client application programming interface.
+The additional kinds need friendly labels in the page.

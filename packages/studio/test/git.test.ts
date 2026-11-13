@@ -129,3 +129,9 @@ describe('Git mapping', () => {
     expect(mapMainReview(review, undefined, 'project-lead')).toMatchObject({ head: 'head', baseHead: 'base', status: 'open', notice: '', evidence: { tests: { ok: false, value: 'stale: passed' }, review: { ok: false, value: 'Missing' }, conflicts: null } })
   })
 })
+
+it('maps email and quiet hours without a stored mail secret', () => {
+  const settings = { carrier: { _tag: 'none' }, tokenSet: false, kinds: [], carriers: [{ name: 'email', enabled: true, tokenSet: true, carrier: { _tag: 'email', host: 'mail.example.test', port: 465, security: 'tls', username: 'owner', from: 'owner@example.test', to: 'owner@example.test' } }], quiet: { enabled: true, start: '22:00', end: '07:00', timeZone: 'America/Chicago', failureOverride: true } } as AlertSettings
+  expect(mapAlertSettings(settings)).toMatchObject({ email: { enabled: true, tokenSet: true, host: 'mail.example.test' }, quiet: { on: true, from: '22:00', to: '07:00', timeZone: 'America/Chicago', failed: true } })
+  expect(mapPhoneOffer(settings)).toBe('declined')
+})

@@ -114,6 +114,7 @@ An installer, startup at login, and loading project configuration from
 - [SECURITY.md](SECURITY.md): how to report a vulnerability, and the security
   rules the design must keep.
 - [docs/features.md](docs/features.md): the feature list.
+- [docs/notifications.md](docs/notifications.md): email, ntfy, quiet hours, and notification API actions.
 - [docs/issues.md](docs/issues.md): the running list of problems found.
 - [docs/specs/2026-11-01-engine-design.md](docs/specs/2026-11-01-engine-design.md):
   the design of the engine, the first of LGTM Studio's four pieces.

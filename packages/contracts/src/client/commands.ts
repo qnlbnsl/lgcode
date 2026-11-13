@@ -5,7 +5,7 @@ import * as RpcGroup from "effect/rpc/RpcGroup"
 import type { CallerKind } from "../commands.ts"
 import { EventEnvelope } from "../events.ts"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
-import { Alert, AlertDeliveryFailure, AlertId, AlertKind, AlertSettings, CarrierSettings } from "./alerts.ts"
+import { Alert, AlertDeliveryFailure, AlertId, AlertKind, AlertSettings, CarrierSettings, CarrierName, QuietHours } from "./alerts.ts"
 import { ClientFilter, ClientRequest, ClientSnapshot, ClientStreamItem, RosterEntry } from "./reads.ts"
 import { WebServerState, WebSettings } from "./settings.ts"
 
@@ -58,22 +58,24 @@ export const ClientRpcGroup = RpcGroup.make(
     success: Schema.Struct({ ...request, items: Schema.Array(Alert), next: Schema.optionalKey(EventSequence) }), error: Refused
   }),
   Rpc.make("alerts.retry", {
-    payload: { ...request, alertId: AlertId, generation: EventSequence, attempt: Schema.Int.check(Schema.isGreaterThan(0)) },
+    payload: { ...request, alertId: AlertId, generation: EventSequence, attempt: Schema.Int.check(Schema.isGreaterThan(0)), name: Schema.optionalKey(CarrierName) },
     success: Schema.Struct({ ...request, accepted: Schema.Boolean, reason: Schema.optionalKey(AlertDeliveryFailure) }), error: Refused
   }),
-  Rpc.make("alerts.test", { payload: request,
+  Rpc.make("alerts.test", { payload: { ...request, name: Schema.optionalKey(CarrierName) },
     success: Schema.Struct({ ...request, accepted: Schema.Boolean, reason: Schema.optionalKey(AlertDeliveryFailure) }), error: Refused }),
   Rpc.make("alerts.prompt.dismiss", { payload: request, success: Ack, error: Refused }),
   Rpc.make("alerts.dismiss", { payload: { ...request, alertId: AlertId }, success: Ack, error: Refused }),
   Rpc.make("alerts.settings", { payload: request, success: Schema.Struct({ ...request, ...AlertSettings.fields }), error: Refused }),
   Rpc.make("alerts.settings.set", { payload: { ...request, kind: AlertKind, push: Schema.Boolean }, success: Ack, error: Refused }),
+  Rpc.make("alerts.quiet.set", { payload: { ...request, quiet: QuietHours }, success: Ack, error: Refused }),
+  Rpc.make("alerts.carrier.enabled.set", { payload: { ...request, name: CarrierName, enabled: Schema.Boolean }, success: Ack, error: Refused }),
   Rpc.make("alerts.carrier.set", { payload: { ...request, carrier: CarrierSettings }, success: Ack, error: Refused }),
   Rpc.make("alerts.carrier.set-token", {
-    payload: { ...request, origin: Schema.NonEmptyString, nonce: Schema.NonEmptyString,
+    payload: { ...request, name: Schema.optionalKey(CarrierName), origin: Schema.NonEmptyString, nonce: Schema.NonEmptyString,
       value: Schema.RedactedFromValue(Schema.NonEmptyString, { label: "secret value" }) },
     success: Ack, error: Refused
   }),
-  Rpc.make("alerts.carrier.clear-token", { payload: request, success: Ack, error: Refused }),
+  Rpc.make("alerts.carrier.clear-token", { payload: { ...request, name: Schema.optionalKey(CarrierName) }, success: Ack, error: Refused }),
   Rpc.make("web.settings", { payload: request, success: Schema.Struct({ ...request, ...WebSettings.fields, serverState: WebServerState }), error: Refused }),
   Rpc.make("web.settings.set", { payload: { ...request, settings: WebSettings }, success: Ack, error: Refused })
 ).prefix("client.")
@@ -86,6 +88,7 @@ export const clientCommandAccess = {
   "client.alerts.retry": ["owner"], "client.alerts.test": ["owner"], "client.alerts.prompt.dismiss": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"], "client.alerts.settings": ["owner"],
   "client.alerts.settings.set": ["owner"], "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
+  "client.alerts.quiet.set": ["owner"], "client.alerts.carrier.enabled.set": ["owner"],
   "client.alerts.carrier.clear-token": ["owner"], "client.web.settings": ["owner"], "client.web.settings.set": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof ClientRpcGroup>>, ReadonlyArray<CallerKind>>
 

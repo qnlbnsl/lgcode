@@ -53,6 +53,8 @@ for (const { command, words, form } of invocations) {
       "cancel-reply": { agentId: "member" }, release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
+      "client.alerts.quiet.set": { quiet: { enabled: true, start: "22:00", end: "07:00", timeZone: "America/Chicago", failureOverride: true } },
+      "client.alerts.carrier.enabled.set": { name: "email", enabled: false },
       "client.web.settings": {},
       "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},

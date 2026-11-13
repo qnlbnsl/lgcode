@@ -81,7 +81,7 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.MasterLeft` | This computer left the master it had joined as a worker. |
 | `project.Renamed` | A project's new name. Its branch and folder keep their names. |
 | `project.Archived`, `project.Restored` | A project was archived, or brought back from the archive. |
-| `client.AlertPromptDismissed` | The owner chose Not now when the first waiting request offered phone notifications. The engine's `client` piece would own it. |
+| `client.AlertPromptDismissed` | The owner chose Not now when the first waiting request offered notifications. The engine's `client` piece would own it. |
 
 ## How the page gets its data
 
@@ -162,7 +162,7 @@ findings on those pages:
 - **The notification service in the samples.** The samples' default settings now have a
   notification service with no token, so a failed notification can point at the missing token.
   The first run's settings have no notification service, as a new service would.
-- **Declining phone notifications.** `api.settings.dismissPushPrompt` is proposed. It writes
+- **Declining notifications.** `api.settings.dismissPushPrompt` is proposed. It writes
   `client.AlertPromptDismissed`, and the reducer sets `settings.pushPromptDismissed`. The engine
   would keep it with the other notification settings.
 - **When an offline machine was last seen.** `project.MachineAdded` and `project.MachineChanged`
@@ -213,7 +213,7 @@ means the engine has no such command yet.
 | `api.agents.choose`, `api.agents.usage` | Proposed: change an agent's model or effort, and read its context use |
 | `api.alerts.list`, `api.settings.*` | `client.alerts.list`, `client.alerts.settings`, `client.web.settings` |
 | `api.alerts.retry`, `api.settings.sendTest` | Proposed: send a failed notification again, and send a test notification |
-| `api.settings.dismissPushPrompt` | Proposed: record that the owner declined phone notifications |
+| `api.settings.dismissPushPrompt` | Proposed: record that the owner declined notifications |
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
 | `api.accounts.usage` | Proposed: read how much of a subscription's usage limit is used |
 | `api.project.*`, `api.machines.*` | Proposed |

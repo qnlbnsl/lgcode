@@ -133,8 +133,8 @@ export function mapRosterDetails(agent: StoreAgent, tasks: ReadonlyArray<{ owner
     stalled: stall?._tag === "roles.StallSeen" }
 }
 
-export function mapPhoneOffer(settings: { carrier: { _tag: string }; pushPromptDismissed?: boolean }) {
-  return { phoneOffer: settings.pushPromptDismissed || settings.carrier._tag !== "none" ? "declined" : "open" }
+export function mapPhoneOffer(settings: { carrier: { _tag: string }; pushPromptDismissed?: boolean; carriers?: ReadonlyArray<{ enabled: boolean }> }) {
+  return { phoneOffer: settings.pushPromptDismissed || settings.carriers?.some((c) => c.enabled) || settings.carrier._tag !== "none" ? "declined" : "open" }
 }
 
 export function mapContextSearch(result: { items: ReadonlyArray<{ reference: ContextReference; label: string }> }) {

@@ -150,7 +150,7 @@ project dialog inside it.
 | Merge review dialog: file list with per-file `+`/`−` | "37 files changed" table | `packages/contracts/src/project/git.ts:16 GitCommitFile` (path, status) | supplied with a different shape | No per-file line counts; `project.diff` with a `path` gives them one file at a time (`packages/contracts/src/project/git.ts:68`) |
 | Merge review dialog: pull request title and description | Editable title and body, 72-character limit | none | missing | `project.review.approve` takes no title or body |
 | Failed start: `agent.failure.reason`, `.machine`, `.subscription` | Failed start row and its "Sign in on Buildbox" button | `packages/contracts/src/client/reads.ts:32 RosterEntry.startFailure` (codes at `packages/contracts/src/startFailure.ts:3`); `RosterEntry.account` at `reads.ts:35` | supplied with a different shape | Engine gives a reason code and an account, not a machine or a fix hint |
-| `s.phoneOffer`, `s.settings.ntfyServer` | "Phone notifications are off" offer | `packages/contracts/src/client/alerts.ts:67 AlertSettings.pushPromptDismissed`, `carrier` (`:40`), read by `client.alerts.settings` | supplied | |
+| `s.phoneOffer`, `s.settings.ntfyServer` | "Notifications are off" offer | `packages/contracts/src/client/alerts.ts:67 AlertSettings.pushPromptDismissed`, `carrier` (`:40`), read by `client.alerts.settings` | supplied | |
 
 #### What the screen does
 
@@ -1122,7 +1122,7 @@ mock's foot note says LGTM Studio never sees the password. That holds for a logi
 It does not hold for `accounts set-secret`, which stores an API key in the engine's secret
 store (`packages/engine/src/commands/accounts.ts:73-79`).
 
-### Phone notifications
+### Notifications
 
 The page is `Notifications` in `service.js:388`. Its form is `NtfyForm` (`service.js:363`),
 and "Send a test" runs `sendTest` (`service.js:357`). The offer on Home is `PhoneOffer` in
@@ -1145,7 +1145,7 @@ across `packages/web/src/admin/alerts.tsx` (the list), `packages/web/src/admin/s
 | `n.delivery` (`sent`, `off`, `failed`, `quiet`, `muted`), `n.error` | The Delivery column and its tooltip | `Alert.delivery` (`client/alerts.ts:50 AlertDelivery`): `delivered` or `failed`, with `reason`, `final`, `attempt`, `generation` | supplied with a different shape | The engine has no `quiet` or `muted` state. Its failure reason is one of three fixed phrases (`client/alerts.ts:48`), not free text. |
 | `n.request`, `n.to` | The row's link to the thread or the sprint | `Alert.subject` (`client/alerts.ts:26`: `permission`, `question`, `agent`, `account`, `piece`) | supplied with a different shape | A sprint link is missing because no sprint kind exists. |
 | `n.agent`, `n.project`, and the request's answer | "From" column: agent, project, answer | `Alert.agentId`; the project through `ProjectAgentSummary` (`packages/contracts/src/project/commands.ts:31`); the answer through `ClientRequest.answer` (`packages/contracts/src/requests.ts:27`) | supplied with a different shape | The page joins three sources. |
-| Count of failed deliveries | The red count beside "Phone notifications" in the sidebar | `Alert.delivery.status` in `ClientSnapshot.alerts` | supplied | |
+| Count of failed deliveries | The red count beside "Notifications" in the sidebar | `Alert.delivery.status` in `ClientSnapshot.alerts` | supplied | |
 | `phoneOffer` (`open` or `declined`) and "no carrier" | The offer on Home and the callout on this page | `AlertSettings.pushPromptDismissed` and `carrier._tag === "none"` (`client/alerts.ts:65-67`) | supplied with a different shape | The engine stores the dismissal for the service. The mock stores it in the browser (`actions.js:196`). The current website shows the offer only while an owner request is open (`packages/web/src/admin/notification-prompt.tsx:18-27`). The mock shows it always. |
 
 #### What the screen does
@@ -1154,7 +1154,7 @@ across `packages/web/src/admin/alerts.tsx` (the list), `packages/web/src/admin/s
 |---|---|---|---|---|
 | Turn on, or save the server and topic | `save` in `NtfyForm` (`service.js:370`); no call | `client.alerts.carrier.set` (`client/commands.ts:70`) | supplied | |
 | Save the access token | the same `save`, which stores `ntfyToken` | `client.alerts.carrier.set-token` (`client/commands.ts:71`), payload `origin`, `nonce`, `value` | supplied with a different shape | The token is a separate, write-only request. It needs an `origin` and a `nonce`. The current website sends it in `packages/web/src/admin/settings.tsx:151`. |
-| Turn off phone notifications | `off` (`service.js:371`); no call | `client.alerts.carrier.set` with `none`, and `client.alerts.carrier.clear-token` (`client/commands.ts:70`, `:76`) | supplied | Two requests replace one. |
+| Turn off notifications | `off` (`service.js:371`); no call | `client.alerts.carrier.set` with `none`, and `client.alerts.carrier.clear-token` (`client/commands.ts:70`, `:76`) | supplied | Two requests replace one. |
 | Send a test | `sendTest` (`service.js:357-362`); no call | `client.alerts.test` (`client/commands.ts:64`; handler `packages/engine/src/commands/notifications.ts:20-29`) | supplied with a different shape | The engine replies `accepted` and an optional reason. It adds no row to the alert list. The mock adds a "Test" row. |
 | Retry a failed delivery | `retry` (`service.js:393`); no call | `client.alerts.retry` (`client/commands.ts:60`), payload `alertId`, `generation`, `attempt` | supplied | The current website keeps the request id to recover an uncertain retry (`packages/web/src/admin/alerts.tsx:35-54`). |
 | Switch a kind on or off | `setOn` (`service.js:394`); no call | `client.alerts.settings.set` (`client/commands.ts:69`) | supplied with a different shape | The kinds differ, as above. |
@@ -1315,7 +1315,7 @@ current website's shell is `packages/web/src/shell/`. Its New project form is
 | `projectStatus` word, such as "Needs you · 3" or "Building" | Project status in the tree and the switcher | `ProjectAgentSummary.status` (`project/commands.ts:31`: `Needs you`, `Reviewing`, `Working`, `Ready`) | supplied with a different shape | The engine's status is for each agent, with four words. The mock makes one word for the project from its stage. |
 | `owner.name` | The owner's row at the sidebar's foot | `ProjectSettings.displayName` (`schema.ts:36`); `Discovery.ownerNameSuggestion` (`mocks.ts:54`) | supplied | |
 | Count of machines online | "n of n online" beside Machines | none | missing | |
-| Failed delivery count | The red count beside Phone notifications | `Alert.delivery` in `ClientSnapshot.alerts` (`client/reads.ts:54`) | supplied | |
+| Failed delivery count | The red count beside Notifications | `Alert.delivery` in `ClientSnapshot.alerts` (`client/reads.ts:54`) | supplied | |
 | Breadcrumbs: repository, project, team, agent, sprint, task | The top bar's path | the snapshot sections above | supplied | |
 | `openRequests(s)` of kinds `question`, `approval`, `merge`, `failed` | The bell, longest wait first | `ClientRequest` (`requests.ts:19`) for questions and approvals; `RosterEntry.startFailure` (`client/reads.ts:32`) for failed starts; `GitMainReview` with `outcome: "open"` (`packages/contracts/src/project/git.ts:41`) through `project.MainReviewOpened` (`packages/contracts/src/project/events.ts:14`) for merges | supplied with a different shape | The engine has three sources for four kinds. The current website's bell shows only failed starts, questions and approvals (`packages/web/src/shell/model.ts:29-40`). |
 | `conn.status`, `conn.lastHeard` | The Live badge | the page's own WebSocket state; `WebSettings.heartbeatSeconds` (`client/settings.ts:22`) | supplied with a different shape | This is client state. The badge's text names the machine "Workstation", which is missing. |
@@ -1410,7 +1410,7 @@ from the engine's shape to the mock's.
   model and effort.
 - **Subscriptions.** The list of accounts, turning one on or off, renaming, removing,
   clearing a usage limit by hand, and the agents on each account.
-- **Phone notifications.** The carrier's server, topic and token, turning them off, sending
+- **Notifications.** The carrier's server, topic and token, turning them off, sending
   a test, retrying a failed delivery, switching kinds, and the list of alerts.
 - **Service settings.** Remote access, the stall watch switch, standing rules, the role
   instructions, the other limits, and resetting the harnesses.

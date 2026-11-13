@@ -30,7 +30,7 @@ let retryPending;
 export function observe(patch) {
   if (patch.session && patch.session.status !== 'in') {
     service = accounts = statuses = retryPending = undefined; subscriptionsLoaded = false; S().ui.serviceReady = false; revision++; clearTimeout(refreshTimer);
-    Object.assign(patch, { notifications: [], settings: { ntfyServer: '', ntfyTopic: '', ntfyToken: '', notifyOn: {}, quiet: {} } });
+    Object.assign(patch, { notifications: [], settings: { ntfyServer: '', ntfyTopic: '', ntfyToken: '', tokenSet: false, ntfyEnabled: false, email: {}, notifyOn: {}, quiet: {} } });
   }
   if (patch.worktrees) patch.worktrees = patch.worktrees.map((w) => ({ ...w, ...(S().worktrees?.find((x) => x.id === w.id && x.folder === w.folder && x.branch === w.branch) || {}), ...Object.fromEntries(Object.entries(w).filter(([k]) => !['files', 'commits', 'ahead', 'behind', 'merge'].includes(k))) }));
   if (patch.subscriptions && subscriptionsLoaded) patch.subscriptions = S().subscriptions;
@@ -144,13 +144,28 @@ export const saveCarrier = (form) => run('notifications', async () => {
 });
 export const clearToken = () => run('notifications', async () => { await request('client.alerts.carrier.clear-token'); await loadService('notifications'); });
 export const notifyKind = (kind, push) => run('notifications', async () => {
-  if (kind === 'merge' || kind === 'sprint') { refuse(); return; }
   await request('client.alerts.settings.set', { kind: kind === 'failed' ? 'failure' : kind, push }); await loadService('notifications');
 });
-export const sendTest = () => run('notifications', async () => { const r = await request('client.alerts.test'); if (!r.accepted) throw new Error(r.reason); act.toast('Test accepted by the notification service.'); });
+export const sendTest = (name = 'ntfy') => run('notifications', async () => {
+  const r = await request('client.alerts.test', { name });
+  if (!r.accepted) throw new Error(r.reason === 'token missing' ? 'Set a password or access token first.' : r.reason === 'service missing' ? 'Configure this carrier first.' : 'The carrier delivery failed. Check your settings and try again.');
+  act.toast(name === 'email' ? 'Your mail server accepted the test email.' : 'The ntfy server accepted the test notification.');
+});
+export const saveEmail = (form) => run('notifications', async () => {
+  const { secret, enabled, tokenSet, ...fields } = form;
+  const carrier = { _tag: 'email', host: fields.host.trim(), port: Number(fields.port), security: fields.security, username: fields.username.trim(), from: fields.from.trim(), to: fields.to.trim() };
+  await request('client.alerts.carrier.set', { carrier });
+  if (secret) await request('client.alerts.carrier.set-token', { name: 'email', origin: JSON.stringify([carrier.host, carrier.port, carrier.security, carrier.username]), nonce: crypto.randomUUID(), value: secret });
+  await loadService('notifications');
+});
+export const carrierEnabled = (name, enabled) => run('notifications', async () => { await request('client.alerts.carrier.enabled.set', { name, enabled }); await loadService('notifications'); });
+export const clearEmailSecret = () => run('notifications', async () => { await request('client.alerts.carrier.clear-token', { name: 'email' }); await loadService('notifications'); });
+export const saveQuiet = (quiet) => run('notifications', async () => {
+  await request('client.alerts.quiet.set', { quiet: { enabled: quiet.on, start: quiet.from, end: quiet.to, timeZone: quiet.timeZone, failureOverride: quiet.failed } }); await loadService('notifications');
+});
 export const retryAlert = (n) => run('notifications', async () => {
   if (retryPending && retryPending.alertId !== n.id) throw new Error('Recover the pending notification retry first.');
-  retryPending ||= { alertId: n.id, generation: n.generation, attempt: n.attempt };
+  retryPending ||= { alertId: n.id, generation: n.generation, attempt: n.attempt, ...(n.carrier ? { name: n.carrier } : {}) };
   let r;
   try { r = await request('client.alerts.retry', retryPending); }
   catch (e) { if (e.refused) retryPending = undefined; throw e; }

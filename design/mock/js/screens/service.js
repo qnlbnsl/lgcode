@@ -1,5 +1,5 @@
 import * as liveGit from '../live/git.js';
-// The service pages: Machines, Subscriptions, Phone notifications and Service settings,
+// The service pages: Machines, Subscriptions, Notifications and Service settings,
 // plus one project's Settings tab and the Add repository dialog.
 import { html, useState, useEffect, Icon, cx, update, store, go, href, ago, clock, dayLabel, useNow, uid, plural, MIN, HOUR, DAY, live, refuse } from '../lib.js';
 import {
@@ -41,7 +41,7 @@ export function seedService(st) {
 
   Object.assign(st.settings, {
     notifyOn: { question: true, approval: true, merge: true, failed: true, sprint: false },
-    quiet: { on: false, from: '22:00', to: '07:00', failed: true },
+    quiet: { on: false, from: '22:00', to: '07:00', timeZone: 'UTC', failed: true },
     defaultHarness: 'claude', defaultModel: 'Sonnet 5.5', defaultEffort: 'Medium', defaultPermission: 'Edit files without asking',
     needToKnow: false, stallAssigned: 5, stallWorker: 10, stallLead: 20, autoNudge: true, replaceAfter: 3, capacityRetries: 12,
     workflowPath: '~/.lgtm', maxRounds: 6, testsDefault: true, reviewDefault: true,
@@ -357,17 +357,18 @@ function AddSubscription({ s }) {
 }
 registerDialog('add-subscription', AddSubscription);
 
-// ---- phone notifications ---------------------------------------------------------
+// ---- notifications ---------------------------------------------------------
 const EVENTS = [
-  ['question', 'An agent asks you a question', 'The alert carries the question and who asked.'],
-  ['approval', 'An approval waits for you', 'Sent when an approval has waited for two minutes.'],
+  ['question', 'An agent asks you a question', 'Sent when a question needs your answer.'],
+  ['approval', 'An approval waits for you', 'Sent when permission needs your approval.'],
   ['merge', 'A merge is ready', 'A project is done and reviewed, and the merge is yours.'],
   ['failed', 'An agent failed to start', 'A sign-in is missing or a machine is offline.'],
   ['sprint', 'A sprint is done', 'Off by default. It tells you about progress, not about a wait.'],
 ];
 const NOTE_KIND = { ...KIND_LABEL, sprint: 'Sprint done', test: 'Test' };
-const DELIVERY = { sent: ['Sent to phone', 'muted'], off: ['Not sent', 'faint'], failed: ['Failed', 'error-text'], quiet: ['Held · quiet hours', 'muted'], muted: ['Not sent · turned off', 'faint'] };
-function sendTest() { if (live.on) return liveGit.sendTest();
+const DELIVERY = { sent: ['Sent', 'muted'], off: ['Not sent', 'faint'], failed: ['Failed', 'error-text'], quiet: ['Held · quiet hours', 'muted'], muted: ['Not sent · turned off', 'faint'] };
+function sendTest(name = "ntfy") { if (live.on) return liveGit.sendTest(name);
+  if (name === "email") { act.toast("Sample email accepted. No email was sent."); return; }
   const s = store.state; const server = s.settings.ntfyServer;
   const ok = /\./.test(server) && !/localhost/.test(server);
   update((st) => { st.notifications.unshift({ id: uid('n'), ts: Date.now(), kind: 'test', title: 'Test notification from LGTM Studio', read: true, delivery: ok ? 'sent' : 'failed', error: ok ? null : `Could not reach ${server}` }); });
@@ -375,61 +376,104 @@ function sendTest() { if (live.on) return liveGit.sendTest();
 }
 function NtfyForm({ s }) {
   const set = s.settings; const on = !!set.ntfyServer;
-  const [f, setF] = useState({ server: set.ntfyServer, topic: set.ntfyTopic, token: set.ntfyToken }); const [show, setShow] = useState(false);
-  const dirty = f.server !== set.ntfyServer || f.topic !== set.ntfyTopic || f.token !== set.ntfyToken;
+  const [f, setF] = useState({ server: set.ntfyServer, topic: set.ntfyTopic, token: '' }); const [show, setShow] = useState(false);
+  const dirty = f.server !== set.ntfyServer || f.topic !== set.ntfyTopic || !!f.token;
   const bad = f.server.trim() && !/^https?:\/\/\S+$/.test(f.server.trim()) ? 'Start the address with https://' : null;
   const badTopic = f.topic && !/^[\w-]+$/.test(f.topic) ? 'A topic has letters, digits, hyphens and underscores only.' : null;
   const can = f.server.trim() && f.topic.trim() && !bad && !badTopic && dirty;
-  const save = async () => { if (!can) return; if (live.on) { const token = f.token; setF({ ...f, token: '' }); await liveGit.saveCarrier({ ...f, token }); return; } setS({ ntfyServer: f.server.trim(), ntfyTopic: f.topic.trim(), ntfyToken: f.token }); act.toast('Phone notifications are on'); };
-  const off = () => act.confirm({ title: 'Turn off phone notifications?', body: 'The server, topic and token are forgotten. Requests still show on Home and in the bell.', action: 'Turn off', onConfirm: () => { if (live.on) return liveGit.saveCarrier({ server: '', topic: '', token: '' }); setS({ ntfyServer: '', ntfyTopic: '', ntfyToken: '' }); setF({ server: '', topic: '', token: '' }); } });
+  const save = async () => { if (!can) return; if (live.on) { const token = f.token; setF({ ...f, token: '' }); await liveGit.saveCarrier({ ...f, token }); return; } setS({ ntfyServer: f.server.trim(), ntfyTopic: f.topic.trim(), ntfyToken: '', tokenSet: !!f.token || set.tokenSet, ntfyEnabled: true }); setF({ ...f, token: '' }); act.toast('Notifications are on'); };
+  const off = () => act.confirm({ title: 'Turn off notifications?', body: 'The server, topic and token are forgotten. Requests still show on Home and in the bell.', action: 'Turn off', onConfirm: () => { if (live.on) return liveGit.saveCarrier({ server: '', topic: '', token: '' }); setS({ ntfyServer: '', ntfyTopic: '', ntfyToken: '' }); setF({ server: '', topic: '', token: '' }); } });
   const fld = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  return html`<form class="svc-form" onSubmit=${(e) => { e.preventDefault(); save(); }}>
+  return html`<form class="svc-form" aria-label="ntfy delivery" onSubmit=${(e) => { e.preventDefault(); save(); }}>
+    ${on && html`<${Row} label="ntfy delivery"><${Switch} on=${set.ntfyEnabled !== false} label="ntfy enabled" onChange=${(enabled) => live.on ? liveGit.carrierEnabled('ntfy', enabled) : setS({ ntfyEnabled: enabled })} /><//>`}
     <div class="field"><label for="nt-server">ntfy server</label><input id="nt-server" class="input mono" value=${f.server} onInput=${fld('server')} placeholder="https://ntfy.example.com" spellcheck="false" autocapitalize="off" />${bad && html`<span class="error">${bad}</span>`}</div>
     <div class="field"><label for="nt-topic">Topic</label><input id="nt-topic" class="input mono" value=${f.topic} onInput=${fld('topic')} placeholder="lgtm-alerts" spellcheck="false" autocapitalize="off" />
       ${badTopic ? html`<span class="error">${badTopic}</span>` : html`<span class="hint">Subscribe to the same topic in the ntfy app on your phone. Anyone who knows the topic can read the alerts, so pick a long one.</span>`}</div>
     <div class="field"><label for="nt-token">Access token <span class="faint" style="font-weight:var(--weight-body)">· optional</span></label>
-      <span class="row"><input id="nt-token" class="input mono grow" type=${show ? 'text' : 'password'} value=${f.token} onInput=${fld('token')} placeholder=${live.on && set.tokenSet ? 'Token is set. Enter a replacement.' : 'tk_…'} autocomplete="off" spellcheck="false" />
+      <span class="row"><input id="nt-token" class="input mono grow" type=${show ? 'text' : 'password'} value=${f.token} onInput=${fld('token')} placeholder=${set.tokenSet ? 'Token is set. Enter a replacement.' : 'tk_…'} autocomplete="off" spellcheck="false" />
         <button type="button" class="btn icon" aria-label=${show ? 'Hide the token' : 'Show the token'} aria-pressed=${show} onClick=${() => setShow(!show)}><${Icon} name=${show ? 'eye-off' : 'eye'} size=${14} /></button></span></div>
     <div class="row" style="flex-wrap:wrap">
       <button type="submit" class="btn primary" disabled=${!can || (live.on && liveGit.busy('notifications'))}>${live.on && liveGit.busy('notifications') ? 'Saving…' : on ? 'Save changes' : 'Turn on'}</button>
-      <button type="button" class="btn" disabled=${!on || dirty || (live.on && (!set.tokenSet || liveGit.busy('notifications')))} data-tip=${!on ? 'Turn notifications on first' : dirty ? 'Save your changes first' : null} onClick=${sendTest}><${Icon} name="send" size=${13} />Send a test</button>
+      <button type="button" class="btn" disabled=${!on || dirty || ((!set.tokenSet || set.ntfyEnabled === false || (live.on && liveGit.busy('notifications'))))} data-tip=${!on ? 'Turn notifications on first' : dirty ? 'Save your changes first' : null} onClick=${() => sendTest('ntfy')}><${Icon} name="send" size=${13} />Send a test</button>
       <span class="grow"></span>
-      ${live.on && set.tokenSet && html`<button type="button" class="btn ghost" onClick=${liveGit.clearToken}>Clear token</button>`}
+      ${set.tokenSet && html`<button type="button" class="btn ghost" onClick=${() => live.on ? liveGit.clearToken() : setS({ tokenSet: false })}>Clear token</button>`}
       ${on && html`<button type="button" class="btn ghost" onClick=${off}>Turn off</button>`}
     </div>
   </form>`;
 }
+function EmailForm({ s }) {
+  const saved = s.settings.email || {};
+  const values = { host: saved.host || '', port: saved.port || 465, security: saved.security || 'tls', username: saved.username || '', from: saved.from || '', to: saved.to || '' };
+  const [f, setF] = useState({ ...values, secret: '' });
+  const dirty = Object.keys(values).some((k) => String(f[k]) !== String(values[k])) || !!f.secret;
+  const can = ['host', 'username', 'from', 'to'].every((k) => f[k].trim()) && Number(f.port) > 0 && Number(f.port) <= 65535 && (dirty || !saved.host);
+  const fld = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const save = async () => {
+    if (!can) return;
+    const form = { ...f }; setF({ ...f, secret: '' });
+    if (live.on) return liveGit.saveEmail(form);
+    setS({ email: { ...values, ...form, port: Number(form.port), secret: undefined, tokenSet: !!form.secret || saved.tokenSet, enabled: true } });
+    act.toast('Email settings saved.');
+  };
+  const enabled = (v) => live.on ? liveGit.carrierEnabled('email', v) : setS({ email: { ...saved, enabled: v } });
+  const clear = () => live.on ? liveGit.clearEmailSecret() : setS({ email: { ...saved, tokenSet: false } });
+  return html`<form class="svc-form" aria-label="Email delivery" onSubmit=${(e) => { e.preventDefault(); save(); }}>
+    <p class="hint">Use your own mail server and account. Your mail server sends these emails.</p>
+    ${saved.host && html`<${Row} label="Email delivery"><${Switch} on=${saved.enabled} label="Email enabled" onChange=${enabled} /><//>`}
+    <div class="field"><label for="em-host">SMTP host</label><input id="em-host" class="input mono" value=${f.host} onInput=${fld('host')} placeholder="smtp.example.com" autocomplete="off" spellcheck="false" /></div>
+    <div class="field"><label for="em-port">SMTP port</label><input id="em-port" class="input mono" type="number" min="1" max="65535" value=${f.port} onInput=${fld('port')} /></div>
+    <div class="field"><label for="em-security">Connection security</label><select id="em-security" class="input" value=${f.security} onChange=${fld('security')}><option value="tls">TLS from connection (usually 465)</option><option value="starttls">Require STARTTLS (usually 587)</option><option value="plain">Plain connection on 127.0.0.1 only</option></select></div>
+    <div class="field"><label for="em-username">Mail user name</label><input id="em-username" class="input" value=${f.username} onInput=${fld('username')} autocomplete="off" spellcheck="false" /></div>
+    <div class="field"><label for="em-secret">Password or app key</label><input id="em-secret" class="input mono" type="password" value=${f.secret} onInput=${fld('secret')} placeholder=${saved.tokenSet ? 'Password is set. Enter a replacement.' : 'Enter a password or app key'} autocomplete="new-password" spellcheck="false" /><span class="hint">A stored password is never shown. Leave this blank to keep it.</span></div>
+    <div class="field"><label for="em-from">Sender address</label><input id="em-from" class="input" type="email" value=${f.from} onInput=${fld('from')} autocomplete="off" /></div>
+    <div class="field"><label for="em-to">Recipient address</label><input id="em-to" class="input" type="email" value=${f.to} onInput=${fld('to')} autocomplete="off" /></div>
+    <div class="row" style="flex-wrap:wrap"><button type="submit" class="btn primary" disabled=${!can}>Save email</button>
+      <button type="button" class="btn" disabled=${!saved.enabled || !saved.tokenSet || dirty} onClick=${() => sendTest('email')}><${Icon} name="send" size=${13} />Send a test</button>
+      ${saved.tokenSet && html`<button type="button" class="btn ghost" onClick=${clear}>Clear password</button>`}</div>
+  </form>`;
+}
+function QuietForm({ s }) {
+  const saved = s.settings.quiet;
+  const [f, setF] = useState({ ...saved });
+  const dirty = ['on', 'from', 'to', 'timeZone', 'failed'].some((k) => f[k] !== saved[k]);
+  const patch = (p) => setF({ ...f, ...p });
+  const save = () => live.on ? liveGit.saveQuiet(f) : setS({ quiet: { ...f } });
+  return html`<form class="svc-form" aria-label="Quiet hours" onSubmit=${(e) => { e.preventDefault(); save(); }}>
+    <${Row} label="Hold alerts at night" hint="Open alerts are sent when quiet hours end."><${Switch} on=${f.on} label="Quiet hours" onChange=${(on) => patch({ on })} /><//>
+    <div class="field"><label for="q-from">From</label><input id="q-from" class="input" type="time" value=${f.from} onInput=${(e) => patch({ from: e.target.value })} /></div>
+    <div class="field"><label for="q-to">Quiet hours end</label><input id="q-to" class="input" type="time" value=${f.to} onInput=${(e) => patch({ to: e.target.value })} /></div>
+    <div class="field"><label for="q-zone">Time zone</label><input id="q-zone" class="input" value=${f.timeZone || ''} onInput=${(e) => patch({ timeZone: e.target.value })} placeholder="America/Chicago" spellcheck="false" /></div>
+    <${Row} label="Let failure alerts through" hint="A failure alert can reach you during quiet hours."><${Switch} on=${f.failed} label="Let failure alerts through" onChange=${(failed) => patch({ failed })} /><//>
+    <button type="submit" class="btn primary" disabled=${!dirty || !f.from || !f.to || !f.timeZone}>Save quiet hours</button>
+  </form>`;
+}
+
 export function Notifications({ s }) {
   useEffect(() => liveGit.openScreen('notifications'), []);
-  const now = useNow(); const set = s.settings; const on = !!set.ntfyServer;
+  const now = useNow(); const set = s.settings; const on = (!!set.ntfyServer && set.ntfyEnabled !== false) || !!set.email?.enabled;
   const list = s.notifications; const unread = list.filter((n) => !n.read).length; const failed = list.filter((n) => n.delivery === 'failed').length;
   const [showAll, setShowAll] = useState(false); const shown = showAll ? list : list.slice(0, 12);
   const open = (n) => { if (live.on) { const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); return; } update(() => { n.read = true; }); const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); };
   const retry = (n) => { if (live.on) return liveGit.retryAlert(n); act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
   const setOn = (k, v) => live.on ? liveGit.notifyKind(k, v) : setS({ notifyOn: { ...set.notifyOn, [k]: v } });
-  const setQuiet = (patch) => setS({ quiet: { ...set.quiet, ...patch } });
   let lastDay = null;
   return html`<div class="view-body"><div class="page">
-    <div class="page-head"><h1 class="page-title">Phone notifications</h1>
-      <span class="sub row" style="gap:6px"><i class=${cx('dot', on ? (failed ? 'failed' : 'working') : 'idle')}></i>${on ? html`Sending to <span class="mono">${set.ntfyTopic}</span>` : 'Not set up'}</span><${Saved} s=${s} /></div>
+    <div class="page-head"><h1 class="page-title">Notifications</h1>
+      <span class="sub row" style="gap:6px"><i class=${cx('dot', on ? (failed ? 'failed' : 'working') : 'idle')}></i>${on ? html`${set.ntfyServer && set.ntfyEnabled !== false ? html`Sending to <span class="mono">${set.ntfyTopic}</span>${set.email?.enabled ? ' and email' : ''}` : 'Sending by email'}` : 'Not set up'}</span><${Saved} s=${s} /></div>
     <fieldset class="svc-split" disabled=${live.on && liveGit.busy('notifications')} aria-busy=${live.on && liveGit.busy('notifications')} style="border:0;padding:0;margin:0;min-width:0">
       <div class="svc-side">
-        <${Section} title="Where alerts go" sub="ntfy">
+        <${Section} title="ntfy" sub="Send alerts to your ntfy topic">
           ${!on && s.phoneOffer === 'open' && html`<div class="callout info" style="align-items:center;margin-bottom:var(--space-3)"><${Icon} name="smartphone" size=${15} />
             <span class="grow">Alerts reach your phone when an agent waits for you. Until then, requests show here, on Home and in the bell.</span>
             <button type="button" class="icon-btn sm" aria-label="Dismiss" onClick=${act.declinePhoneOffer}><${Icon} name="x" size=${13} /></button></div>`}
           ${(!live.on || s.settings.notifyOn && Object.keys(s.settings.notifyOn).length > 0) && html`<${NtfyForm} key=${live.on ? set.ntfyServer + set.ntfyTopic : 'mock'} s=${s} />`}
         <//>
+        <${Section} title="Email" sub="Send through your own mail server">${(!live.on || Object.keys(set.notifyOn || {}).length > 0) && html`<${EmailForm} key=${JSON.stringify(set.email || {})} s=${s} />`}<//>
         <${Section} title="Notify me when">
           <div class=${cx('svc-rows', !on && 'svc-off')}>${(live.on ? Object.keys(set.notifyOn).map((k) => [k, EVENTS.find((x) => x[0] === k)?.[1] || k, '']) : EVENTS).map(([k, label, hint]) => html`<${Row} key=${k} label=${label} hint=${hint}><${Switch} on=${set.notifyOn[k]} label=${label} onChange=${(v) => setOn(k, v)} /><//>`)}</div>
         <//>
         <${Section} title="Quiet hours">
-          <div class=${cx('svc-rows', !on && 'svc-off')}>
-            <${Row} label="Hold alerts at night" hint="Held alerts arrive together when quiet hours end."><${Switch} on=${set.quiet.on} label="Quiet hours" onChange=${(v) => setQuiet({ on: v })} /><//>
-            ${set.quiet.on && html`<${Row} label="From" id="q-from"><span class="row"><input id="q-from" class="input" style="width:128px" type="time" value=${set.quiet.from} onInput=${(e) => setQuiet({ from: e.target.value })} />
-              <span class="muted">to</span><input class="input" style="width:128px" type="time" aria-label="Quiet hours end" value=${set.quiet.to} onInput=${(e) => setQuiet({ to: e.target.value })} /></span><//>
-            <${Row} label="Let failed starts through" hint="A failed start stops a team, so it can wake you."><${Switch} on=${set.quiet.failed} label="Let failed starts through" onChange=${(v) => setQuiet({ failed: v })} /><//>`}
-          </div>
+          ${(!live.on || Object.keys(set.notifyOn || {}).length > 0) && html`<${QuietForm} key=${JSON.stringify(set.quiet)} s=${s} />`}
         <//>
       </div>
       <div class="svc-main" data-main>
@@ -445,7 +489,7 @@ export function Notifications({ s }) {
               <span class=${cx('kind', n.kind === 'failed' ? 'failed' : r && r.status === 'open' ? n.kind : 'closed')}>${NOTE_KIND[n.kind] || n.kind}</span>
               ${clickable ? html`<a class="title truncate" href=${href(r ? routeForRequest(s, r) : n.to)} onClick=${(e) => { e.preventDefault(); open(n); }}>${n.title}</a>` : html`<span class="title truncate">${n.title}</span>`}
               <span class="from muted truncate">${a ? a.name : 'LGTM Studio'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : n.answer ? ' · ' + n.answer : ''}</span>
-              <span class=${cx('del', dc)} title=${n.error || (del === 'off' ? 'Phone notifications were not set up' : null)}>${del === 'failed' ? html`<${Icon} name="circle-alert" size=${13} />` : del === 'sent' ? html`<${Icon} name="check" size=${13} />` : null}${dw}
+              <span class=${cx('del', dc)} title=${n.deliveries?.length ? n.deliveries.map((d) => `${d.carrier}: ${d.status === 'delivered' ? 'Sent' : d.reason}`).join(' · ') : n.error || (del === 'off' ? 'Notifications were not set up' : null)}>${del === 'failed' ? html`<${Icon} name="circle-alert" size=${13} />` : del === 'sent' ? html`<${Icon} name="check" size=${13} />` : null}${dw}
                 ${del === 'failed' && html`<button type="button" class="link" onClick=${() => retry(n)}>Retry</button>`}</span>
               <time class="muted">${now - n.ts < DAY ? clock(n.ts) : ago(n.ts, now) + ' ago'}</time>
             </li>`; })}</ul>
@@ -617,7 +661,7 @@ export function ServiceSettings({ s, route }) {
   return html`<div class="view-body"><div class="svc-settings">
     <nav class="svc-nav" aria-label="Settings sections">${SECTIONS.map(([id, label, icon]) => html`<a key=${id} class="nav-item" href=${href('/settings?section=' + id)} aria-current=${cur[0] === id ? 'page' : null}><${Icon} name=${icon} size=${15} /><span>${label}</span></a>`)}
       <span class="svc-nav-sep"></span>
-      <a class="nav-item" href=${href('/notifications')}><${Icon} name="smartphone" size=${15} /><span>Phone notifications</span><${Icon} name="arrow-up-right" size=${12} class="faint" /></a></nav>
+      <a class="nav-item" href=${href('/notifications')}><${Icon} name="smartphone" size=${15} /><span>Notifications</span><${Icon} name="arrow-up-right" size=${12} class="faint" /></a></nav>
     <div class="svc-pane" data-main>
       <div class="page-head"><h1 class="page-title">${cur[1]}</h1><span class="sub">${cur[4]}</span><${Saved} s=${s} /></div>
       <fieldset disabled=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} aria-busy=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0">${live.on && liveGit.busy('settings') && html`<span role="status">Saving…</span>`}${(!live.on || s.ui.serviceReady || cur[0] === 'appearance') && html`<${Body} key=${cur[0] + (live.on ? String(s.settings.port ?? '') : '')} s=${s} />`}</fieldset>

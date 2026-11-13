@@ -33,7 +33,7 @@ const COLS = [
 function PhoneOffer({ s }) {
   if (s.phoneOffer !== 'open' || !live.on && s.settings.ntfyServer) return null;
   return html`<div class="phone-offer" role="note" aria-busy=${busy('phone-offer')}>
-    <${Icon} name="smartphone" size=${14} /><span>Phone notifications are off</span>
+    <${Icon} name="smartphone" size=${14} /><span>Notifications are off</span>
     <a class="btn sm" href=${href('/notifications')}>Set up</a>
     <button type="button" class="btn sm ghost" disabled=${busy('phone-offer')} onClick=${act.declinePhoneOffer}>Not now</button>
   </div>`;

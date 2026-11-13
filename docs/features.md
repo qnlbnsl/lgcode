@@ -950,10 +950,22 @@ The page shows the install script before it runs.
 ## Notifications with more than one kind of delivery
 
 The owner asked for this on 2026-11-13.
-"Phone notifications" is renamed "Notifications".
+The page and its navigation entry are named "Notifications".
 Delivery kinds are added, starting with email and ntfy, and others may follow.
 Email is sent through the user's own mail account, with the user's own credentials or key.
 LGTM Studio's maker never sends the email.
+
+The engine and website support independent email and ntfy delivery as of 2026-11-13.
+Email uses the owner's Simple Mail Transfer Protocol (SMTP) server through Nodemailer.
+Each configured carrier has an enable switch and a test action.
+Tests report whether that carrier accepted the message.
+Quiet hours use a start, an end, and a named time zone.
+The owner can let failure alerts through during quiet hours.
+Sprint completion events raise sprint alerts, which are off by default.
+Opening an owner merge review raises a merge alert.
+Passwords and access tokens stay in the owner's secret store.
+Clients receive only whether a secret is set.
+
 
 ## A Workflows tab with a visual editor
 

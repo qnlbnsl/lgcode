@@ -1,5 +1,5 @@
 import {
-  alertPushDefaults, defaultWebSettings, type AlertKind, type CarrierSettings,
+  defaultQuietHours, type QuietHours, type CarrierName, alertPushDefaults, defaultWebSettings, type AlertKind, type CarrierSettings,
   type AlertDelivery, type ClientEvent, type Event, type EventSequence, type WebSettings,
 } from "@lgtm/contracts";
 import type { PieceView } from "../../pieces/viewTables.ts";
@@ -10,7 +10,18 @@ export interface AlertRow extends Raised {
   readonly status: "open" | "cleared";
   readonly clearedSequence?: number;
 }
+export interface CarrierView {
+  readonly carrier: CarrierSettings;
+  readonly enabled: boolean;
+  readonly tokenSet: boolean;
+  readonly token?: { readonly origin: string; readonly carrierGeneration: string } | undefined;
+  readonly generation: number;
+  readonly delivery: ClientView["delivery"];
+}
 export interface ClientView {
+  readonly destinations: Readonly<Partial<Record<CarrierName, CarrierView>>>;
+  readonly ntfyEnabled: boolean;
+  readonly quiet: QuietHours;
   readonly position?: number;
   readonly alerts: Readonly<Record<string, AlertRow>>;
   readonly push: Readonly<Record<AlertKind, boolean>>;
@@ -25,6 +36,7 @@ export interface ClientView {
   readonly pushPromptDismissed: boolean;
 }
 export const emptyClientView = (): ClientView => ({
+  destinations: {}, ntfyEnabled: true, quiet: { ...defaultQuietHours },
   alerts: Object.create(null), push: { ...alertPushDefaults }, carrier: { _tag: "none" },
   pushPromptDismissed: false, tokenSet: false, generation: 0, retiredTokens: [], delivery: Object.create(null), webSettings: { ...defaultWebSettings }, webDown: false,
 });
@@ -32,6 +44,27 @@ export const clientView = (value: unknown): ClientView => value as ClientView;
 const reduce = (view: ClientView, event: Event, sequence: number): ClientView => {
   let next = view;
   switch (event._tag) {
+    case "client.AlertQuietChanged": return { ...view, quiet: event.quiet };
+    case "client.AlertCarrierEnabled": {
+      if (event.name === "ntfy") return { ...view, ntfyEnabled: event.enabled };
+      const state = view.destinations[event.name];
+      return state ? { ...view, destinations: { ...view.destinations, [event.name]: { ...state, enabled: event.enabled } } } : view;
+    }
+    case "client.AlertDestinationChanged": {
+      const previous = view.destinations[event.name];
+      return { ...view, destinations: { ...view.destinations, [event.name]: {
+        carrier: event.carrier, enabled: true, tokenSet: previous?.tokenSet ?? false, token: previous?.token,
+        generation: sequence, delivery: {},
+      } } };
+    }
+    case "client.AlertDestinationTokenSet":
+    case "client.AlertDestinationTokenCleared": {
+      const state = view.destinations[event.name]; if (!state) return view;
+      const token = event._tag === "client.AlertDestinationTokenSet" ? { origin: event.origin, carrierGeneration: event.carrierGeneration } : undefined;
+      return { ...view, retiredTokens: state.token ? [...view.retiredTokens, state.token.carrierGeneration] : view.retiredTokens,
+        destinations: { ...view.destinations, [event.name]: { ...state, token, tokenSet: token !== undefined, generation: sequence,
+          delivery: Object.fromEntries(Object.entries(state.delivery).filter(([, mark]) => mark.status === "delivered").map(([id, mark]) => [id, { ...mark, generation: sequence }])) } } };
+    }
     case "client.AlertPromptDismissed": return { ...view, pushPromptDismissed: true };
     case "client.AlertBaseline":
       return { ...view, position: Math.max(view.position ?? 0, event.position) };
@@ -46,7 +79,7 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
       break;
     }
     case "client.AlertSettingsChanged": return { ...view, push: { ...view.push, [event.kind]: event.push } };
-    case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier, generation: sequence, delivery: Object.create(null) };
+    case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier, ntfyEnabled: true, generation: sequence, delivery: Object.create(null) };
     case "client.AlertCarrierTokenSet":
     case "client.AlertCarrierTokenCleared": {
       const delivery = Object.fromEntries(Object.entries(view.delivery).filter(([, mark]) => mark.status === "delivered")
@@ -57,6 +90,13 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
     }
     case "client.AlertDelivered":
     case "client.AlertDeliveryFailed":
+      if (event.carrier !== "ntfy") {
+        const state = view.destinations[event.carrier]; if (!state || state.generation !== event.generation) return view;
+        const mark: ClientView["delivery"][string] = event._tag === "client.AlertDelivered" ? { status: "delivered" as const, sequence, generation: event.generation, attempt: event.attempt }
+          : { status: "failed" as const, sequence, failureSequence: sequence, generation: event.generation, attempt: event.attempt,
+            reason: event.reason === "token missing" || event.reason === "service missing" ? event.reason : "carrier delivery failed" as const, final: event.final === true };
+        return { ...view, destinations: { ...view.destinations, [event.carrier]: { ...state, delivery: { ...state.delivery, [event.alertId]: mark } } } };
+      }
       if (event.generation !== view.generation) return view;
       return { ...view, delivery: { ...view.delivery, [event.alertId]: {
         sequence, generation: event.generation, attempt: event.attempt,

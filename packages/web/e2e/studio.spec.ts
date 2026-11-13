@@ -903,3 +903,9 @@ test("live website: subscriptions, notifications and service settings persist th
 
 
 test('live website: Git changes, history, remotes, integration and owner approval', async ({ page }) => { test.setTimeout(360_000); await exerciseStudioGit(page) })
+
+// Keep this notification journey separate from the service settings journey.
+test('live website: email save, test delivery and secret protection', async ({ page }) => {
+  const { exerciseStudioNotifications } = await import('./support/studioNotifications.ts')
+  await exerciseStudioNotifications(page)
+})
