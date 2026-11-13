@@ -11486,6 +11486,7 @@ The answer buttons stay in their row and are disabled.
 The chosen button is highlighted, in green for an allow or an accept and in red for a deny.
 A typed answer shows as "You answered" with the owner's words, and a cancelled request shows "Cancelled".
 "Details" stays usable beside them.
+The recommendation line leaves an answered card, and the row names the accepted answer instead.
 The change is in `BriefCard` in `design/mock/js/ui.js`, and the live website carries the chosen option's kind as `answerKind`.
 This is a change to the visible mock, and it awaits the owner's approval of the look.
 

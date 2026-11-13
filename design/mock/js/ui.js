@@ -278,14 +278,14 @@ function BriefCard({ s, r, openThread, who }) {
   const done = r.status !== 'open';
   if (!live && !done) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Held: ' + brief}>
     <div class="qc-top"><b class="qc-q">${brief}</b></div></section>`;
-  const outcome = done ? requestOutcome(r, rec, recShort) : null;
+  const outcome = done ? requestOutcome(r, rec, null) : null;
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
   return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req qc', r.kind, open && 'open', done && 'done')} id=${'req-' + r.id} tabindex="-1" aria-label=${(done ? 'Answered: ' : isQ ? 'Question: ' : 'Approval: ') + brief}>
     <div class="qc-top"><b class="qc-q">${brief}</b>${done ? html`<span class="qc-age">${clock(r.answeredAt)}</span>` : html`<span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span>`}</div>
     ${summary && html`<p class="qc-sum">${summary}</p>`}
-    ${recShort && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
+    ${recShort && !done && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
     ${open && html`<div class="qc-report" id=${id}>
       <p class="qc-meta">${who && html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} /><span>Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span>Blocks ${r.blocks}</span>`}${!isQ && r.tool && html`<span>Tool ${r.tool}</span>`}</p>
       ${isQ && html`<section class="qc-part q"><h5>The question</h5><${Paras} list=${r.body || r.title} /></section>`}
