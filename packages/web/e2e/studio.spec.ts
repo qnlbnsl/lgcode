@@ -204,6 +204,7 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect.poll(() => runner.callsOf('answerPermission').filter((c) => c.input.requestId === 'studio-thread-permission').length).toBe(1)
         })
 
+        success(yield* call(ownerCredential, 'project.task.update', { projectId: project.projectId, taskId: contextTask, state: 'review' }))
         yield* appendSetup([eventOf({ _tag: 'roles.StallSeen', agentId: project.workerId, noticeRecipient: 'owner', triggerSequence: 1, sourceSequence: 1, occurrence: 1, notice: 'sent' })])
         yield* Effect.promise(async () => {
           const origin = `http://127.0.0.1:${port}`
@@ -214,6 +215,7 @@ test("live website: signs in through the engine, shows its real records, and kee
           await page.getByRole('button', { name: 'Table', exact: true }).click()
           const row = page.locator('.ag-table tbody tr').filter({ hasText: 'name-one-worker' })
           await expect(row).toContainText('TASK-1')
+          await expect(row.locator('.ws')).toHaveText('Reviewing')
           await expect(row).toContainText('other-model')
           await row.getByRole('button', { name: 'More for name-one-worker', exact: true }).click()
           await page.getByRole('menuitem', { name: /^Nudge/ }).click()
