@@ -665,7 +665,7 @@ export function ProjectSettings({ s, project: p }) {
     <//>
     <${Section} title="Repository and machine">
       <div class="svc-rows">
-        <${Row} label="Repository"><span class="row"><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a><span class="muted mono truncate">${r.remote || 'No remote'}</span></span><//>
+        <${Row} label="Repository"><span class="row"><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a><span class="muted mono truncate">${live.on ? r.remote : r.remote || 'No remote'}</span></span><//>
         <${Row} label="Base branch" id="ps-base" hint="Finished work merges into this branch, with your approval.">
           <select id="ps-base" class="select mono" style="width:300px" value=${p.base || r.main} onChange=${(e) => set({ base: e.target.value })}>${branches.map((b) => html`<option value=${b}>${b}${b === r.main ? ' (repository default)' : ''}</option>`)}</select><//>
         <${Row} label="Project branch"><span class="mono">${p.branch}</span><//>

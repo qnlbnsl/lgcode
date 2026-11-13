@@ -11109,3 +11109,21 @@ A live rename or archive therefore had no pending control and lost its draft on 
 These dialogs now support waiting for a reply when the caller requests it.
 The connected project actions use this option.
 The standalone mock retains its immediate callbacks.
+
+## s2-board-7. Repository placeholders asserted that unknown data was absent.
+
+The repository page rendered a missing remote address as "None".
+Project settings rendered the same missing address as "No remote".
+The engine does not hold a remote address, so these statements were not supported by its records.
+The live fields now remain empty.
+The live repository description also omits the mock's promise that a lead will write it.
+
+## s2-board-8. The full browser check failed in three unchanged website cases.
+
+The full check at `04eb7aa` passed all TypeScript checks and all 528 test files.
+Its browser run passed the three Studio cases and failed three existing website cases.
+The Git staging case could not find the expected disabled "Commit 2 files" button after staging.
+The Git synchronization case retained "1 incoming" after Pull.
+The registered component preview case did not observe the expected document response.
+The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
+The result file records the baseline checks for these failures.

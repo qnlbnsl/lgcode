@@ -338,14 +338,14 @@ export function RepoPage({ s, repoId }) {
     <div class="view-body">
       <div class="repo-facts">
         <dl class="dl">
-          <dt>Remote</dt><dd class="mono">${r.remote || html`<span class="muted" style="font-family:var(--font-body)">None</span>`}</dd>
+          <dt>Remote</dt><dd class="mono">${live.on ? r.remote : r.remote || html`<span class="muted" style="font-family:var(--font-body)">None</span>`}</dd>
           <dt>Base branch</dt><dd class="mono">${r.main}</dd>
           <dt>Folders</dt><dd class="row" style="flex-wrap:wrap;gap:4px 14px">${Object.entries(r.folders).map(([m, f]) => html`<span key=${m}>${machineOf(s, m).name} <span class="mono muted">${f}</span></span>`)}</dd>
         </dl>
         <section class="repo-desc" aria-label="Product description">
           <h2>Product</h2>
           ${r.description ? html`<p>${r.description}</p>${r.describedAt && html`<small class="faint">Updated ${ago(r.describedAt)} ago by the project lead of ${(s.projects.find((p) => p.lead === r.describedBy) || {}).name}</small>`}`
-            : html`<p class="muted">Written by the first project lead.</p>`}
+            : live.on ? null : html`<p class="muted">Written by the first project lead.</p>`}
         </section>
       </div>
       <div data-main><${ProjectTable} s=${s} projects=${ps} showRepo=${false} /></div>

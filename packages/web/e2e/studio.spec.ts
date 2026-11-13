@@ -138,6 +138,8 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect(page.locator(".main")).toContainText("Owner added task")
           await page.goto(`${origin}/studio/#/r/${project.repoId}`)
           await expect(page.locator(".repo-facts")).toContainText(rig.work)
+          await expect(page.locator(".repo-facts dt").filter({ hasText: "Remote" }).locator("+ dd")).toBeEmpty()
+          await expect(page.locator(".repo-desc p")).toHaveCount(0)
           await expect(page.locator(".main .table")).toContainText("Project")
           await page.goto(`${origin}/studio/#/p/${project.projectId}/messages/waiting`)
           await expect(page.locator(".ch-row").filter({ hasText: "project-updates" }).locator(".count.info")).toHaveText("1")
