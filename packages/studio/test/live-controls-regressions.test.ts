@@ -223,3 +223,20 @@ it("the actual logout clears an answered request retained by the Home reader", a
     expect(element.querySelector("#login-password")).not.toBeNull()
   } finally { chat.setMapping(undefined) }
 })
+
+it("answers an approval with Allow and Deny, and keeps a long standing answer in the Allow menu", async () => {
+  const long = "Yes, and don't ask again for commands that start with `rm -- /tmp/a-very-long-path-that-does-not-exist`"
+  const base = mapSnapshot(engineSnapshot, 1)
+  const records = { ...base, requests: base.requests.map((r) => r.id !== "perm-1" ? r : { ...r, task: "tk-1", options: [
+    { id: "once", label: "Yes, proceed", kind: "allow_once", primary: true },
+    { id: "always", label: long, kind: "allow_always" },
+    { id: "no", label: "No, and tell the agent what to do differently", kind: "reject_once" }] }) }
+  const { calls } = await mount("/p/pj-orchard/task/tk-1", undefined, records)
+  const card = element.querySelector<HTMLElement>("#req-perm-1 .qc-actions")
+  expect(card, "the open approval card").not.toBeNull()
+  // The harness's long wording is not a button on the card.
+  expect([...card!.querySelectorAll("button")].map((b) => b.textContent?.trim())).toEqual(["Allow", "", "Deny", "Details", "Open thread"])
+  button("Allow", card!).click()
+  await settle()
+  expect(calls).toContain("answer")
+})

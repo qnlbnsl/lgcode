@@ -11338,7 +11338,40 @@ It shows "Reconnecting" and gives the owner no reason.
 The connection in `packages/studio/src/connection.ts` drops the error.
 The owner should see that the service answered and what it said.
 
-## 656. A fast connection reply could leave a reloaded page blank.
+## 656. The live approval card overflowed, and a delivered answer showed the engine's wrapper
+
+Found: 2026-11-13, by the owner, on the first real project.
+State: fixed in the same change.
+
+The live approval card showed each of the harness's options as its own button.
+A long standing option, such as "Yes, and don't ask again for commands that start with ...", ran past the card's edge.
+The card now has "Allow" and "Deny", as the mock designed it.
+A standing option from the harness sits in the menu beside its button, with the harness's wording as the note.
+An option of a kind the page does not know stays a button, and its text now wraps.
+A delivered answer appeared in the thread as "Data from another agent [...] (delivery ...): Answer to question ...".
+That text is the wrapper the engine puts around data for an agent's safety.
+The thread now shows one short line, "Answer delivered: ...", and shows other passed data without the wrapper.
+The context figure in the composer showed fifteen decimal places, and is now a whole percentage.
+
+## 657. The engine labels the owner's answer as "Data from another agent"
+
+Found: 2026-11-13, in the same check as issue 656.
+State: open.
+
+The wrapper around an answer the owner gave begins "Data from another agent" (`packages/engine/src/routing/envelope.ts:18`).
+The agent that asked is told the answer came from an agent, when it came from the owner.
+
+## 658. An open live page stays on "Offline" after the service restarts
+
+Found: 2026-11-13, by hand on the first real project.
+State: open.
+
+A restart of the service ends the browser's session.
+An open page of the live website then shows "Offline" and stays there.
+Only a reload brings up the Login page.
+The page should notice that the service answers again and ask the owner to sign in.
+
+## 659. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11348,7 +11381,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## 657. Registered workspaces need their project and team links joined.
+## 660. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11357,7 +11390,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## 658. The settings contract does not return effective role defaults.
+## 661. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11369,7 +11402,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## 659. Notification retries need the original receipt after a lost reply.
+## 662. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11380,7 +11413,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## 660. Git destinations must keep their workspace identifiers.
+## 663. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11390,7 +11423,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## 661. The existing website's browser assertions failed in the full check.
+## 664. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11421,7 +11454,18 @@ The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
 The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
 Their causes remain unproved.
 
-## 662. The automatic merge retained duplicate shared declarations.
+The review merge's full check passed 532 unit files and 7,960 unit tests.
+All five Studio browser cases passed.
+The existing website's cases failed at `git.spec.ts:208`, `git.spec.ts:271`, and `new-project.spec.ts:626`.
+The final merge with area commit `aed0fce` passed 533 unit files and 7,980 unit tests.
+All six Studio browser cases passed.
+The browser suite finished with 48 passed cases and two failed cases.
+The lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The component preview case observed issuance status 0 instead of 200 at `new-project.spec.ts:605`, as described in issue 611.
+The separate credits check passed.
+No existing website assertion or deadline was changed.
+
+## 665. The automatic merge retained duplicate shared declarations.
 
 Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
 State: fixed in the merge.
@@ -11433,7 +11477,7 @@ The automatic merge also duplicated the JavaScript request export and the dialog
 The merge now keeps one request method, one request export, and one live import.
 The test connection keeps the board builder's request recording.
 
-## 663. The review control fixtures did not load connected service settings.
+## 666. The review control fixtures did not load connected service settings.
 
 Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
 State: fixed in the merge.
@@ -11452,7 +11496,7 @@ A later remote run observed an empty value after the initial stall-time edit.
 The remote settings save also waits for the form to report no unsaved changes before reloading.
 A subsequent run read the previous check-in value after reloading.
 
-## 664. The Home reader retained an answered request after logout.
+## 667. The Home reader retained an answered request after logout.
 
 Found: 2026-11-13, while merging the chat work with the connection review fixes.
 State: fixed in the merge.
@@ -11463,7 +11507,7 @@ The reader now retains an answered request only while its agent is still present
 A regression test loads an answered request through the Home reader and clicks the actual logout control.
 It checks that the connection signs out and the request store becomes empty.
 
-## 665. The Nudge regression test still expected an unconnected control after the merge.
+## 668. The Nudge regression test still expected an unconnected control after the merge.
 
 Found: 2026-11-13, while merging the area branch into the chat worker branch.
 State: fixed in this merge.
@@ -11474,7 +11518,7 @@ The merged test now checks that the request reaches the connection.
 It also checks that an engine refusal appears and leaves the local posts empty.
 The other unconnected controls keep their original refusal checks.
 
-## 666. The merged Messages module imported the live binding twice.
+## 669. The merged Messages module imported the live binding twice.
 
 Found: 2026-11-13, during the remote browser check of this merge.
 State: fixed in this merge.
@@ -11485,7 +11529,7 @@ The browser rejected the module and left both the live page and the standalone m
 The test transformer accepted the declarations, so the Studio tests did not expose the error.
 Removing the redundant import lets the browser parse the module.
 
-## 667. The board mapping replaced worker names with role labels.
+## 670. The board mapping replaced worker names with role labels.
 
 Found: 2026-11-13, during the merged chat browser journey.
 State: fixed in this merge.
