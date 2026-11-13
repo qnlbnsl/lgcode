@@ -1,5 +1,7 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "mock editor design changed; refresh and retry", "mock editor export must be base64 data of at most 512 KiB",
+  "mock editor export contains private data", "mock editor file changed or its path is unsafe", "mock editor revision exceeds the data budget",
   "mock screen feedback exceeds the read budget",
   "mock screen is unavailable", "mock comment must contain between 1 and 4096 characters", "mock screen comment limit reached; record a new revision",
   "project state changed; refresh and retry",

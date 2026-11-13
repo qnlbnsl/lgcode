@@ -525,8 +525,11 @@ The full design is in
   what users get, and any gap between the mock and the design gets fixed.
   Since 2026-11-08 the web mock shows OpenPencil's web editor in a frame, built
   from source in `design/openpencil/`. It opens a
-  repository's design file but cannot save into the repository yet. Saving back
-  needs an endpoint that writes the file, or OpenPencil's automation bridge.
+  repository's design file. The live Mocks tab now accepts the editor's exported file
+  through Save changes from editor. The owner selects the export, and the engine
+  replaces only the registered design file. Exports are limited to 512 kibibytes.
+  Saving records a new design revision and mock revision. It returns the project
+  to Design and clears approval and seen marks for the new version.
 - **Teams named for their stage** (requested by the owner, 2026-11-07; not
   designed). A project moves through a Design team, a Planning team, a Build
   team and a Review team, in place of hand-picked names. The project page shows

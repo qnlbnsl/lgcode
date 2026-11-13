@@ -7,6 +7,7 @@ import { type GitService, type GitOperation } from "./git/index.ts"
 import { callerKey } from "../identity/caller.ts"
 import { own, projectKey, projectView } from "./view.ts"
 import { reviewPlanners, reviewReads } from "./gitReview.ts"
+import { saveMockEditor } from "./mockEditor.ts"
 
 type Raw = Record<string, unknown>
 const workspaceRead = (run: (git: GitService, path: string, raw: Raw, agentRead: boolean) => GitOperation<unknown>): ReadHandler =>
@@ -57,6 +58,7 @@ export const gitReads = {
   "project.discard.plan": workspaceRead((git, path, raw) => git.planDiscard(path, raw.paths as string[] | undefined)),
 } satisfies Record<string, ReadHandler>
 export const gitPlanners = {
+  "project.mocks.editor.save": saveMockEditor,
   ...reviewPlanners,
   "project.stage": mutate((git, path, raw) => git.stage(path, raw.path as string)),
   "project.unstage": mutate((git, path, raw) => git.unstage(path, raw.path as string)),

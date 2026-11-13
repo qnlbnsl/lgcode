@@ -16,6 +16,7 @@ export function mockControlsSource(path: string, source: string): string {
   }
   if (path === "js/screens/mocks.js") {
     source = "import * as controls from '../live/mock-controls.js';\n" + source
+    replace("${live.on ? html`<${mocks.Display} key=${m.designRevision} title=\"Mock design editor\"", "${live.on ? html`<${controls.SaveEditor} project=${p} mocks=${m} /><${mocks.Display} key=${m.designRevision} title=\"Mock design editor\"")
     const approveStart = source.indexOf("          ${sc.status !== 'approved' && html`")
     const approveEnd = source.indexOf("</button>`}", approveStart) + "</button>`}".length
     if (approveStart < 0 || approveEnd < "</button>`}".length) throw new Error(`Mock approval integration no longer matches ${path}`)

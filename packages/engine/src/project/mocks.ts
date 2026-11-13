@@ -30,7 +30,7 @@ const validReviews = (bundle: typeof MockBundle.Type) => {
       && (row.status === "new" ? row.known === undefined : row.known !== undefined
         && (row.status === "matches" ? row.known === row.field.type : row.known !== row.field.type))))
 }
-const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): MockApproval["worklist"] => ({
+export const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): MockApproval["worklist"] => ({
   screens: revision.bundle.screens.map((row) => row.screenId),
   drafts: revision.bundle.components.filter((row) => row.provenance === "draft").map((row) => row.componentId),
   draftedFields: revision.bundle.draftedFields,
@@ -39,7 +39,7 @@ const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): Mo
 })
 // Leave room for the request and cursor in the 256 KiB read envelope. Admit
 // both the revision and its eventual approval, including duplicated fields.
-const readable = (revision: MockRevision, approval: MockApproval) => Buffer.byteLength(JSON.stringify(agentReadReply("budget", { items: [revision], approval }))) <= 192 * 1024
+export const readable = (revision: MockRevision, approval: MockApproval) => Buffer.byteLength(JSON.stringify(agentReadReply("budget", { items: [revision], approval }))) <= 192 * 1024
 // Use the production structural positions, so prose is redacted before the
 // aggregate budget is admitted, while typed identities remain intact.
 const cleanBundle = (input: Input, bundle: typeof MockBundle.Type) => Effect.gen(function* () {

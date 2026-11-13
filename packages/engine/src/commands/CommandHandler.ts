@@ -42,6 +42,7 @@ import { planGitOperation, refreshGitState } from "./gitOperation.ts";
 import { prepareRegistration, registrationPlanners } from "../project/commands.ts";
 import { prepareDesignRecord } from "../project/design.ts";
 import { prepareMock } from "../project/mocks.ts";
+import { finalizeMockEditorSave } from "../project/mockEditor.ts";
 import { prepareContextFiles } from "../project/context.ts";
 import { promptPlanner } from "./planners.ts";
 import { postPlanner } from "../board/commands.ts";
@@ -330,8 +331,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               const files = yield* prepareContextFiles(input, admitted.payload.context as import("@lgtm/contracts").ContextReference[] | undefined);
               return { finalize: name === "prompt" ? promptPlanner(files) : postPlanner(files) };
             }
-            return yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,
+            const operation = yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,
               admitted.bodyHash, gitPlanners[name as keyof typeof gitPlanners]);
+            return name === "project.mocks.editor.save" && operation.plan !== undefined
+              ? { finalize: finalizeMockEditorSave(input, admitted.payload, operation.plan) } : operation;
           }).pipe(
             Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
             Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),

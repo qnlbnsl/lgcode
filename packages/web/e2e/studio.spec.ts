@@ -1,5 +1,7 @@
 import { exerciseStudioGit } from './support/studioGit.ts'
+import { exerciseStudioMocks } from './support/studioMocks.ts'
 import { exerciseStudioService } from './support/studioService.ts'
+test("studio mocks: owner feedback, approval, seen versions and editor saves", async ({ page }) => exerciseStudioMocks(page))
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"

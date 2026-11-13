@@ -116,6 +116,7 @@ const summaries: Record<CommandName, string> = {
   "project.mocks.comment": "Post a plain text owner comment on the current recorded mock screen.",
   "project.mocks.screen.approve": "Approve or withdraw owner approval of one recorded screen without advancing the project stage.",
   "project.mocks.seen": "Record that the owner has seen exactly one recorded screen version.",
+  "project.mocks.editor.save": "Save an editor export into the exact recorded design file and record a new mock revision as the owner.",
   "project.mocks.screen.read": "Read versioned comments, approval and seen marks on a screen in your project.",
   "project.mocks.record": "Record a project-scoped mock revision with actual artifact references.",
   "project.mocks.read": "Read bounded immutable mock revisions and current owner approval.",
