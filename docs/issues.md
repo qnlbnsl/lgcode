@@ -11182,3 +11182,14 @@ after the socket or the connection closes.
 Opening a frame still requires the live connection.
 A focused test verifies both cleanup cases and the authenticated request options.
 This problem is fixed on the worker branch.
+
+## s2-mocks-6. A legacy Git browser case retained its initial uncertainty message.
+
+The full check on `c8f7009` passed all 529 unit test files.
+Its browser run failed the existing lost-reply case at `git.spec.ts:271`.
+The page retained its initial database acknowledgment warning instead of the
+expected terminal uncertainty message.
+Six focused repetitions of this case passed on baseline `803db7f`.
+The affected website source, engine source, and test body are unchanged.
+The cause has not been established.
+The worker result records the full check and baseline comparison outcomes.
