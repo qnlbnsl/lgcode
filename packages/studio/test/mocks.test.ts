@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { MockRevision, MockApproval, RepositoryDesignResult, Discovery } from "@lgtm/contracts"
 import { mapMocks, mapDesign, mapMachineDetails, validDisplayFrame } from "../src/mocks.ts"
 const revision = { projectId: "project", revisionId: "revision-2", at: 123, author: { _tag: "agent", agentId: "designer" }, artifacts: [{ sourceId: "screens", fingerprint: "abc" }],
@@ -81,5 +81,20 @@ describe("search over loaded navigation records", () => {
     expect(searchScore("the of", title)).toBe(0)
     expect(searchScore("unrelated", title)).toBe(0)
     expect(searchScore("lead", { label: "Project lead", text: "", kind: "Agent", boost: 0.5 })).toBeGreaterThan(searchScore("lead", { label: "Project lead", text: "", kind: "Agent" }))
+  })
+})
+
+
+describe("display cleanup after disconnection", () => {
+  it("still closes an issued frame over authenticated HTTP after the socket and connection close", async () => {
+    const { engineConnection } = await import("../src/connection.ts")
+    const http = vi.fn(async () => new Response(null, { status: 204 }))
+    const connection = engineConnection({ location: { protocol: "http:", host: "127.0.0.1:8794" }, fetch: http })
+    await expect(connection.request("display.open", {})).rejects.toThrow("not connected")
+    await expect(connection.request("display.close", { id: "issued-frame" })).resolves.toBeUndefined()
+    connection.close()
+    await expect(connection.request("display.close", { id: "late-frame" })).resolves.toBeUndefined()
+    expect(http).toHaveBeenCalledTimes(2)
+    expect(http).toHaveBeenLastCalledWith("/api/display/close", expect.objectContaining({ method: "POST", credentials: "same-origin", keepalive: true, body: JSON.stringify({ id: "late-frame" }) }))
   })
 })

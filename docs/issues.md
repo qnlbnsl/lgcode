@@ -11171,3 +11171,14 @@ Unit tests cover the search mapping and ranking.
 The browser test covers navigation, empty results, and archived project exclusion.
 No search request is made to the engine.
 This problem is fixed on the worker branch.
+
+## s2-mocks-5. Display cleanup depended on a live socket.
+
+The new display adapter initially applied the socket guard to closing a frame.
+A lost socket could therefore prevent navigation cleanup from reaching the
+Hypertext Transfer Protocol (HTTP) endpoint.
+Closing an issued frame now remains available with the owner's session cookie
+after the socket or the connection closes.
+Opening a frame still requires the live connection.
+A focused test verifies both cleanup cases and the authenticated request options.
+This problem is fixed on the worker branch.

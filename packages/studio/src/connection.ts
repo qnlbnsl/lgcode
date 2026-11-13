@@ -257,8 +257,9 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     board, mocks,
     async request(tag, payload) {
       const client = activeClient
-      if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
       if (tag === "display.open" || tag === "display.close") {
+        // Cleanup still uses the owner cookie when the WebSocket has gone away.
+        if (tag === "display.open" && (closed || client === undefined || controller?.signal.aborted)) throw new Error("The service is not connected.")
         const response = await http(tag === "display.open" ? "/api/display/open" : "/api/display/close", {
           method: "POST", credentials: "same-origin", cache: "no-store", keepalive: tag === "display.close",
           headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000)
@@ -272,6 +273,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         if (!mocks.validDisplayFrame(frame, new URL(`${where.protocol}//${where.host}`).hostname, now())) throw new Error("The display reply is invalid.")
         return frame
       }
+      if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
       const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, unknown>>)[tag]
       if (method === undefined) throw new Error("This request is not available.")
       const result = await Effect.runPromise(Effect.result(method({ ...payload, requestId: requestId() })), { signal: controller!.signal })
