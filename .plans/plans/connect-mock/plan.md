@@ -98,6 +98,10 @@ conversion starts.
 
 ## What each screen needs
 
+The table below is a first reading, made from request names alone. The checked table is
+[gap-table.md](gap-table.md), written on 2026-11-13 from the source. Where the two differ,
+the checked table is right. The mock reports 14 kinds of call, not 9.
+
 "Has it" means a request with that purpose exists in `packages/contracts`. It does not
 mean the request returns everything the screen shows.
 
