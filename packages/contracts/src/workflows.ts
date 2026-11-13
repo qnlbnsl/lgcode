@@ -12,7 +12,7 @@ export const WorkflowSettings = Schema.Struct({
   stuckRounds: Positive, autoMergeFix: Schema.Boolean,
 })
 export const WorkflowBlock = Schema.Struct({
-  id: WorkflowId, name: Text, role: Schema.Literals(workflowRoles),
+  id: WorkflowId, name: Text, end: Schema.optionalKey(Schema.Boolean), role: Schema.Literals(workflowRoles),
   // Nested spec blocks retain their internal states and decisions as labelled steps.
   steps: Schema.Array(Schema.Struct({ from: Text, to: Text, when: Text, role: Schema.Literals(workflowRoles) })).check(Schema.isMaxLength(100)),
 })
@@ -32,6 +32,7 @@ const graphError = (value: WorkflowDefinition): string | undefined => {
       if (!block.name.trim()) return 'Give every block a name.'
       if (ids.has(block.id)) return 'Give every phase and block a unique identifier.'
       ids.add(block.id)
+      if (block.steps.some((step) => !step.from.trim() || !step.to.trim() || !step.when.trim())) return 'Give every inner move a source, target and condition.'
     }
   }
   const blocks = new Set(value.phases.flatMap((p) => p.blocks.map((b) => b.id)))
@@ -39,12 +40,14 @@ const graphError = (value: WorkflowDefinition): string | undefined => {
   for (const move of value.moves) {
     if (!blocks.has(move.from) || !blocks.has(move.to)) return 'Every move must connect two existing blocks.'
     if (!move.when.trim()) return 'Give every move a condition.'
-    const key = JSON.stringify(move)
+    if (move.from === move.to) return 'A move must connect two different blocks.'
+    const key = JSON.stringify([move.from, move.to, move.when])
     if (moves.has(key)) return 'Remove the duplicate move.'
     moves.add(key)
   }
   if (!value.name.trim()) return 'Give the workflow a name.'
   if (value.settings.approvalAfterRound < value.settings.fullReviewRounds) return 'Ask for approval after the full review rounds.'
+  if (value.settings.maxReviewRounds !== null && value.settings.maxReviewRounds < value.settings.approvalAfterRound) return 'Keep the review limit at or above the approval round.'
   return undefined
 }
 export const WorkflowDefinition = WorkflowShape.check(Schema.makeFilter((value) => graphError(value)))
@@ -76,6 +79,9 @@ export const validateWorkflow = (value: unknown): string | undefined => {
   return graphError(value as WorkflowDefinition)
 }
 export const WorkflowScope = Schema.Literals(['default', 'user', 'repository'])
-export const WorkflowSummary = Schema.Struct({ scope: WorkflowScope, id: Schema.String, name: Schema.String, readOnly: Schema.Boolean, error: Schema.optionalKey(Schema.String) })
+export const WorkflowSummary = Schema.Struct({ scope: WorkflowScope, id: Schema.String, name: Schema.String, readOnly: Schema.Boolean, error: Schema.optionalKey(Schema.String), canDelete: Schema.optionalKey(Schema.Boolean) })
 export type WorkflowSummary = typeof WorkflowSummary.Type
 export const WorkflowRecord = Schema.Struct({ ...WorkflowSummary.fields, definition: WorkflowDefinition })
+
+export const WorkflowFolder = Schema.Struct({ scope: Schema.Literals(['user', 'repository']), limit: Schema.Int, truncated: Schema.Boolean, error: Schema.optionalKey(Schema.String) })
+export type WorkflowFolder = typeof WorkflowFolder.Type

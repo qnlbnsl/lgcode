@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 import { validateWorkflow } from '../src/workflows.ts'
-const file = new URL('../../../design/mock/workflows/build-loop.json', import.meta.url)
+const file = new URL('../../engine/src/workflows/build-loop.json', import.meta.url)
 test('the shipped build loop validates and covers all eight phases and every named block', () => {
   let data: any
   try { data = JSON.parse(readFileSync(file, 'utf8')) } catch { data = null }
@@ -27,4 +27,39 @@ test('the definition preserves every state and inner move from the specification
     const to = rest!.split(': ')[0]!
     for (const state of [from!, to]) if (!/^[1-8] /.test(state)) expect(names.has(state), `The spec state ${state} is missing.`).toBe(true)
   }
+})
+
+
+test('rejects ambiguous moves, blank inner steps and inconsistent review limits', () => {
+  const fresh = () => JSON.parse(readFileSync(file, 'utf8'))
+  const d = fresh(), m = d.moves[0]
+  d.moves.push({ when: m.when, to: m.to, from: m.from })
+  expect(validateWorkflow(d)).toBeTypeOf('string')
+  const self = fresh(); self.moves.push({ from: m.from, to: m.from, when: 'again' })
+  expect(validateWorkflow(self)).toBeTypeOf('string')
+  const capped = fresh(); capped.settings.maxReviewRounds = capped.settings.approvalAfterRound - 1
+  expect(validateWorkflow(capped)).toBeTypeOf('string')
+  for (const field of ['from', 'to', 'when']) {
+    const blank = fresh(); const b = blank.phases.flatMap((p: any) => p.blocks).find((b: any) => b.steps.length)
+    b.steps[0][field] = '   '
+    expect(validateWorkflow(blank), field).toBeTypeOf('string')
+  }
+})
+
+test('every default block is reachable and only declared ends can stop', () => {
+  const d = JSON.parse(readFileSync(file, 'utf8'))
+  const blocks = d.phases.flatMap((p: any) => p.blocks)
+  const seen = new Set([blocks[0].id])
+  for (let n = 0; n < blocks.length; n++) for (const m of d.moves) if (seen.has(m.from)) seen.add(m.to)
+  expect(blocks.filter((b: any) => !seen.has(b.id)).map((b: any) => b.name)).toEqual([])
+  expect(blocks.filter((b: any) => !b.end && !d.moves.some((m: any) => m.from === b.id)).map((b: any) => b.name)).toEqual([])
+  expect(blocks.some((b: any) => b.end)).toBe(true)
+  expect(d.phases[1].blocks.filter((b: any) => b.name === 'Tests on?')).toHaveLength(2)
+  const lookup = (name: string) => blocks.find((b: any) => b.name === name)
+  for (const name of ['Product tried', 'Approve release?']) expect(lookup(name).role, name).toBe('owner')
+  for (const name of ['Plans compared', 'Plans work together?', 'All teams merged']) expect(lookup(name).role, name).toBe('orchestrator')
+  expect(lookup('Failure report written').role).toBe('evaluator')
+  expect(d.moves.filter((m: any) => m.from === lookup('Approve release?').id && m.when.startsWith('no'))).toHaveLength(2)
+  expect(d.moves.some((m: any) => m.from === lookup('Fix team').id && m.to === lookup('Fixes merged').id)).toBe(true)
+  expect(d.moves.some((m: any) => m.from === lookup('Failure report written').id && m.to === lookup('Fix team').id)).toBe(true)
 })

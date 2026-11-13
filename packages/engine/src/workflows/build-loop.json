@@ -44,7 +44,7 @@
         {
           "id": "phase-1-state-5",
           "name": "Mockups made if screens change",
-          "role": "project-lead",
+          "role": "designer",
           "steps": []
         },
         {
@@ -62,7 +62,7 @@
         {
           "id": "phase-1-state-8",
           "name": "Build this?",
-          "role": "project-lead",
+          "role": "owner",
           "steps": []
         },
         {
@@ -92,7 +92,7 @@
         {
           "id": "phase-1-state-13",
           "name": "Test commands ready",
-          "role": "engine",
+          "role": "build-init",
           "steps": []
         },
         {
@@ -104,7 +104,7 @@
         {
           "id": "phase-1-state-15",
           "name": "Agent review?",
-          "role": "project-lead",
+          "role": "owner",
           "steps": []
         },
         {
@@ -128,7 +128,7 @@
         {
           "id": "phase-2-state-2",
           "name": "Tests on?",
-          "role": "orchestrator",
+          "role": "engine",
           "steps": []
         },
         {
@@ -146,7 +146,7 @@
         {
           "id": "phase-2-state-5",
           "name": "Full run passes?",
-          "role": "orchestrator",
+          "role": "test-runner",
           "steps": []
         },
         {
@@ -180,15 +180,21 @@
           "steps": []
         },
         {
+          "id": "phase-2-tests-flows",
+          "name": "Tests on?",
+          "role": "engine",
+          "steps": []
+        },
+        {
           "id": "phase-2-state-11",
           "name": "User-flow tests written",
-          "role": "orchestrator",
+          "role": "build-init",
           "steps": []
         },
         {
           "id": "phase-2-state-12",
           "name": "Teams started",
-          "role": "engine",
+          "role": "orchestrator",
           "steps": []
         }
       ]
@@ -206,7 +212,7 @@
         {
           "id": "phase-3-state-5",
           "name": "Plan read",
-          "role": "planning-lead",
+          "role": "planner",
           "steps": []
         },
         {
@@ -218,7 +224,7 @@
         {
           "id": "phase-3-state-7",
           "name": "Plan written",
-          "role": "planning-lead",
+          "role": "planner",
           "steps": []
         },
         {
@@ -230,7 +236,7 @@
         {
           "id": "phase-3-state-9",
           "name": "Plan reviewed",
-          "role": "planning-lead",
+          "role": "reviewer",
           "steps": []
         },
         {
@@ -248,13 +254,13 @@
         {
           "id": "phase-3-state-12",
           "name": "Plans compared",
-          "role": "planning-lead",
+          "role": "orchestrator",
           "steps": []
         },
         {
           "id": "phase-3-state-13",
           "name": "Plans work together?",
-          "role": "planning-lead",
+          "role": "orchestrator",
           "steps": []
         },
         {
@@ -266,25 +272,25 @@
               "from": "Subitems split",
               "to": "Code read",
               "when": "Read the code",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "Code read",
               "to": "Question answered",
               "when": "Answer next, with citations [OWNER IF NEEDED]",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "Question answered",
               "to": "Answered enough?",
               "when": "Judge own answer",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "Answered enough?",
               "to": "All answered?",
               "when": "yes",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "All answered?",
@@ -296,25 +302,25 @@
               "from": "Citations real?",
               "to": "Plan written",
               "when": "yes",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "Answered enough?",
               "to": "Code read",
               "when": "no: read more",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "All answered?",
               "to": "Code read",
               "when": "no: next question",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "Citations real?",
               "to": "Code read",
               "when": "no: fix the citation",
-              "role": "planning-lead"
+              "role": "planner"
             }
           ]
         },
@@ -327,25 +333,25 @@
               "from": "Sets picked",
               "to": "Question answered",
               "when": "Answer next question",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Question answered",
               "to": "Blocker?",
               "when": "Continue",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Blocker?",
               "to": "Answer logged",
               "when": "no: log any problem",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Answer logged",
               "to": "All answered?",
               "when": "Continue",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "All answered?",
@@ -363,32 +369,32 @@
               "from": "Statement settled",
               "to": "Plan reviewed",
               "when": "Write it in the plan",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Blocker?",
               "to": "Blocker raised",
               "when": "yes",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Statement stuck?",
               "to": "Plan reviewed",
               "when": "no",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "All answered?",
               "to": "Question answered",
               "when": "no: next question",
-              "role": "planning-lead"
+              "role": "reviewer"
             }
           ]
         },
         {
           "id": "phase-3-block-3",
           "name": "Next round",
-          "role": "reviewer",
+          "role": "planning-lead",
           "steps": [
             {
               "from": "Scope changed",
@@ -400,7 +406,7 @@
               "from": "Report not clean",
               "to": "All folded",
               "when": "Fold everything",
-              "role": "planning-lead"
+              "role": "planner"
             },
             {
               "from": "All folded",
@@ -412,25 +418,25 @@
               "from": "Round 3 done?",
               "to": "Full review",
               "when": "no",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Round 3 done?",
               "to": "Round 4 done?",
               "when": "yes",
-              "role": "planning-lead"
+              "role": "engine"
             },
             {
               "from": "Round 4 done?",
               "to": "Blockers, majors review",
               "when": "no",
-              "role": "planning-lead"
+              "role": "reviewer"
             },
             {
               "from": "Round 4 done?",
               "to": "Round 6 done?",
               "when": "yes",
-              "role": "planning-lead"
+              "role": "engine"
             },
             {
               "from": "Round 6 done?",
@@ -454,7 +460,7 @@
               "from": "Plan cut, split or accepted",
               "to": "Plans compared",
               "when": "Continue",
-              "role": "planning-lead"
+              "role": "orchestrator"
             },
             {
               "from": "Round 6 done?",
@@ -479,13 +485,13 @@
         {
           "id": "phase-4-state-5",
           "name": "Tests on?",
-          "role": "build-lead",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-4-state-6",
           "name": "All teams merged",
-          "role": "build-lead",
+          "role": "orchestrator",
           "steps": []
         },
         {
@@ -515,7 +521,7 @@
         {
           "id": "phase-4-state-11",
           "name": "Subitems built",
-          "role": "build-lead",
+          "role": "builder",
           "steps": []
         },
         {
@@ -533,7 +539,7 @@
         {
           "id": "phase-4-state-14",
           "name": "All pass?",
-          "role": "build-lead",
+          "role": "test-runner",
           "steps": []
         },
         {
@@ -557,7 +563,7 @@
               "from": "Building",
               "to": "Tests and stubs written",
               "when": "Write stubs, tests: unit, integration, behavior",
-              "role": "build-lead"
+              "role": "build-init"
             },
             {
               "from": "Tests and stubs written",
@@ -569,31 +575,31 @@
               "from": "Fail on the assertion?",
               "to": "Tests match the page?",
               "when": "yes: check tests against page",
-              "role": "build-lead"
+              "role": "reviewer"
             },
             {
               "from": "Tests match the page?",
               "to": "Tests approved",
               "when": "yes",
-              "role": "build-lead"
+              "role": "reviewer"
             },
             {
               "from": "Tests approved",
               "to": "Code written",
               "when": "Write code, edit old work, narrow runs [OWNER IF NEEDED]",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Code written",
               "to": "Code committed",
               "when": "Commit; tell build lead: done",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Code committed",
               "to": "Checks pass?",
               "when": "Build lead calls lgtm check; test runner runs builder's config",
-              "role": "build-lead"
+              "role": "test-runner"
             },
             {
               "from": "Checks pass?",
@@ -605,7 +611,7 @@
               "from": "Risky tests?",
               "to": "Code broken on temp",
               "when": "yes: break it on a temp branch",
-              "role": "build-lead"
+              "role": "reviewer"
             },
             {
               "from": "Code broken on temp",
@@ -617,62 +623,62 @@
               "from": "Tests go red?",
               "to": "Subitem built",
               "when": "yes",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Checks pass?",
               "to": "Type of failure?",
               "when": "no: report to builder, notice to lead",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Type of failure?",
               "to": "3 Plan",
               "when": "plan: tell lead",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Fail on the assertion?",
               "to": "Building",
               "when": "no: fix the test",
-              "role": "build-lead"
+              "role": "build-init"
             },
             {
               "from": "Tests match the page?",
               "to": "Building",
               "when": "no: rewrite",
-              "role": "build-lead"
+              "role": "build-init"
             },
             {
               "from": "Tests go red?",
               "to": "Building",
               "when": "no: tests too weak",
-              "role": "build-lead"
+              "role": "build-init"
             },
             {
               "from": "Risky tests?",
               "to": "Subitem built",
               "when": "no",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Type of failure?",
               "to": "Building",
               "when": "test: tell lead",
-              "role": "build-lead"
+              "role": "build-init"
             },
             {
               "from": "Type of failure?",
               "to": "Tests approved",
               "when": "code: tell lead",
-              "role": "build-lead"
+              "role": "builder"
             }
           ]
         },
         {
           "id": "phase-4-block-2",
           "name": "Build without tests",
-          "role": "builder",
+          "role": "build-lead",
           "steps": [
             {
               "from": "Tests off",
@@ -690,13 +696,13 @@
               "from": "Subitems assigned",
               "to": "Code written",
               "when": "Write code",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Code written",
               "to": "Agent review on?",
               "when": "Continue",
-              "role": "build-lead"
+              "role": "engine"
             },
             {
               "from": "Agent review on?",
@@ -708,7 +714,7 @@
               "from": "Agent review on?",
               "to": "Looks good?",
               "when": "yes: review the code",
-              "role": "build-lead"
+              "role": "reviewer"
             },
             {
               "from": "Subitems merged",
@@ -720,7 +726,7 @@
               "from": "More subitems?",
               "to": "All teams merged",
               "when": "no: orchestrator merges teams",
-              "role": "build-lead"
+              "role": "orchestrator"
             },
             {
               "from": "Looks good?",
@@ -732,7 +738,7 @@
               "from": "Looks good?",
               "to": "Code written",
               "when": "no: fix",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "More subitems?",
@@ -763,7 +769,7 @@
               "from": "Fix team started",
               "to": "Fixes built",
               "when": "Build subitems",
-              "role": "build-lead"
+              "role": "builder"
             },
             {
               "from": "Fixes built",
@@ -794,13 +800,13 @@
         {
           "id": "phase-5-state-1",
           "name": "Teams merged",
-          "role": "test-runner",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-5-state-2",
           "name": "Tests on?",
-          "role": "test-runner",
+          "role": "engine",
           "steps": []
         },
         {
@@ -830,43 +836,43 @@
         {
           "id": "phase-5-state-7",
           "name": "All pass?",
-          "role": "test-runner",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-5-state-8",
           "name": "Agent review on?",
-          "role": "test-runner",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-5-state-9",
           "name": "Product checked",
-          "role": "test-runner",
+          "role": "reviewer",
           "steps": []
         },
         {
           "id": "phase-5-state-10",
           "name": "Looks good?",
-          "role": "test-runner",
+          "role": "reviewer",
           "steps": []
         },
         {
           "id": "phase-5-state-11",
           "name": "Failure report written",
-          "role": "test-runner",
+          "role": "evaluator",
           "steps": []
         },
         {
           "id": "phase-5-state-12",
           "name": "Fixes merged",
-          "role": "engine",
+          "role": "orchestrator",
           "steps": []
         },
         {
           "id": "phase-5-state-13",
           "name": "Failed, related tests run",
-          "role": "engine",
+          "role": "test-runner",
           "steps": []
         }
       ]
@@ -938,37 +944,37 @@
         {
           "id": "phase-7-state-1",
           "name": "Review closed",
-          "role": "project-lead",
+          "role": "orchestrator",
           "steps": []
         },
         {
           "id": "phase-7-state-2",
           "name": "Work merged",
-          "role": "project-lead",
+          "role": "orchestrator",
           "steps": []
         },
         {
           "id": "phase-7-state-3",
           "name": "Fix users can't see?",
-          "role": "project-lead",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-7-state-4",
           "name": "Product tried",
-          "role": "project-lead",
+          "role": "owner",
           "steps": []
         },
         {
           "id": "phase-7-state-5",
           "name": "Device checked",
-          "role": "project-lead",
+          "role": "owner",
           "steps": []
         },
         {
           "id": "phase-7-state-6",
           "name": "Approve release?",
-          "role": "project-lead",
+          "role": "owner",
           "steps": []
         },
         {
@@ -980,13 +986,13 @@
         {
           "id": "phase-7-state-8",
           "name": "Live product tested",
-          "role": "project-lead",
+          "role": "test-runner",
           "steps": []
         },
         {
           "id": "phase-7-state-9",
           "name": "Evaluation round run",
-          "role": "project-lead",
+          "role": "evaluator",
           "steps": []
         },
         {
@@ -1004,31 +1010,32 @@
         {
           "id": "phase-8-state-1",
           "name": "Released",
-          "role": "evaluator",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-8-state-2",
           "name": "Tests on?",
-          "role": "evaluator",
+          "role": "engine",
           "steps": []
         },
         {
           "id": "phase-8-state-3",
           "name": "Next change",
-          "role": "evaluator",
-          "steps": []
+          "role": "owner",
+          "steps": [],
+          "end": true
         },
         {
           "id": "phase-8-state-4",
           "name": "Nightly run done",
-          "role": "evaluator",
+          "role": "test-runner",
           "steps": []
         },
         {
           "id": "phase-8-state-5",
           "name": "Skipped tests checked",
-          "role": "evaluator",
+          "role": "test-runner",
           "steps": []
         },
         {
@@ -1052,7 +1059,7 @@
         {
           "id": "phase-8-state-9",
           "name": "Bug?",
-          "role": "evaluator",
+          "role": "project-lead",
           "steps": []
         }
       ]
@@ -1206,11 +1213,11 @@
     },
     {
       "from": "phase-2-state-10",
-      "to": "phase-2-state-2",
+      "to": "phase-2-tests-flows",
       "when": "Continue"
     },
     {
-      "from": "phase-2-state-2",
+      "from": "phase-2-tests-flows",
       "to": "phase-2-state-11",
       "when": "yes: write from page, mockups"
     },
@@ -1240,7 +1247,7 @@
       "when": "yes"
     },
     {
-      "from": "phase-2-state-2",
+      "from": "phase-2-tests-flows",
       "to": "phase-2-state-12",
       "when": "no"
     },
@@ -1481,7 +1488,7 @@
     },
     {
       "from": "phase-5-state-11",
-      "to": "phase-4-state-4",
+      "to": "phase-4-block-3",
       "when": "fix team"
     },
     {
@@ -1592,7 +1599,7 @@
     {
       "from": "phase-7-state-6",
       "to": "phase-4-state-4",
-      "when": "no: ask for a change [OWNER]"
+      "when": "no: small change [OWNER]"
     },
     {
       "from": "phase-7-state-3",
@@ -1655,51 +1662,6 @@
       "when": "no: wait for next night"
     },
     {
-      "from": "phase-4-state-16",
-      "to": "phase-3-state-4",
-      "when": "Plan wrong"
-    },
-    {
-      "from": "phase-5-state-13",
-      "to": "phase-4-state-4",
-      "when": "Failure report"
-    },
-    {
-      "from": "phase-6-state-9",
-      "to": "phase-5-state-1",
-      "when": "Fix, re-verify"
-    },
-    {
-      "from": "phase-6-state-9",
-      "to": "phase-3-state-4",
-      "when": "Design wrong"
-    },
-    {
-      "from": "phase-7-state-10",
-      "to": "phase-2-state-1",
-      "when": "Next sprint"
-    },
-    {
-      "from": "phase-7-state-10",
-      "to": "phase-4-state-4",
-      "when": "Small change, owner approval"
-    },
-    {
-      "from": "phase-7-state-10",
-      "to": "phase-1-state-1",
-      "when": "Big change, owner approval"
-    },
-    {
-      "from": "phase-8-state-9",
-      "to": "phase-4-state-4",
-      "when": "Nightly bug"
-    },
-    {
-      "from": "phase-8-state-9",
-      "to": "phase-1-state-1",
-      "when": "Next change, owner approval"
-    },
-    {
       "from": "phase-3-state-6",
       "to": "phase-3-block-1",
       "when": "Enter Write each plan"
@@ -1750,9 +1712,39 @@
       "when": "Complete Build without tests"
     },
     {
-      "from": "phase-5-state-11",
-      "to": "phase-4-block-3",
-      "when": "Start the fix team"
+      "from": "phase-4-block-3",
+      "to": "phase-5-state-12",
+      "when": "Passing report: merge fixes"
+    },
+    {
+      "from": "phase-7-state-6",
+      "to": "phase-1-state-4",
+      "when": "no: big change [OWNER]"
+    },
+    {
+      "from": "phase-6-state-8",
+      "to": "phase-5-state-1",
+      "when": "Fix, re-verify"
+    },
+    {
+      "from": "phase-6-state-4",
+      "to": "phase-3-state-4",
+      "when": "Design wrong"
+    },
+    {
+      "from": "phase-1-state-3",
+      "to": "phase-1-state-16",
+      "when": "Owner asks to turn tests on later"
+    },
+    {
+      "from": "phase-3-block-3",
+      "to": "phase-3-state-12",
+      "when": "Owner cuts, splits or accepts plan"
+    },
+    {
+      "from": "phase-8-state-3",
+      "to": "phase-1-state-4",
+      "when": "Owner starts the next change [OWNER]"
     }
   ]
 }

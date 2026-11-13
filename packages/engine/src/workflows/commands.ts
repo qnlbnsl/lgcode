@@ -12,15 +12,15 @@ const handler = (operation: string): ReadHandler => (input: Input, payload: Reco
   }
   const repository = typeof payload.repoId === 'string' ? Object.values(projectView(input.snapshot).repositories).find((r) => r.repoId === payload.repoId) : undefined
   if (payload.repoId !== undefined && !repository) return yield* Effect.fail(refused('Choose a registered repository.'))
-  const store = new WorkflowStore(input.runtime.home, repository?.path)
-  const result = yield* Effect.try({
-    try: () => {
+  const result = yield* Effect.tryPromise({
+    try: async () => {
+      const store = new WorkflowStore(input.runtime.home, repository?.path)
       switch (operation) {
-        case 'list': return { items: store.list() }
-        case 'read': return { workflow: store.read(payload.scope as string, payload.id as string) }
-        case 'clone': return { workflow: store.clone(payload.scope as string, payload.id as string, payload.target as string, payload.name as string) }
-        case 'save': return { workflow: store.save(payload.scope as string, payload.id as string, payload.definition) }
-        case 'delete': store.delete(payload.scope as string, payload.id as string); return {}
+        case 'list': return await store.list()
+        case 'read': return { workflow: await store.read(payload.scope as string, payload.id as string) }
+        case 'clone': return { workflow: await store.clone(payload.scope as string, payload.id as string, payload.target as string, payload.name as string) }
+        case 'save': return { workflow: await store.save(payload.scope as string, payload.id as string, payload.definition) }
+        case 'delete': await store.delete(payload.scope as string, payload.id as string); return {}
         default: throw new Error('Unknown workflow action.')
       }
     }, catch: (error) => refused(error instanceof Error && !('code' in error) ? error.message : 'The workflow file is unavailable, unsafe, or already exists.'),

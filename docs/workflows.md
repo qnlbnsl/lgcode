@@ -14,9 +14,15 @@ The `owner` and `engine` roles describe human decisions and deterministic progra
 A move names its source block, destination block, and the condition that takes it.
 Moves may cross phases or go backwards.
 The phase and block order controls the picture, while moves describe the routes.
-The format permits terminal blocks without an outgoing move.
+A block may declare `end: true` to mark the end of the current run.
+The default ends at Next change until the owner starts another change.
+Its outgoing owner action starts the next run at Change described.
+The format permits unfinished blocks without an outgoing move while editing.
+The shipped default requires every block to be reachable and every block without an outgoing move to declare an endpoint.
 The format permits disconnected blocks while someone constructs a workflow.
-Every move must reference existing blocks.
+Every move must reference two different existing blocks.
+Duplicate moves are refused regardless of the order of their JSON keys.
+Inner move sources, targets, and conditions must contain text.
 Every phase and block identifier must be unique across the document.
 Names and conditions have a limit of 200 characters.
 A definition has at most 24 phases, 100 blocks per phase, and 1,000 moves.
@@ -32,9 +38,11 @@ The application programming interface (API) and terminal can also change inner s
 
 ## The shipped build loop
 
-The canonical default is `design/mock/workflows/build-loop.json`.
-The engine reads this same file.
-The website build copies it into its static files for the sample page.
+The canonical default is `packages/engine/src/workflows/build-loop.json`.
+The engine reads this file without a dependency on the design folder.
+The Studio build copies it into the live page and generates the sample copy.
+The Studio build bundles the contracts validator for both page modes.
+Run `pnpm --filter @lgtm/studio build` before opening the standalone sample.
 The default has eight phases and every named inner block in the build-loop specification.
 The default cannot be saved or deleted through the engine.
 A clone becomes an independent user or repository file.
@@ -42,6 +50,7 @@ A clone becomes an independent user or repository file.
 The settings record whether tests and agent review run.
 The settings also record the full review rounds, the approval threshold, the optional maximum rounds, the stuck statement thresholds, and automatic merging for fixes users cannot see.
 A null maximum means that review has no hard limit.
+A finite maximum must be at least the approval threshold.
 The default requires approval after round four.
 The owner's decision of 2026-11-11 supersedes the older round-six exit in the specification's diagram text.
 The corresponding inner move therefore repeats the approval request.
@@ -59,16 +68,30 @@ An API caller cannot supply a destination folder.
 The identifier contains lowercase letters, numbers, and hyphens.
 The identifier stays unchanged when the workflow's display name changes.
 A clone derives its new identifier from the requested name.
+A name without ASCII letters or digits receives a generated identifier.
+The display name keeps its original text.
 An existing destination is never overwritten by cloning.
 
-The Linux file store holds open directory descriptors while operating.
+The Linux file store performs asynchronous file operations.
+It checks at most 100 directory entries per folder during a list.
+The list reports when that limit is reached.
+An unavailable folder reports its own error while other folders remain listed.
+The list includes folder statuses with a limit, a truncation flag, and an optional error.
+The store refuses to start an operation if `/proc/self/fd` is unavailable.
+The store holds open directory descriptors while operating.
 It refuses symbolic links at the repository or home folder, `.lgtm`, `workflows`, and file boundaries.
 It refuses linked files, special files, and oversized files.
 It writes a private temporary file inside the selected workflow folder.
 It commits a save with an atomic rename.
 It creates a clone exclusively.
 An invalid JSON file is listed with an error and cannot be read as a definition.
-A malformed workflow may be deleted after confirmation in the page.
+A malformed regular workflow file may be repaired through a valid API save.
+It may also be deleted after confirmation in the page.
+The list marks unsafe or unaddressable entries with `canDelete: false`.
+The page offers no Delete button for these entries.
+Remove or replace these entries manually in the workflow folder.
+Removing a symbolic link means removing the link itself.
+Do not remove its target.
 File writes are configuration operations and do not add stored engine events.
 Concurrent saves use the last successful writer.
 

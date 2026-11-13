@@ -11852,3 +11852,29 @@ The unchanged journey passed when run alone.
 The workflow browser journey passed in the full run.
 The service-settings implementation was left to its assigned builder.
 The full check therefore remains a failed run even though the isolated retry passed.
+
+
+## s5-workflows-7. Workflow actions have no event or receipt.
+
+This is open for the owner.
+Workflow actions operate directly on configuration files.
+They write neither an engine event nor an action receipt.
+The owner must decide how workflow changes should appear in the audit history.
+
+## s5-workflows-8. Two browser tabs can overwrite a workflow without a warning.
+
+This is open for the owner.
+The last successful save wins when two tabs edit the same workflow.
+The editor has no revision check or conflict warning.
+
+## s5-workflows-9. Renaming a workflow changes only its display name.
+
+This is open for the owner.
+Saving a different name leaves the workflow identifier and filename unchanged.
+The owner must decide whether a separate identifier rename is needed.
+
+## s5-workflows-10. The visual editor cannot change inner steps.
+
+This is open for the owner.
+The editor shows and preserves a block's inner steps.
+Only the application programming interface (API) and terminal can edit these steps.

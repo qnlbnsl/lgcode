@@ -7,15 +7,17 @@ The live website, described below, runs the same files on the engine's records.
 
 ## How to open it
 
-Serve the `design/` folder, which is the parent of this folder.
+Run `pnpm --filter @lgtm/studio build` from the repository root first.
+This generates the shared workflow validator and the sample default from their source packages.
+Then serve the `design/` folder, which is the parent of this folder.
 
 ```
 cd design
 python3 -m http.server 4178 --bind 127.0.0.1
 ```
 
-Then open `http://127.0.0.1:4178/`, which opens the mock at `http://127.0.0.1:4178/mock/`. The mock has no build step and loads nothing from
-the network.
+Then open `http://127.0.0.1:4178/`, which opens the mock at `http://127.0.0.1:4178/mock/`. The generated assets are local files.
+The mock loads nothing from the external network.
 
 Changes you make stay until you reload the page. The colour mode, the density, and the
 sizes of the panels are remembered in the browser. The "Mock controls" button at the foot
@@ -27,7 +29,8 @@ resets everything.
 The same files also run as the live website, which reads the engine's real records.
 The package `packages/studio` copies this folder, adds the connection to the engine, and
 the engine serves the result at `/studio/`.
-This folder itself is not changed by that build, and it still opens on its sample data.
+The build generates the workflow validator and default in this folder.
+The mock still opens on its sample data.
 
 Build the live website from the repository root:
 
