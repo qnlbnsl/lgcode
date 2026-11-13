@@ -64,3 +64,26 @@ it("6.14 clear-token dispatches the authenticated owner command without a secret
   expect(peer.requests).toHaveLength(1); expect(peer.requests[0]!.tag).toBe("client.alerts.carrier.clear-token");
   expect(Object.keys(peer.requests[0]!.payload)).toEqual(["requestId"]);
 });
+
+it("review 4: email password input confirms the configured SMTP destination and never accepts argv secrets", async () => {
+  const root = prepareRoot(), password = randomUUID();
+  const carrier = { _tag: "email", host: "mail.example.test", port: 465, security: "tls", username: "mail-owner", from: "owner@example.test", to: "recipient@example.test" };
+  const peer = await fakeEngine(root, { onRequest: (frame, socket) => {
+    if (frame.tag === "client.alerts.settings") succeed(socket, frame, { requestId: frame.payload.requestId, kinds: [], carrier: { _tag: "none" }, tokenSet: false, carriers: [{ name: "email", carrier, enabled: false, tokenSet: false }] });
+    else succeed(socket, frame, { requestId: frame.payload.requestId });
+  } });
+  const child = startCli(root, [...words, "set-token", "email"], serviceEnvironment(root));
+  const ready = await until("email destination shown before consuming password", () => (child.stdout() + child.stderr()).includes(carrier.host) ? { ready: true } : child.exited() ? { ready: false } : false);
+  expect(ready.ready).toBe(true);
+  expect(child.stdout() + child.stderr()).toContain(String(carrier.port));
+  expect(child.stdout() + child.stderr()).toContain(carrier.username);
+  child.child.stdin.end(`yes\n${password}\n`);
+  expect((await finishCli(child)).code).toBe(0);
+  expect(peer.requests[1]!.payload).toMatchObject({ name: "email", origin: JSON.stringify([carrier.host, carrier.port, carrier.security, carrier.username]), value: password });
+  assertNoSecrets(child, [password]);
+  for (const extra of [[password], ["--input", JSON.stringify({ value: password })]]) {
+    const rejected = startCli(root, [...words, "set-token", "email", ...extra], serviceEnvironment(root)); rejected.child.stdin.end();
+    expect((await finishCli(rejected)).code).not.toBe(0); assertNoSecrets(rejected, [password]);
+  }
+  expect(peer.requests).toHaveLength(2);
+});

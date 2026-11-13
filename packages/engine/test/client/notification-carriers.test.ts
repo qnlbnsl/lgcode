@@ -14,6 +14,7 @@ const emailSettings = (port: number) => ({ _tag: "email", host: "127.0.0.1", por
 const setupEmail = (port: number, secret: string) => Effect.gen(function* () {
   success(yield* call(ownerCredential, "client.alerts.carrier.set", { carrier: emailSettings(port) }));
   success(yield* call(ownerCredential, "client.alerts.carrier.set-token", { name: "email", origin: JSON.stringify(["127.0.0.1", port, "plain", "local-user"]), nonce: randomUUID(), value: Redacted.make(secret) }));
+  success(yield* call(ownerCredential, "client.alerts.carrier.enabled.set", { name: "email", enabled: true }));
 });
 
 it("email uses the owner's SMTP server, reports acceptance and rejection, and never returns or records its secret", async () => {
@@ -28,8 +29,10 @@ it("email uses the owner's SMTP server, reports acceptance and rejection, and ne
     expect(Object.values(storedValues(rig))).toContain(secret);
     expect(JSON.stringify({ settings, snapshot: yield* snapshot, events: yield* alertLog, lines })).not.toContain(secret);
     expect(yield* alertLog).toEqual(before);
-    smtp.reject(); expect(success(yield* call(ownerCredential, "client.alerts.test", { name: "email" }))).toMatchObject({ accepted: false, reason: "carrier delivery failed" });
-    expect(JSON.stringify(yield* alertLog)).not.toContain("private rejection");
+    smtp.reject(); const rejected = success(yield* call(ownerCredential, "client.alerts.test", { name: "email" }));
+    expect(rejected).toMatchObject({ accepted: false, reason: "carrier delivery failed" });
+    expect(JSON.stringify({ rejected, lines })).not.toContain("private rejection");
+    expect(JSON.stringify({ rejected, lines })).not.toContain(secret);
   }), { lines }); } finally { await smtp.close(); }
 });
 

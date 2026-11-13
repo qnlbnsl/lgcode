@@ -41,6 +41,7 @@ for (const { command, words, form } of invocations) {
       "client.alerts.settings.set": { kind: "approval", push: false },
       "client.alerts.carrier.set": { carrier: { _tag: "ntfy", server: "https://push.example", topic: "owner_alerts" } },
       "client.alerts.carrier.clear-token": {},
+      "client.alerts.carrier.remove": { name: "email" },
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       configure: { agentId: "member", model: "small", effort: "low" },
       "client.agent.configuration": { agentId: "member" },

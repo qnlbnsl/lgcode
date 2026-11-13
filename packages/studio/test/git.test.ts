@@ -135,3 +135,8 @@ it('maps email and quiet hours without a stored mail secret', () => {
   expect(mapAlertSettings(settings)).toMatchObject({ email: { enabled: true, tokenSet: true, host: 'mail.example.test' }, quiet: { on: true, from: '22:00', to: '07:00', timeZone: 'America/Chicago', failed: true } })
   expect(mapPhoneOffer(settings)).toBe('declined')
 })
+
+it('maps held notifications ahead of a failed carrier result', () => {
+  const alert = { alertId: 'held', kind: 'question', status: 'open', raisedAt: 1, held: true, deliveries: [{ carrier: 'email', status: 'failed', generation: 2, attempt: 1, reason: 'carrier delivery failed', final: false }] } as unknown as Alert
+  expect(mapAlerts([alert], [])[0]).toMatchObject({ delivery: 'quiet', carrier: 'email', generation: 2, attempt: 1 })
+})
