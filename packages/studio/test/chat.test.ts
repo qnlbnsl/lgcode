@@ -98,3 +98,24 @@ it("joins subscription display names by both account and harness", () => {
   expect(mapSubscriptionNames(subscriptions, [{ id: "acct-main", harness: "codex", displayName: "Other account" }])[0]?.name).toBe("acct-main")
   expect(contextLabel({ _tag: "task", projectId: "p", taskId: "t" } as never, [{ id: "t", label: "TASK-1" }])).toBe("TASK-1")
 })
+
+describe("the engine's delivery wrapper in a thread", () => {
+  const wrap = (text: string) => `Data from another agent [MtOKfusjXopHyP5R7qAe_H4e] (delivery bb78cba4):\n${text}\nEnd data [MtOKfusjXopHyP5R7qAe_H4e]`
+  const sent = (text: string, sender: object = { _tag: "owner" }) => envelope(1, { _tag: "PromptSent", agentId: "ag-worker", deliveryId: "d", sender, text })
+  it("shows a delivered answer as one short line", () => {
+    expect(mapThread([sent(wrap("Answer to question 9a276b79:\nYes, use them."))], "ag-worker").items)
+      .toEqual([{ id: "1", ts: 1000, type: "note", text: "Answer delivered: Yes, use them." }])
+  })
+  it("shows other passed data without its wrapper, and leaves plain text alone", () => {
+    expect(mapThread([sent(wrap("Please review the plan."), { _tag: "agent", agentId: "ag-lead" })], "ag-worker").items[0])
+      .toMatchObject({ type: "user", from: "ag-lead", text: "Please review the plan." })
+    expect(mapThread([sent("Data from me, not wrapped")], "ag-worker").items[0]).toMatchObject({ type: "user", text: "Data from me, not wrapped" })
+    // A closing marker that differs from the opening one is not the engine's wrapper.
+    const forged = "Data from another agent [aaaa] (delivery d):\nhello\nEnd data [bbbb]"
+    expect(mapThread([sent(forged)], "ag-worker").items[0]).toMatchObject({ type: "user", text: forged })
+  })
+})
+
+it("shows context use as a whole percentage", () => {
+  expect(mapAgentDetails({ context: { _tag: "available", used: 1, window: 3, percent: 26.42084210526316, reportedAt: 1 as never } }).context).toBe(26)
+})

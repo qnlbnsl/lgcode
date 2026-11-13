@@ -59,7 +59,7 @@ export interface StoreAgent {
   readonly stalled: boolean; readonly startedAt: number; readonly lastOutputAt: number
   readonly failure: { readonly reason: string } | null
 }
-export interface StoreOption { readonly id: string; readonly label: string; readonly primary?: boolean }
+export interface StoreOption { readonly id: string; readonly label: string; readonly kind?: string; readonly primary?: boolean }
 export interface StoreRequest {
   readonly sourceSequence?: number
   readonly id: string; readonly kind: "approval" | "question"; readonly agent: string; readonly project: string
@@ -268,7 +268,7 @@ export function mapRequest(row: EngineRow, kind: "approval" | "question", agents
   const firstLine = preview.split("\n").find((line) => line.trim() !== "")?.trim() ?? ""
   const title = display?.title ?? (firstLine || (kind === "approval" ? "Permission request" : "Question"))
   const options: StoreOption[] = (display?.options ?? []).map((option) => ({
-    id: option.id, label: option.name, ...(option.kind === "allow_once" ? { primary: true } : {})
+    id: option.id, label: option.name, kind: option.kind, ...(option.kind === "allow_once" ? { primary: true } : {})
   }))
   return {
     sourceSequence: row.sourceSequence,

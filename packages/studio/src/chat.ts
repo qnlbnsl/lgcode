@@ -21,7 +21,7 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
     recommendation: question?.recommendation ?? base.recommendation, command,
     blind: row.display?.inputAvailable === false || row.display?.inputRedacted === true,
     options: row.kind === "question" ? (proposed ? [{ id: "proposed", label: proposed, primary: true }] : [])
-      : options.map((o) => ({ id: o.id, label: o.name, primary: o.kind === "allow_once" })),
+      : options.map((o) => ({ id: o.id, label: o.name, kind: o.kind, primary: o.kind === "allow_once" })),
     answer: row.answer ?? options.find((o) => o.id === row.optionId)?.name ?? row.optionId ?? row.reason ?? (row.status === "cancelled" ? "Cancelled" : ""),
     answeredAt: row.answeredAt ?? null }
 }
@@ -37,6 +37,11 @@ export function contextLabel(reference: ContextReference, tasks: ReadonlyArray<{
   return reference._tag === "file" ? reference.path : tasks.find((task) => task.id === reference.taskId)?.label ?? reference.taskId
 }
 
+// The text inside the engine's delivery wrapper, or undefined when the text has none.
+// The wrapper is made by packages/engine/src/routing/envelope.ts.
+export function unwrapDelivery(text: string): string | undefined {
+  return /^Data from [^\[\n]+ \[([A-Za-z0-9_-]+)\] \(delivery [^)\n]+\):\n([\s\S]*)\nEnd data \[\1\]$/.exec(text)?.[2]
+}
 export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, tasks: ReadonlyArray<{ id: string; label: string }> = []) {
   let pending = false
   let delivery: string | undefined
@@ -52,8 +57,15 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, 
     if (e._tag === "StateChanged" && e.state._tag !== "working"
       || ["TurnEnded", "AgentStopped", "AgentInterrupted", "AgentCrashed", "AgentReloadFailed"].includes(e._tag)
       || (e._tag === "DeliveryReturned" || e._tag === "DeliveryRequeued" || e._tag === "DeliveryHeld") && e.deliveryId === delivery) pending = false
-    if (e._tag === "PromptSent") rows.push({ ...base, type: "user", text: e.text,
-      ...(e.sender._tag === "agent" ? { from: e.sender.agentId } : {}), context: e.context?.map((ref) => contextLabel(ref, tasks)) ?? [] })
+    if (e._tag === "PromptSent") {
+      const data = unwrapDelivery(e.text)
+      const answer = data === undefined ? null : /^Answer to question [^:\n]+:\n([\s\S]*)$/.exec(data)
+      // The engine wraps what it passes to an agent, for the agent's safety. The owner reads
+      // the content. An answer already shows on its question, so it is one short line here.
+      if (answer) rows.push({ ...base, type: "note", text: `Answer delivered: ${answer[1]!.trim()}` })
+      else rows.push({ ...base, type: "user", text: data ?? e.text,
+        ...(e.sender._tag === "agent" ? { from: e.sender.agentId } : {}), context: e.context?.map((ref) => contextLabel(ref, tasks)) ?? [] })
+    }
     else if (e._tag === "ThreadItem") {
       lastOutputAt = Math.max(lastOutputAt ?? 0, item.occurredAt)
       const c = e.content
@@ -72,7 +84,7 @@ export function mapThread(items: ReadonlyArray<EventEnvelope>, agentId: string, 
 }
 
 export function mapAgentDetails(reply: { context?: ContextUsage; configuration?: AgentConfiguration; models?: AgentChoices["models"]; efforts?: AgentChoices["efforts"] }) {
-  return { ...reply.configuration?.desired, context: reply.context?._tag === "available" ? reply.context.percent : null,
+  return { ...reply.configuration?.desired, context: reply.context?._tag === "available" ? Math.round(reply.context.percent) : null,
     contextReason: reply.context?._tag === "unavailable" ? reply.context.reason : null,
     configuration: reply.configuration ?? null, models: reply.models?.options ?? [], efforts: reply.efforts?.options ?? [] }
 }

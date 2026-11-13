@@ -240,6 +240,16 @@ function BriefCard({ s, r, openThread, who }) {
     <${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
       items=${[{ label: always, why, onSelect: () => answer(o === 'deny' ? 'never' : 'always') }]} width=${280} /></span>`;
   const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
+  // The live website answers with the options the harness sent. The one-time answer is the
+  // button. A standing answer sits in its menu, with the harness's own wording as the note.
+  const liveSplit = (label, icon, always, onceKind, alwaysKind) => {
+    const once = opts.find((o) => o.kind === onceKind); if (!once) return null;
+    const standing = opts.filter((o) => o.kind === alwaysKind); const busy = chatLive.requestBusy(r);
+    return html`<span class="split">
+      <button type="button" class="btn" disabled=${busy} title=${once.label} onClick=${() => answer(once.id)}><${Icon} name=${icon} size=${14} />${label}</button>
+      ${standing.length > 0 && html`<${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
+        items=${standing.map((o) => ({ label: always, why: o.label, disabled: busy, onSelect: () => answer(o.id) }))} width=${320} />`}</span>`;
+  };
   if (liveMode.on && r.status === 'open' && r.heldBy) return html`<section class="req qc" id=${'req-' + r.id}><b>${r.title}</b><p>${r.body}</p><p class="muted">Waiting on ${agentOf(s, r.heldBy).name}</p></section>`;
   if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
     <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
@@ -270,7 +280,11 @@ function BriefCard({ s, r, openThread, who }) {
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
     <div class="req-actions qc-actions">
-      ${!isQ && liveMode.on && opts.map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`) }
+      ${!isQ && liveMode.on && liveSplit('Allow', 'check', 'Always allow', 'allow_once', 'allow_always')}
+      ${!isQ && liveMode.on && liveSplit('Deny', 'x', 'Always deny', 'reject_once', 'reject_always')}
+      ${!isQ && liveMode.on && opts.filter((o) => !['allow_once', 'allow_always', 'reject_once', 'reject_always'].includes(o.kind)
+        || (o.kind === 'allow_always' && !opts.some((x) => x.kind === 'allow_once')) || (o.kind === 'reject_always' && !opts.some((x) => x.kind === 'reject_once')))
+        .map((o) => html`<button key=${o.id} disabled=${chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => answer(o.id)}>${o.label}</button>`)}
       ${rec && !declined && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
       ${!isQ && !liveMode.on && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}

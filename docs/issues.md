@@ -11368,3 +11368,36 @@ It shows "Reconnecting" and gives the owner no reason.
 The connection in `packages/studio/src/connection.ts` drops the error.
 The owner should see that the service answered and what it said.
 
+## 656. The live approval card overflowed, and a delivered answer showed the engine's wrapper
+
+Found: 2026-11-13, by the owner, on the first real project.
+State: fixed in the same change.
+
+The live approval card showed each of the harness's options as its own button.
+A long standing option, such as "Yes, and don't ask again for commands that start with ...", ran past the card's edge.
+The card now has "Allow" and "Deny", as the mock designed it.
+A standing option from the harness sits in the menu beside its button, with the harness's wording as the note.
+An option of a kind the page does not know stays a button, and its text now wraps.
+A delivered answer appeared in the thread as "Data from another agent [...] (delivery ...): Answer to question ...".
+That text is the wrapper the engine puts around data for an agent's safety.
+The thread now shows one short line, "Answer delivered: ...", and shows other passed data without the wrapper.
+The context figure in the composer showed fifteen decimal places, and is now a whole percentage.
+
+## 657. The engine labels the owner's answer as "Data from another agent"
+
+Found: 2026-11-13, in the same check as issue 656.
+State: open.
+
+The wrapper around an answer the owner gave begins "Data from another agent" (`packages/engine/src/routing/envelope.ts:18`).
+The agent that asked is told the answer came from an agent, when it came from the owner.
+
+## 658. An open live page stays on "Offline" after the service restarts
+
+Found: 2026-11-13, by hand on the first real project.
+State: open.
+
+A restart of the service ends the browser's session.
+An open page of the live website then shows "Offline" and stays there.
+Only a reload brings up the Login page.
+The page should notice that the service answers again and ask the owner to sign in.
+
