@@ -69,3 +69,15 @@ describe("setup and model choices", () => {
     expect(board.mapSetup({ step: "found" } as SetupState, discovery, { workspaceFolder: "/work", shell: "zsh", displayName: "Owner" })).toMatchObject({ step: 1, completed: false, workspace: "/work", repositories: discovery.repositories, lead: null })
   })
 })
+
+
+describe("engine stall records", () => {
+  it("uses current roles actions and clears a stall only after its durable end", () => {
+    const roles = (ended: number) => ({ agents: { items: [{ agentId: "ag-worker", actions: [
+      { _tag: "roles.StallSeen", sequence: 10, stalledPostId: "post" }, { _tag: "roles.StallEnded", sequence: ended }
+    ] }] } })
+    expect(board.mapStalls(roles(9))).toEqual({ agents: ["ag-worker"], posts: ["post"] })
+    expect(board.mapStalls(roles(11))).toEqual({ agents: [], posts: [] })
+    expect(board.mapStalls(undefined)).toEqual({ agents: [], posts: [] })
+  })
+})

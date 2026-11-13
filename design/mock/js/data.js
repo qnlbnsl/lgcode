@@ -444,11 +444,12 @@ export function agentStatus(s, a) {
 }
 export function projectStatus(s, p) {
   if (p.archived) return { word: 'Archived', tone: null };
+  if (p.archiving) return { word: 'Archiving', tone: 'warn' };
   const n = openRequests(s, { project: p.id }).length;
   if (n) return { word: `Needs you · ${n}`, tone: 'warn', n };
   const working = agentsOfProject(s, p.id).some((a) => a.state === 'working');
   if (!working) return { word: 'Idle', tone: null };
-  return { word: { Design: 'Designing', Plan: 'Planning', Build: 'Building', Review: 'Reviewing', 'Hand over': 'Handing over' }[p.stage], tone: 'ok' };
+  return { word: { Design: 'Designing', Plan: 'Planning', Build: 'Building', Review: 'Reviewing', 'Hand over': 'Handing over' }[p.stage] || 'Working', tone: 'ok' };
 }
 export function sprintProgress(s, sp) {
   const ts = tasksOfSprint(s, sp.id);

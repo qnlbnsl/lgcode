@@ -11088,3 +11088,24 @@ The new task detail read initially treated history and changed files as one succ
 A refused Git read therefore hid history that the engine had returned.
 This change applies each successful read and shows the reason for each failed read.
 The browser fixture now registers a real temporary Git repository and its workspace settings.
+
+## s2-board-4. The sidebar did not refresh the owner's saved name.
+
+The connection originally read the owner's name only when it connected.
+Saving a display name during first run left the sidebar showing its old value.
+The connection now reads the settings again when their change arrives on the stream.
+
+## s2-board-5. The mock hides message post actions in a narrow panel.
+
+The existing message styles hide the post action buttons when the panel is narrower than 720 pixels.
+This also happens on a desktop when the sidebar and channel list reduce the panel width.
+The browser test uses a wide viewport to exercise those existing controls.
+Changing this layout remains outside this connection change.
+
+## s2-board-6. Generic dialogs closed before a live request finished.
+
+The mock's rename and confirmation dialogs close before their callbacks run.
+A live rename or archive therefore had no pending control and lost its draft on refusal.
+These dialogs now support waiting for a reply when the caller requests it.
+The connected project actions use this option.
+The standalone mock retains its immediate callbacks.

@@ -22,6 +22,7 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly owner?: StoreOwner
   readonly boardUnread?: Record<string, number>
   readonly boardRevision?: number
+  readonly boardDetails?: object
   readonly channels?: ReturnType<typeof board.snapshotChannels>
   readonly posts?: ReadonlyArray<ReturnType<typeof board.mapPost>>
   readonly taskDetails?: object
@@ -66,9 +67,9 @@ const refreshTags = new Set([
   "AgentStarted", "AgentStartFailed", "SessionOpened", "AgentGrouped", "ModeChanged",
   "TurnStarted", "TurnEnded", "AgentCrashed", "AgentInterrupted", "AgentStopped", "AgentReloadFailed",
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
-  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
+  "AgentConfigurationChosen", "AgentConfigurationApplied", "AgentConfigurationRefused", "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
 ])
-const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("client.Alert")
+const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("roles.") || tag.startsWith("client.Alert")
 
 const emptyRecords: EngineRecords = { machines: [], subscriptions: [], repos: [], projects: [], teams: [], agents: [], requests: [], worktrees: [], sprints: [], tasks: [] }
 
@@ -107,7 +108,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, boardUnread: {}, boardRevision: 0 })
+  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, boardUnread: {}, boardRevision: 0, boardDetails: {} })
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -133,7 +134,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       current = snapshot
       after = snapshot.sequence
       const records = board.mapBoardRecords(snapshot, mapSnapshot(snapshot, now()))
-      if (!signal.aborted) write({ ...records, channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision,
+      if (!signal.aborted) write({ ...records, channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision, boardDetails: board.mapStalls(snapshot.roles),
         session: { status: "in", firstRun: snapshot.project?.setup !== undefined && snapshot.project.setup.completedAt === undefined } })
     }
     const program = Effect.gen(function* () {
@@ -141,6 +142,33 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
         yield* Effect.scoped(Effect.gen(function* () {
           const client: Client = yield* open({ url })
           activeClient = client
+          // The snapshot is bounded. Page its navigation records when its project
+          // section was cut short, and retry if the log changed during that read.
+          const hydrate = (snapshot: ClientSnapshot) => Effect.gen(function* () {
+            if (!snapshot.project?.truncated) return snapshot
+            const pageAll = (tag: "project.repositories" | "project.workspaces" | "project.read", payload: object) => Effect.gen(function* () {
+              const items: unknown[] = [], cursors = new Set<string>()
+              let after: string | undefined
+              for (;;) {
+                const reply = yield* client[tag]({ ...payload, requestId: requestId(), limit: 200, ...(after === undefined ? {} : { after }) } as never)
+                if (!("items" in reply)) return yield* Effect.fail(new Error("Project records unavailable"))
+                items.push(...reply.items)
+                if (reply.next === undefined) return items
+                if (!reply.items.length || cursors.has(reply.next)) return yield* Effect.fail(new Error("Project cursor did not advance"))
+                cursors.add(reply.next); after = reply.next
+              }
+            })
+            const repositories = yield* pageAll("project.repositories", {})
+            const workspaces = yield* pageAll("project.workspaces", {})
+            const projects = yield* pageAll("project.read", { collection: "projects" })
+            const teams = yield* pageAll("project.read", { collection: "teams" })
+            const sprints = yield* pageAll("project.read", { collection: "sprints" })
+            const tasks = yield* pageAll("project.read", { collection: "tasks" })
+            const agents = yield* pageAll("project.read", { collection: "agents" })
+            const end = yield* client["client.sequence"]({ requestId: requestId() })
+            if (end.sequence !== snapshot.sequence) return undefined
+            return { ...snapshot, project: { ...snapshot.project, truncated: false, repositories, workspaces, projects, teams, sprints, tasks, agents } } as ClientSnapshot
+          })
           const refresh = (minimum = 0) => Effect.gen(function* () {
             for (;;) {
               const started = clock()
@@ -149,7 +177,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
                 timing.snapshotMs = clock() - started
                 debug(`LGTM Studio: the snapshot took ${timing.snapshotMs.toFixed(1)} ms`)
               }
-              if (snapshot.sequence >= minimum) { publish(snapshot); return }
+              if (snapshot.sequence >= minimum) { const complete = yield* hydrate(snapshot); if (complete !== undefined) { publish(complete); return } }
               // Publication may lag the log. Read again until the snapshot holds the event.
               yield* Effect.sleep(25)
             }
@@ -157,10 +185,13 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
           if (current === undefined) yield* refresh()
           if (!signal.aborted) setConn("live")
           // The owner's name is the one saved in the engine's settings, or else Git's
-          // user.name, read once for each connection. The current page reads it the same way.
-          const settings = yield* client["project.settings"]({ requestId: requestId() }).pipe(Effect.option)
-          const name = settings._tag === "Some" ? settings.value.settings?.displayName ?? settings.value.ownerNameSuggestion : undefined
-          if (!signal.aborted) write({ owner: mapOwner(name) })
+          // user.name. Refresh it when settings change as well as on connection.
+          const refreshOwner = () => Effect.gen(function* () {
+            const settings = yield* client["project.settings"]({ requestId: requestId() }).pipe(Effect.option)
+            const name = settings._tag === "Some" ? settings.value.settings?.displayName ?? settings.value.ownerNameSuggestion : undefined
+            if (!signal.aborted) write({ owner: mapOwner(name) })
+          })
+          yield* refreshOwner()
           const subscribed = clock()
           yield* client["client.subscribe"]({ requestId: requestId(), after }).pipe(Stream.runForEach((item) => Effect.gen(function* () {
             if (timing.firstPushMs === undefined) {
@@ -171,7 +202,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
                 + (timing.firstPushDeliveryMs === undefined ? "" : `, ${timing.firstPushDeliveryMs} ms after the engine recorded it`))
             }
             if (item.sequence <= after) return
-            if ("event" in item) yield* apply(item, refresh)
+            if ("event" in item) {
+              if (item.event._tag === "project.SettingsChanged") yield* refreshOwner()
+              yield* apply(item, refresh)
+            }
             else if (item._tag === "client.Oversized" && needsRefresh(item.tag)) yield* refresh(item.sequence)
             after = Math.max(after, item.sequence) as EventSequence
             failures = 0

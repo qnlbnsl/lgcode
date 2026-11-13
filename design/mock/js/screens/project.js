@@ -306,7 +306,7 @@ export function TaskPage({ s, project, taskId }) {
 export function TeamPage({ s, project, teamId }) {
   const t = teamOf(s, teamId);
   const memberIds = agentsOfTeam(s, teamId).map((a) => a.id).join(',');
-  useEffect(() => { if (live.on && memberIds) void board.loadAgents(memberIds.split(',')); }, [teamId, memberIds]);
+  useEffect(() => { if (live.on && memberIds) void board.loadAgents(memberIds.split(',')); }, [teamId, memberIds, s.boardRevision]);
   if (!t) return html`<div class="page"><${Empty} title="This team does not exist">It may have finished. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const ags = agentsOfTeam(s, t.id); const tasks = tasksOfTeam(s, t.id); const ch = s.channels.find((c) => c.team === t.id);
   return html`<div class="page">
@@ -320,7 +320,7 @@ export function TeamPage({ s, project, teamId }) {
           <td class="state-cell"><span class="row" style="gap:8px"><${Avatar} agent=${a} s=${s} size="sm" /><a href=${href(routeForAgent(s, a))} style="font-weight:var(--weight-medium)" onClick=${(e) => e.stopPropagation()}>${a.name}</a></span></td>
           <td><${StateWord} status=${st} /></td><td class="muted truncate" style="max-width:340px">${a.activity || '—'}</td>
           <td>${task ? html`<a class="mono" href=${href(`/p/${project.id}/task/${task.id}`)} onClick=${(e) => e.stopPropagation()}>${task.label}</a>` : html`<span class="faint">—</span>`}</td>
-          <td class="muted">${HARNESSES[a.harness].name} · ${a.model} · ${a.effort}</td><td class=${cx('num', a.context >= 70 ? 'warn-text' : 'muted')}>${live.on ? (s.boardAgents?.[a.id]?.context == null ? '' : s.boardAgents[a.id].context + '%') : a.context + '%'}</td></tr>`; })}</tbody></table></div>
+          <td class="muted">${HARNESSES[a.harness]?.name || a.harness} · ${live.on ? s.boardAgents?.[a.id]?.models.find((m) => m.id === a.model)?.label || a.model : a.model} · ${live.on ? s.boardAgents?.[a.id]?.efforts.find((e) => e.id === a.effort)?.label || a.effort : a.effort}</td><td class=${cx('num', a.context >= 70 ? 'warn-text' : 'muted')}>${live.on ? (s.boardAgents?.[a.id]?.context == null ? '' : s.boardAgents[a.id].context + '%') : a.context + '%'}</td></tr>`; })}</tbody></table></div>
     <div class="section-head" style="margin-top:var(--gap-group)"><h2>Tasks</h2><span class="count">${tasks.length}</span></div>
     <div class="table-wrap" data-main><${TaskTable} s=${s} tasks=${tasks} showSprint=${true} /></div>
   </div>`;

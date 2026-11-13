@@ -9,8 +9,10 @@ export const sprintColumn = (sprint: Section["sprints"][number], tasks: Section[
 
 export function mapBoardRecords(snapshot: ClientSnapshot, records: EngineRecords): EngineRecords {
   const section = snapshot.project
+  const stalls = mapStalls(snapshot.roles)
   return {
     ...records,
+    repos: records.repos.map((r) => ({ ...r, main: "" })),
     projects: records.projects.map((p) => ({ ...p, prefix: "", tests: "", agentReview: "",
       archiving: section?.projects.find((r) => r.projectId === p.id)?.archiving ?? false,
       worktreeId: section?.projects.find((r) => r.projectId === p.id)?.worktreeId ?? "" })),
@@ -25,7 +27,7 @@ export function mapBoardRecords(snapshot: ClientSnapshot, records: EngineRecords
       worktreeId: section?.tasks.find((r) => r.taskId === t.id)?.worktreeId ?? "",
       blockedBy: records.requests.find((r) => r.task === t.id)?.kind ?? null })),
     requests: records.requests.map((r) => ({ ...r, sprint: [...snapshot.requests, ...snapshot.questions].find((row) => row.id === r.id)?.display?.sprintId ?? null })),
-    agents: records.agents.map((a) => ({ ...a, task: records.tasks.find((t) => t.owner === a.id && t.state !== "done")?.label ?? null }))
+    agents: records.agents.map((a) => ({ ...a, stalled: stalls.agents.includes(a.id), activity: snapshot.agents.find((row) => row.agentId === a.id)?.displayedState ?? "", name: a.role === "project-lead" ? "Project lead" : a.role === "team-lead" ? "Team lead" : a.role.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" "), task: section?.tasks.find((t) => t.owner === a.id && t.state !== "done")?.label ?? null }))
   }
 }
 export const authorId = (author: BoardAuthor): string => author._tag === "agent" ? author.agentId : author._tag === "owner" ? "owner" : `service:${author.service}`
@@ -76,4 +78,18 @@ export function snapshotChannels(snapshot: ClientSnapshot, records: EngineRecord
   const section = snapshot.board
   if (!section || typeof section !== "object" || !("channels" in section) || !Array.isArray(section.channels)) return []
   return mapChannels(section.channels as Channel[], records)
+}
+
+// The roles section retains the latest action of each kind for each current agent.
+// Compare durable positions rather than inferring a stall from elapsed browser time.
+export function mapStalls(roles: unknown) {
+  const agents: string[] = [], posts: string[] = []
+  if (!roles || typeof roles !== "object" || !("agents" in roles)) return { agents, posts }
+  const rows = roles.agents as { items?: ReadonlyArray<{ agentId: string; actions: ReadonlyArray<{ _tag: string; sequence: number; stalledPostId?: string }> }> }
+  for (const row of rows?.items ?? []) {
+    const seen = row.actions.filter((a) => a._tag === "roles.StallSeen").sort((a, b) => b.sequence - a.sequence)[0]
+    const ended = row.actions.filter((a) => a._tag === "roles.StallEnded").sort((a, b) => b.sequence - a.sequence)[0]
+    if (seen && (!ended || seen.sequence > ended.sequence)) { agents.push(row.agentId); if (seen.stalledPostId) posts.push(seen.stalledPostId) }
+  }
+  return { agents, posts }
 }
