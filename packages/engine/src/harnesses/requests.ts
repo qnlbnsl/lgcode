@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import type { Event, HarnessInstallation, HarnessInstallResult, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import type { ReadHandler } from "../api/reads.ts"
 import { freshRequest, readHarnesses, refused, type Input } from "../commands/internal.ts"
 import { accountReadiness } from "../project/leadDefaults.ts"
-import { harnessLogin } from "../runner/harnesses.ts"
+import { resolveCodexHome } from "../accounts/shadowHome.ts"
+import { harnessLogin, homeConflict } from "../runner/harnesses.ts"
 import { makeHarnessPrograms, quoteCommand, type HarnessPrograms } from "./programs.ts"
 
 const instances = new WeakMap<object, { programs: HarnessPrograms; running: Set<string> }>()
@@ -109,7 +111,19 @@ const accountCheck: ReadHandler = (input, p) => Effect.gen(function* () {
   // This command is displayed as text and is never executed by the engine.
   if (installation.path && value) command = quoteCommand([installation.path, ...value.signInArguments])
   const variable = harnessLogin(account.harness).homeVariable
-  if (account.home && variable) command = `${variable}=${quoteCommand([account.home])} ${command}`
+  const configuredHome = variable === undefined ? undefined : account.environment?.[variable]
+  if (configuredHome?.startsWith("secret:") || homeConflict(account.harness, account.home, configuredHome)) return yield* refused("The account's login folder cannot be displayed from these settings.")
+  let loginHome = account.home ?? configuredHome
+  if (account.harness === "codex") {
+    // Additional Codex accounts use a private auth overlay. The displayed
+    // command must target the same home the runner and readiness read use.
+    // Resolving it does not materialize a folder or copy any credentials.
+    const environment = yield* resolveCodexHome({ stateFolder: input.runtime.stateFolder, home: input.runtime.home, accountId: account.id,
+      variables: loginHome ? { CODEX_HOME: loginHome } : {}, ...(account.home ? { homePath: account.home } : {}) }).pipe(
+      Effect.provide(NodeServices.layer), Effect.mapError(() => refused("The account's login folder could not be read.")))
+    loginHome = environment.CODEX_HOME
+  }
+  if (loginHome && variable) command = `${variable}=${quoteCommand([loginHome])} ${command}`
   return { reply: { requestId: p.requestId, accountId: account.id, state, remoteAuthentication: "not-checked", signInCommand: yield* input.runtime.log.redactText(command) } }
 })
 export const harnessReads = {

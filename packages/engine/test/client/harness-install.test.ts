@@ -130,3 +130,25 @@ it.live("checks only local sign-in evidence without launching a provider", () =>
     expect(runner.calls).toHaveLength(0)
   }))
 }))
+
+it.live("shows the private Codex account's actual login folder without creating it", () => Effect.gen(function* () {
+  rig = makeRig()
+  const runner = yield* makeFakeRunner()
+  yield* provideRig(rig, { runner, secrets: makeFakeSecrets() }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    yield* appendSetup([
+      eventOf({ _tag: "HarnessChanged", harness: harnessSettings("codex", { adapterPath: process.execPath }) }),
+      eventOf({ _tag: "AccountChanged", accountId: "second-codex", account: { id: "second-codex", harness: "codex", enabled: true } })
+    ])
+    const before = success(yield* call(ownerCredential, "client.harness.account.check", { accountId: "second-codex" }))
+    expect(before.state).toBe("signed-out")
+    const folder = /^CODEX_HOME='([^']+)' /.exec(before.signInCommand)?.[1]
+    expect(folder).toBeDefined()
+    expect(folder!.startsWith(rig.stateFolder + "/")).toBe(true)
+    expect(existsSync(folder!)).toBe(false)
+    mkdirSync(folder!, { recursive: true })
+    writeFileSync(join(folder!, "auth.json"), JSON.stringify({ tokens: { access_token: "synthetic-private-token" } }))
+    expect(success(yield* call(ownerCredential, "client.harness.account.check", { accountId: "second-codex" })).state).toBe("local-credential")
+    expect(runner.calls).toHaveLength(0)
+  }))
+}))

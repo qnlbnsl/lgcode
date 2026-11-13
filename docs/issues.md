@@ -11931,3 +11931,12 @@ The engine now redacts the complete version capture before selecting its first l
 Oversized or forcibly interrupted captures are discarded.
 A failure still returns its plain reason.
 This prevents the capture limit from cutting a secret before the redactor can recognize it.
+
+## s5-harnesses-7. A Codex sign-in command must name the account's private home.
+
+Additional Codex accounts use the engine's existing private authentication layout.
+Displaying a command for the shared home would sign the owner into a different folder.
+The new read now resolves the same effective home as readiness and launch.
+It does not create that folder or copy credentials.
+A harmless regression writes a synthetic credential to the displayed folder and verifies that the readiness read sees it.
+A login-folder secret reference or conflicting settings receive a plain refusal.
