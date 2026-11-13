@@ -49,6 +49,7 @@ export async function exerciseStudioService(page: Page, origin: string) {
   await expect(page.getByRole('radio', { name: /^Edit files without asking/ })).toBeChecked()
 
   await page.goto(`${root}#/settings?section=stall-watch`)
+  await expect(page.locator('.svc-pane fieldset')).toHaveAttribute('aria-busy', 'false')
   await page.locator('#sd-w').fill('37')
   await expect(page.locator('#sd-w')).toHaveValue('37')
   await expect(page.getByText('Saving…', { exact: true })).toHaveCount(0)
@@ -70,6 +71,7 @@ export async function exerciseStudioService(page: Page, origin: string) {
   await expect(page.locator('#ra-check')).toHaveValue('25')
   await page.locator('#ra-check').fill('31')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.locator('.svc-save')).toContainText('No unsaved changes.')
   await expect(page.getByText('Saving…', { exact: true })).toHaveCount(0)
   await page.reload()
   await expect(page.locator('#ra-check')).toHaveValue('31')

@@ -11316,7 +11316,29 @@ The production web source, engine source, and affected test file are unchanged f
 The cause remains unproved.
 The task result records the complete checks and baseline comparisons.
 
-## 654. A fast connection reply could leave a reloaded page blank.
+## 654. The snapshot could not be read once an account was added without an enabled flag
+
+Found: 2026-11-13, while setting up the first real project on LGTM Studio itself.
+State: fixed in the same change.
+
+An account added with `lgtm accounts` and no `enabled` field is stored without that field.
+The `client.snapshot` reply requires a true or false value for each account.
+The engine sent the unset value, so the reply could not be encoded and every snapshot failed.
+The current website and the live website both stayed on "Reconnecting", with no error shown.
+The engine now reports such an account as enabled, which is how account picking already treats it.
+The test is case 3.1a in `packages/engine/test/client/snapshot.test.ts`.
+
+## 655. The live website stays on "Reconnecting" when the snapshot fails, and says nothing
+
+Found: 2026-11-13, in the same check as issue 654.
+State: open.
+
+When `client.snapshot` fails for a reason other than a lost connection, the live website retries without end.
+It shows "Reconnecting" and gives the owner no reason.
+The connection in `packages/studio/src/connection.ts` drops the error.
+The owner should see that the service answered and what it said.
+
+## 656. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11326,7 +11348,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## 655. Registered workspaces need their project and team links joined.
+## 657. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11335,7 +11357,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## 656. The settings contract does not return effective role defaults.
+## 658. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11347,7 +11369,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## 657. Notification retries need the original receipt after a lost reply.
+## 659. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11358,7 +11380,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## 658. Git destinations must keep their workspace identifiers.
+## 660. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11368,7 +11390,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## 659. The existing website's browser assertions failed in the full check.
+## 661. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11399,7 +11421,7 @@ The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
 The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
 Their causes remain unproved.
 
-## 660. The automatic merge retained duplicate shared declarations.
+## 662. The automatic merge retained duplicate shared declarations.
 
 Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
 State: fixed in the merge.
@@ -11411,7 +11433,7 @@ The automatic merge also duplicated the JavaScript request export and the dialog
 The merge now keeps one request method, one request export, and one live import.
 The test connection keeps the board builder's request recording.
 
-## 661. The review control fixtures did not load connected service settings.
+## 663. The review control fixtures did not load connected service settings.
 
 Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
 State: fixed in the merge.
@@ -11425,8 +11447,23 @@ The original refusal assertions still inspect every request after each control i
 The service browser journey also waits for the standing-rules write to finish before clicking its next control.
 The streamed setting can update before the write's final refresh has completed.
 The test keeps its original refusal assertion and deadlines.
+The initial stall-time input also waits for the settings fieldset's pending state to clear.
+A later remote run observed an empty value after the initial stall-time edit.
+The remote settings save also waits for the form to report no unsaved changes before reloading.
+A subsequent run read the previous check-in value after reloading.
 
-## 662. The Nudge regression test still expected an unconnected control after the merge.
+## 664. The Home reader retained an answered request after logout.
+
+Found: 2026-11-13, while merging the chat work with the connection review fixes.
+State: fixed in the merge.
+
+The chat reader kept answered requests across snapshot updates.
+It also restored an answered request when logout cleared the connection's records.
+The reader now retains an answered request only while its agent is still present.
+A regression test loads an answered request through the Home reader and clicks the actual logout control.
+It checks that the connection signs out and the request store becomes empty.
+
+## 665. The Nudge regression test still expected an unconnected control after the merge.
 
 Found: 2026-11-13, while merging the area branch into the chat worker branch.
 State: fixed in this merge.
@@ -11437,7 +11474,7 @@ The merged test now checks that the request reaches the connection.
 It also checks that an engine refusal appears and leaves the local posts empty.
 The other unconnected controls keep their original refusal checks.
 
-## 663. The merged Messages module imported the live binding twice.
+## 666. The merged Messages module imported the live binding twice.
 
 Found: 2026-11-13, during the remote browser check of this merge.
 State: fixed in this merge.
@@ -11448,7 +11485,7 @@ The browser rejected the module and left both the live page and the standalone m
 The test transformer accepted the declarations, so the Studio tests did not expose the error.
 Removing the redundant import lets the browser parse the module.
 
-## 664. The board mapping replaced worker names with role labels.
+## 667. The board mapping replaced worker names with role labels.
 
 Found: 2026-11-13, during the merged chat browser journey.
 State: fixed in this merge.
@@ -11457,14 +11494,3 @@ The area board mapping replaced each worker's engine name with its role label.
 The chat roster needs the engine name to identify a worker and its controls.
 The merged mapping keeps worker names and retains the area's project lead and team lead labels.
 The browser journey checks the same worker in the blocked lane and the table.
-
-## 665. The Home reader retained an answered request after logout.
-
-Found: 2026-11-13, while merging the chat work with the connection review fixes.
-State: fixed in the merge.
-
-The chat reader kept answered requests across snapshot updates.
-It also restored an answered request when logout cleared the connection's records.
-The reader now retains an answered request only while its agent is still present.
-A regression test loads an answered request through the Home reader and clicks the actual logout control.
-It checks that the connection signs out and the request store becomes empty.
