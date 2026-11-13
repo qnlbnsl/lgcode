@@ -321,12 +321,11 @@ function App() {
   }, [route.path]);
   useEffect(() => { document.title = 'LGTM Studio'; }, []);
   // The live website opens Home once the engine says this browser is signed in.
-  useEffect(() => { if (live.on && s.session.status === 'in' && route.parts[0] === 'login') go('/home'); }, [s.session.status, route.path]);
+  useEffect(() => { if (live.on && s.session.status === 'in' && (route.parts[0] === 'login' || s.session.firstRun && route.parts[0] !== 'setup')) go(s.session.firstRun ? '/setup' : '/home'); }, [s.session.status, s.session.firstRun, route.path]);
   const top = route.parts[0] || 'home';
   // The live website asks the engine whether this browser is signed in before it shows anything.
   if (s.session.status === 'checking') return html`<main class="auth" aria-busy="true"></main>`;
   if (top === 'login' || (s.session.status !== 'in' && (top !== 'setup' || live.on))) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
-  if (top === 'setup' && live.on) return html`<main class="auth"><${NotConnected} what="The first run" /></main><${Toasts} s=${s} />`;
   if (top === 'setup') return html`<${FirstRun} s=${s} route=${route} /><${DialogHost} s=${s} /><${Toasts} s=${s} />`;
   const project = top === 'p' ? projectOf(s, route.parts[1]) : null;
   let content;
@@ -387,7 +386,7 @@ function mountLive(el) {
   const state = emptyState();
   state.ui = {};
   seedTerminal(state);
-  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, notifications: [], workflow: {}, mocks: {}, design: {} });
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], workflow: {}, mocks: {}, design: {} });
   store.state = guardStore(state);
   act.applyPrefs();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);

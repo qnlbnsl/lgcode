@@ -41,7 +41,7 @@ export interface StoreProject {
   readonly id: string; readonly repo: string; readonly name: string; readonly prefix: string; readonly goal: string
   readonly stage: StoreStage | ""; readonly phase: string; readonly branch: string; readonly folder: string
   readonly machine: string; readonly lead: string; readonly shell: string; readonly createdAt: number | null
-  readonly archived: boolean; readonly hasMocks: boolean; readonly tests: "on" | "off"; readonly agentReview: "on" | "off"
+  readonly archived: boolean; readonly hasMocks: boolean; readonly tests: "on" | "off" | ""; readonly agentReview: "on" | "off" | ""
 }
 export interface StoreTeam {
   readonly id: string; readonly project: string; readonly name: string; readonly stage: StoreStage | ""

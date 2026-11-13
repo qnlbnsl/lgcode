@@ -1,16 +1,18 @@
 // The project board, sprint and task pages, the team page, and the repository page.
-import { html, useState, useRef, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid, useKey, store, DAY, persist, remember } from '../lib.js';
+import { html, useState, useRef, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid, useKey, store, DAY, persist, remember, live, useEffect } from '../lib.js';
 import {
   STAGES, PHASES, COLUMNS, PRIORITIES, TASK_STATES, sprintsOf, epicsOf, tasksOfSprint, tasksOfTeam, teamOf, teamName, teamsOf, agentOf, agentsOfTeam, agentsOfProject,
   requestsOfSprint, requestsOfTask, openRequests, sprintProgress, agentStatus, byId, repoOf, machineOf, leadOf, routeForAgent, agentLabel, HARNESSES, subLabel,
 } from '../data.js';
 import * as act from '../actions.js';
+import * as board from '../live/board.js';
 import { Avatar, RequestBlock, Empty, StateWord, AgentLine, Menu } from '../ui.js';
 import { ProjectTable } from './home.js';
 
 // ---- status line ----------------------------------------------------------------
 // The project's stage and phase as one quiet line that links to Workflow.
 export function StatusLine({ s, project }) {
+  if (live.on) return html`<a class="status-link" href=${href(`/p/${project.id}/workflow`)}><span>${project.stage}</span><${Icon} name="arrow-right" size=${12} class="faint" /></a>`;
   const phase = PHASES.find((p) => p.id === project.phase);
   return html`<a class="status-link" href=${href(`/p/${project.id}/workflow`)} title="Open Workflow">
     <span>${phase.name}</span><span class="muted">· Phase ${phase.n} of 8</span><${Icon} name="arrow-right" size=${12} class="faint" /></a>`;
@@ -21,6 +23,7 @@ export function StatusLine({ s, project }) {
 // status, Table sorts and filters, Roadmap lays epics and sprints along a time line.
 const PRIO_ICON = { Urgent: 'zap', High: 'arrow-up', Medium: 'minus', Low: 'arrow-down' };
 function Priority({ p, label = false }) {
+  if (live.on) return null;
   return html`<span class=${cx('prio', 'p-' + p.toLowerCase())} title=${'Priority: ' + p}><${Icon} name=${PRIO_ICON[p]} size=${12} />${label && html`<span>${p}</span>`}</span>`;
 }
 function SprintCard({ s, sp, hover }) {
@@ -123,8 +126,8 @@ function RoadmapView({ s, project, items }) {
     : r.k === 'epic' ? html`<div class="rm-cell epic" key=${r.id}><${Icon} name="layers" size=${13} class="faint" /><b class="truncate">${r.e ? r.e.name : 'No epic'}</b><span class="count">${r.n}</span></div>`
     : html`<div class="rm-cell" key=${r.id}><span class="tag">${r.sp.label}</span><a class="truncate" href=${sprintHref(r.sp)}>${r.sp.name}</a></div>`;
   const track = (r) => html`<div class=${cx('rm-cell rm-track', r.k === 'epic' && 'epic')} key=${r.k + (r.id || '')}>
-    ${r.k === 'epic' && r.st != null && html`<span class="rm-bar epic" style=${{ left: x(r.st) + 'px', width: (r.en - r.st) * DAYPX + 'px' }}></span>`}
-    ${r.k === 'sprint' && html`<a class=${cx('rm-bar', 'st-' + r.sp.column.replace(' ', '-').toLowerCase())} href=${sprintHref(r.sp)} style=${{ left: x(r.sp.start ?? 0) + 'px', width: Math.max(0.3, (r.sp.end ?? 1) - (r.sp.start ?? 0)) * DAYPX + 'px' }} title=${`${r.sp.label} ${r.sp.name} · ${r.sp.column}`}><span class="truncate">${r.sp.name}</span></a>`}</div>`;
+    ${r.k === 'epic' && !live.on && r.st != null && html`<span class="rm-bar epic" style=${{ left: x(r.st) + 'px', width: (r.en - r.st) * DAYPX + 'px' }}></span>`}
+    ${r.k === 'sprint' && (!live.on || (r.sp.start != null && r.sp.end != null)) && html`<a class=${cx('rm-bar', 'st-' + r.sp.column.replace(' ', '-').toLowerCase())} href=${sprintHref(r.sp)} style=${{ left: x(r.sp.start ?? 0) + 'px', width: Math.max(0.3, (r.sp.end ?? 1) - (r.sp.start ?? 0)) * DAYPX + 'px' }} title=${`${r.sp.label} ${r.sp.name} · ${r.sp.column}`}><span class="truncate">${r.sp.name}</span></a>`}</div>`;
   return html`<div class="roadmap" data-main>
     <div class="rm-grid" style=${{ '--rm-w': (to - from) * DAYPX + 'px', '--day': DAYPX + 'px' }}>
       <div class="rm-names">
@@ -146,7 +149,7 @@ export function Board({ s, project, route }) {
   const f = useBoardFilter(s, project); const focus = !!s.ui.focus;
   const epics = epicsOf(s, project.id);
   useKey((e) => { if (e.key === 'Escape' && store.state.ui.focus && !store.state.dialog) update((st) => { st.ui.focus = false; }); }, []);
-  if (project.archived) return html`<div class="page"><${Empty} title="This project is archived" icon="archive">Its agents are stopped. <button type="button" class="btn sm" onClick=${() => act.archiveProject(project.id, false)}>Restore</button><//></div>`;
+  if (project.archived) return html`<div class="page"><${Empty} title="This project is archived" icon="archive">Its agents are stopped. <button type="button" class="btn sm" disabled=${live.on && board.busy('project:' + project.id)} aria-busy=${live.on && board.busy('project:' + project.id)} onClick=${() => act.archiveProject(project.id, false)}>Restore</button><//></div>`;
   const views = [['board', 'Board', 'kanban'], ['table', 'Table', 'table-2'], ['roadmap', 'Roadmap', 'calendar']];
   return html`<div class="board-page">
     <div class="board-bar">
@@ -224,7 +227,8 @@ export function SprintPage({ s, project, sprintId }) {
   if (!sp) return html`<div class="page"><${Empty} title="This sprint does not exist">It may have been removed. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const tasks = tasksOfSprint(s, sp.id); const reqs = requestsOfSprint(s, sp.id); const t = sp.team && teamOf(s, sp.team); const pr = sprintProgress(s, sp);
   const done = sp.column === 'Done'; const epic = epicsOf(s, project.id).find((e) => e.id === sp.epic);
-  const add = (e) => { e.preventDefault(); if (!title.trim()) return;
+  const add = async (e) => { e.preventDefault(); if (!title.trim()) return;
+    if (live.on) { const reply = await board.addTask(project, sp, title); if (reply) { setTitle(''); setAdding(false); } return; }
     update((st) => { const n = Math.max(...st.tasks.filter((x) => x.project === project.id).map((x) => +x.label.split('-')[1] || 0)) + 1;
       st.tasks.push({ id: uid('t'), project: project.id, label: `${project.prefix}-${n}`, title: title.trim(), sprint: sp.id, team: sp.team, owner: null, state: 'queue', points: 2, files: [], history: [{ ts: Date.now(), who: 'owner', text: 'You added this task. The project lead was told.' }] }); });
     act.toast('Task added. The project lead was told.'); setTitle(''); setAdding(false); };
@@ -244,7 +248,7 @@ export function SprintPage({ s, project, sprintId }) {
   const taskHead = html`<div class="tk-panehead"><${Icon} name="list-checks" size=${14} class="faint" /><b>Tasks</b><span class="count">${tasks.length}</span><span class="grow"></span>
     ${!done && html`<button type="button" class="btn sm" onClick=${() => setAdding(!adding)}><${Icon} name="plus" size=${13} />Add task</button>`}</div>
     ${adding && html`<form class="row tk-add" onSubmit=${add}><input class="input" autofocus placeholder="What should be done?" value=${title} onInput=${(e) => setTitle(e.target.value)} aria-label="Task title" />
-      <button type="submit" class="btn" disabled=${!title.trim()}>Add</button><button type="button" class="btn ghost" onClick=${() => setAdding(false)}>Cancel</button></form>`}`;
+      <button type="submit" class="btn" disabled=${!title.trim() || (live.on && board.busy('task:' + sp.id))} aria-busy=${live.on && board.busy('task:' + sp.id)}>${live.on && board.busy('task:' + sp.id) ? 'Adding…' : 'Add'}</button><button type="button" class="btn ghost" onClick=${() => setAdding(false)}>Cancel</button></form>`}`;
   return html`<div class=${cx('tk', 'v-' + view)}>
     <header class="tk-head">
       <div class="tk-titlerow">
@@ -270,25 +274,30 @@ export function SprintPage({ s, project, sprintId }) {
 // ---- task page ------------------------------------------------------------------
 export function TaskPage({ s, project, taskId }) {
   const t = byId(s.tasks, taskId); const now = useNow();
+  useEffect(() => { if (live.on && t?.worktreeId) void board.loadTask(project, t); }, [taskId, t?.worktreeId, s.boardRevision]);
+  const detail = live.on ? s.taskDetails?.[taskId] : t;
+  const files = detail?.files || [], history = detail?.history || [];
   if (!t) return html`<div class="page"><${Empty} title="This task does not exist">It may have been removed. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const sp = byId(s.sprints, t.sprint); const o = t.owner && agentOf(s, t.owner); const team = t.team && teamOf(s, t.team); const reqs = requestsOfTask(s, t.id);
   return html`<div class="page narrow">
     <a class="back" href=${href(`/p/${project.id}/sprint/${sp.id}`)}><${Icon} name="arrow-left" size=${14} />${sp.label} ${sp.name}</a>
     <div class="page-head" style="margin-top:6px"><h1 class="page-title grow">${t.title}</h1>
       ${o && html`<a class=${cx('btn', !reqs.length && 'primary')} href=${href(routeForAgent(s, o))}><${Icon} name="message-square" size=${14} />Talk to ${o.name}</a>`}</div>
-    <p class="status-line"><span class="tag">${t.label}</span><${TaskState} t=${t} /><span>${t.points} points</span></p>
+    <p class="status-line"><span class="tag">${t.label}</span><${TaskState} t=${t} /><span>${t.points == null ? '' : t.points + ' points'}</span></p>
     ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
     <dl class="dl facts">
       <dt>Owner</dt><dd>${o ? html`<${AgentLine} s=${s} agent=${o} />` : html`<span class="muted">Unassigned. The team lead assigns it in dependency order.</span>`}</dd>
       <dt>Team</dt><dd>${team ? html`<a class="link" href=${href(`/p/${project.id}/team/${team.id}`)}>${teamName(team)}</a>` : html`<span class="muted">None</span>`}</dd>
-      <dt>Worktree</dt><dd class="mono truncate-start" title=${team ? team.branch : project.branch}>${team ? team.branch : project.branch}</dd>
+      <dt>Worktree</dt><dd class="mono truncate-start" title=${live.on ? detail?.branch || '' : team ? team.branch : project.branch}>${live.on ? detail?.branch || '' : team ? team.branch : project.branch}</dd>
       ${o && o.activity && html`<dt>Doing now</dt><dd>${o.activity}</dd>`}
     </dl>
-    <div class="section-head" style="margin-top:var(--gap-group)"><h2>Changed files</h2><span class="grow"></span>${t.files.length > 0 && html`<a class="link" href=${href(`/p/${project.id}/git`)}>Open in Git</a>`}</div>
-    ${t.files.length ? html`<ul class="file-list">${t.files.map((f) => html`<li key=${f}><${Icon} name="file-code" size=${14} class="faint" /><span class="mono truncate-start">${f}</span></li>`)}</ul>` : html`<p class="muted">No files changed yet.</p>`}
+    ${live.on && detail?.folder && html`<p class="mono muted">${detail.folder}</p>`}
+    ${live.on && board.busy('read-task:' + taskId) && html`<p class="muted" role="status">Loading task details…</p>`}
+    <div class="section-head" style="margin-top:var(--gap-group)"><h2>Changed files</h2><span class="grow"></span>${files.length > 0 && html`<a class="link" href=${href(`/p/${project.id}/git`)}>Open in Git</a>`}</div>
+    ${files.length ? html`<ul class="file-list">${files.map((f) => html`<li key=${f}><${Icon} name="file-code" size=${14} class="faint" /><span class="mono truncate-start">${f}</span></li>`)}</ul>` : html`<p class="muted">No files changed yet.</p>`}
     <div class="section-head" style="margin-top:var(--gap-group)"><h2>Work and handoff</h2></div>
-    ${t.history.length ? html`<ol class="timeline">${t.history.map((h, i) => { const w = h.who === 'owner' ? null : agentOf(s, h.who);
-      return html`<li key=${i}><time>${dayLabel(h.ts, now) === 'Today' ? clock(h.ts) : dayLabel(h.ts, now) + ' ' + clock(h.ts)}</time><span><b>${w ? w.name : 'You'}</b> ${h.text}</span></li>`; })}</ol>`
+    ${history.length ? html`<ol class="timeline">${history.map((h, i) => { const w = h.who === 'owner' ? null : agentOf(s, h.who);
+      return html`<li key=${i}><time>${dayLabel(h.ts, now) === 'Today' ? clock(h.ts) : dayLabel(h.ts, now) + ' ' + clock(h.ts)}</time><span><b>${w ? w.name : live.on ? '' : 'You'}</b> ${h.text}</span></li>`; })}</ol>`
       : html`<p class="muted">Nothing has happened on this task yet.</p>`}
   </div>`;
 }
@@ -296,6 +305,8 @@ export function TaskPage({ s, project, taskId }) {
 // ---- team page ------------------------------------------------------------------
 export function TeamPage({ s, project, teamId }) {
   const t = teamOf(s, teamId);
+  const memberIds = agentsOfTeam(s, teamId).map((a) => a.id).join(',');
+  useEffect(() => { if (live.on && memberIds) void board.loadAgents(memberIds.split(',')); }, [teamId, memberIds]);
   if (!t) return html`<div class="page"><${Empty} title="This team does not exist">It may have finished. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const ags = agentsOfTeam(s, t.id); const tasks = tasksOfTeam(s, t.id); const ch = s.channels.find((c) => c.team === t.id);
   return html`<div class="page">
@@ -309,7 +320,7 @@ export function TeamPage({ s, project, teamId }) {
           <td class="state-cell"><span class="row" style="gap:8px"><${Avatar} agent=${a} s=${s} size="sm" /><a href=${href(routeForAgent(s, a))} style="font-weight:var(--weight-medium)" onClick=${(e) => e.stopPropagation()}>${a.name}</a></span></td>
           <td><${StateWord} status=${st} /></td><td class="muted truncate" style="max-width:340px">${a.activity || '—'}</td>
           <td>${task ? html`<a class="mono" href=${href(`/p/${project.id}/task/${task.id}`)} onClick=${(e) => e.stopPropagation()}>${task.label}</a>` : html`<span class="faint">—</span>`}</td>
-          <td class="muted">${HARNESSES[a.harness].name} · ${a.model} · ${a.effort}</td><td class=${cx('num', a.context >= 70 ? 'warn-text' : 'muted')}>${a.context}%</td></tr>`; })}</tbody></table></div>
+          <td class="muted">${HARNESSES[a.harness].name} · ${a.model} · ${a.effort}</td><td class=${cx('num', a.context >= 70 ? 'warn-text' : 'muted')}>${live.on ? (s.boardAgents?.[a.id]?.context == null ? '' : s.boardAgents[a.id].context + '%') : a.context + '%'}</td></tr>`; })}</tbody></table></div>
     <div class="section-head" style="margin-top:var(--gap-group)"><h2>Tasks</h2><span class="count">${tasks.length}</span></div>
     <div class="table-wrap" data-main><${TaskTable} s=${s} tasks=${tasks} showSprint=${true} /></div>
   </div>`;

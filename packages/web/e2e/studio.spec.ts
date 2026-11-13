@@ -1,6 +1,7 @@
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"
+import { execFileSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -15,7 +16,7 @@ import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
-import { call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
+import { appendSetup, call, eventOf, ownerCredential, seedAccount, harnessSettings, success, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
@@ -46,6 +47,8 @@ test("live website: signs in through the engine, shows its real records, and kee
     })
   })
   try {
+    execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
+    execFileSync("git", ["-C", rig.work, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
     const studioRoot = await buildStudio(join(rig.root, "studio"))
     const port = await unusedPort()
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
@@ -56,6 +59,16 @@ test("live website: signs in through the engine, shows its real records, and kee
       yield* Effect.scoped(Effect.gen(function* () {
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
+        yield* appendSetup([eventOf({ _tag: "project.RepositoryAdded", repoId: project.repoId, name: "Repository", path: rig.work }),
+          eventOf({ _tag: "project.RepositoryLocated", repoId: project.repoId, machineId: "local", path: rig.work }),
+          eventOf({ _tag: "project.WorktreeCreated", repoId: project.repoId, worktreeId: project.worktreeId,
+          branch: "main", path: rig.work, machineId: "local", checkout: "main" })])
+        const taskId = success(yield* call(ownerCredential, "project.task.create", { ...project.task, title: "Engine task", label: "TK-1" })).taskId
+        success(yield* call(ownerCredential, "project.task.note", { projectId: project.projectId, taskId, title: "Recorded note", detail: "Actual engine history" }))
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
+        yield* seedAccount("studio-ready", "cursor")
+        success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
+        success(yield* call(ownerCredential, "accounts set-secret", { accountId: "studio-ready", name: "CURSOR_API_KEY", nonce: "studio-browser", value: Redacted.make("synthetic-studio-browser-key") }))
         yield* completedSetup(project.projectId)
         yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
@@ -96,6 +109,26 @@ test("live website: signs in through the engine, shows its real records, and kee
           const sidebar = page.locator(".sidebar")
           await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/board`)
           await expect(page.locator(".main")).toContainText("Pushed sprint")
+          await expect(page.locator('[aria-label="Backlog"] .sprint-card')).toHaveCount(0)
+          await expect(page.locator('[aria-label="Planned"]')).toContainText("Pushed sprint")
+          await expect(page.locator('[aria-label="In progress"]')).toContainText("Sprint")
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/sprint/${project.sprintId}`)
+          await expect(page.locator(".tk")).toContainText("Engine task")
+          await page.getByRole("button", { name: "Add task", exact: true }).click()
+          await page.getByRole("textbox", { name: "Task title" }).fill("Owner added task")
+          await page.getByRole("button", { name: "Add", exact: true }).click()
+          await expect(page.locator(".tk")).toContainText("Owner added task")
+          await page.getByRole("row").filter({ hasText: "Engine task" }).click()
+          await expect(page.locator(".page-title")).toHaveText("Engine task")
+          await expect(page.locator(".main")).toContainText(rig.work)
+          await expect(page.locator(".timeline")).toContainText("Recorded note")
+          await expect(page.locator(".main")).toContainText(rig.work)
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/team/${project.team.teamId}`)
+          await expect(page.getByRole("link", { name: "Team channel", exact: true })).toBeVisible()
+          await expect(page.locator(".main")).toContainText("Owner added task")
+          await page.goto(`${origin}/studio/#/r/${project.repoId}`)
+          await expect(page.locator(".repo-facts")).toContainText(rig.work)
+          await expect(page.locator(".main .table")).toContainText("Project")
           await expect.poll(() => timings.some((line) => line.includes("first pushed update") && line.includes("after the engine recorded it"))).toBe(true)
           await page.goto(`${origin}/studio/#/home`)
 

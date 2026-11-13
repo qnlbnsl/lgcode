@@ -423,7 +423,7 @@ export function openRequests(s, filter = {}) {
     && (!filter.kind || r.kind === filter.kind)).sort(byAttention);
 }
 export const requestsOfTask = (s, tid) => s.requests.filter((r) => r.task === tid && r.status === 'open');
-export const requestsOfSprint = (s, sid) => { const ids = new Set(tasksOfSprint(s, sid).map((t) => t.id)); return s.requests.filter((r) => r.status === 'open' && ids.has(r.task)); };
+export const requestsOfSprint = (s, sid) => { const ids = new Set(tasksOfSprint(s, sid).map((t) => t.id)); return s.requests.filter((r) => r.status === 'open' && (r.sprint === sid || ids.has(r.task))); };
 
 // The dot and the short words for an agent, from its state and its open requests.
 export function agentStatus(s, a) {

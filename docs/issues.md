@@ -11067,3 +11067,24 @@ With a long `LGTM_HOME`, the engine's socket path exceeds 100 bytes, and the ser
 The service prints "socket path exceeds 100 bytes", but `serve --detach` discards the child's output.
 The launcher reports only "lgtm: service failed to start".
 Running `node packages/engine/src/service.ts` directly shows the reason.
+
+## s2-board-1. The live board inferred sprint status from its phase.
+
+The first connection put a sprint into a column from its phase and completion time.
+The engine derives status from its completion text and task states.
+This change maps those four engine states and leaves Backlog empty.
+It also removes the mock's default priority, roadmap dates, and eight-phase progress from live board rendering.
+
+## s2-board-2. Project settings rendered values the engine does not store.
+
+The first connection supplied enabled test and review switches and a derived task prefix.
+The settings page also proposed a work assignment from the mock's model lists.
+This change leaves these live fields empty and keeps their actions on the explicit refusal.
+The lead's model and effort choices now come from the configuration read.
+
+## s2-board-3. A failed Git read hid independent task history.
+
+The new task detail read initially treated history and changed files as one successful operation.
+A refused Git read therefore hid history that the engine had returned.
+This change applies each successful read and shows the reason for each failed read.
+The browser fixture now registers a real temporary Git repository and its workspace settings.
