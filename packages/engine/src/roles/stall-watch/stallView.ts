@@ -21,7 +21,8 @@ export const stallInput = (snapshot: Snapshot, enabled = true): StallInput => {
     const stallWatchTurn = turn?.event._tag === "DeliverySent" && deliveryIsStallWatchTurn(snapshot, turn.event.deliveryId);
     return [id, {
       state: row.state, role: row.role, parent: row.parent, capacityHeld: row.capacityHeld, stallWatchTurn,
-      stallMinutes: resolveSettings(roles.settings, roleSettings(roles.file, row.role)).stallMinutes,
+      stallMinutes: own(roles.agents, id)?.turnStartSequence === undefined && roles.settings.assignedStallMinutes !== undefined
+        ? roles.settings.assignedStallMinutes : resolveSettings(roles.settings, roleSettings(roles.file, row.role)).stallMinutes,
       ...(row.state._tag === "paused" ? { pause: { kind: row.state.reason === "signed-out" ? "signed-out" : "usage-limit",
         ...(row.state.resetAt === undefined ? {} : { resetAt: row.state.resetAt }) } } : account?.status === "needs-sign-in" ? { pause: { kind: "signed-out" } }
         : account?.status === "out-of-usage" ? { pause: { kind: "usage-limit", ...(account.resetAt === undefined ? {} : { resetAt: account.resetAt }) } } : {}),
