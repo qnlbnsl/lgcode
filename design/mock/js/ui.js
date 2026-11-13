@@ -219,6 +219,19 @@ function Cited({ text }) {
     : /^`/.test(t) ? html`<code key=${i}>${t.slice(1, -1)}</code>` : t.replace(/ $/, ' '));
 }
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
+// What an answered card says about its answer: a short label, and the owner's words when the
+// answer was typed.
+export function requestOutcome(r, rec) {
+  const a = (r.answer || '').trim();
+  if (r.status === 'cancelled') return { label: 'Cancelled', text: a && a !== 'Cancelled' ? a : '', icon: 'x', tone: 'off' };
+  if (r.kind !== 'question') {
+    const byKind = { allow_once: 'Allowed', allow_always: 'Allowed, always', reject_once: 'Denied', reject_always: 'Denied, always' }[r.answerKind];
+    const label = byKind || a || 'Answered'; const no = /^(denied|sent back)/i.test(label);
+    return { label, text: '', icon: no ? 'x' : 'check', tone: no ? 'no' : 'yes' };
+  }
+  if (rec && a === rec.label) return { label: 'Accepted the recommendation', text: '', icon: 'check', tone: 'yes' };
+  return { label: 'You answered', text: a, icon: 'check', tone: 'yes' };
+}
 function BriefCard({ s, r, openThread, who }) {
   const now = useNow(); const a = agentOf(s, r.agent); const isQ = r.kind === 'question';
   const [open, setOpen] = useState(() => s.ui.panelReq === r.id);
@@ -251,14 +264,17 @@ function BriefCard({ s, r, openThread, who }) {
         items=${standing.map((o) => ({ label: always, why: o.label, disabled: busy, onSelect: () => answer(o.id) }))} width=${320} />`}</span>`;
   };
   if (liveMode.on && r.status === 'open' && r.heldBy) return html`<section class="req qc" id=${'req-' + r.id}><b>${r.title}</b><p>${r.body}</p><p class="muted">Waiting on ${agentOf(s, r.heldBy).name}</p></section>`;
-  if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
-    <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
-    <p class="qc-answer">${r.answer}</p></section>`;
+  // An answered card keeps everything it showed. The answer buttons leave, and one line says
+  // what the answer was.
+  const done = r.status !== 'open';
+  if (!live && !done) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Held: ' + brief}>
+    <div class="qc-top"><b class="qc-q">${brief}</b></div></section>`;
+  const outcome = done ? requestOutcome(r, rec) : null;
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
-  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req qc', r.kind, open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${(isQ ? 'Question: ' : 'Approval: ') + brief}>
-    <div class="qc-top"><b class="qc-q">${brief}</b><span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span></div>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req qc', r.kind, open && 'open', done && 'done')} id=${'req-' + r.id} tabindex="-1" aria-label=${(done ? 'Answered: ' : isQ ? 'Question: ' : 'Approval: ') + brief}>
+    <div class="qc-top"><b class="qc-q">${brief}</b>${done ? html`<span class="qc-age">${clock(r.answeredAt)}</span>` : html`<span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span>`}</div>
     ${summary && html`<p class="qc-sum">${summary}</p>`}
     ${recShort && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
     ${open && html`<div class="qc-report" id=${id}>
@@ -269,17 +285,19 @@ function BriefCard({ s, r, openThread, who }) {
       ${r.what && html`<section class="qc-part"><h5>What it is about</h5><${Paras} list=${r.what} /></section>`}
       ${(r.whyText || r.why) && html`<section class="qc-part why"><h5>Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
       ${r.recWhy && html`<section class="qc-part reco"><h5><${Icon} name="sparkles" size=${13} />Why this answer</h5><${Paras} list=${r.recWhy} /></section>`}
-      ${(others.length > 0 || isQ) && html`<section class="qc-part"><h5>Other answers</h5>
+      ${(others.length > 0 || (isQ && !done)) && html`<section class="qc-part"><h5>Other answers</h5>
         <ul class="qc-opts">
           ${others.map((o) => html`<li key=${o.id}><div><b>${o.label}</b>${o.note && html`<p>${o.note}</p>`}</div>
-            <button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button></li>`)}
-          ${isQ && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+            ${!done && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button>`}</li>`)}
+          ${isQ && !done && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
             <input ref=${own} class="input" placeholder="Your own answer" aria-label="Your own answer" value=${text} onInput=${(e) => setText(e.target.value)} />
             <button type="submit" class="btn sm" disabled=${!text.trim() || (liveMode.on && chatLive.requestBusy(r))}>Send</button></form></li>`}
         </ul></section>`}
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
+    ${done && html`<p class=${cx('qc-outcome', outcome.tone)}><${Icon} name=${outcome.icon} size=${14} /><b>${outcome.label}</b>${outcome.text && html`<span>${outcome.text}</span>`}</p>`}
     <div class="req-actions qc-actions">
+      ${!done && html`
       ${!isQ && liveMode.on && liveSplit('Allow', 'check', 'Always allow', 'allow_once', 'allow_always')}
       ${!isQ && liveMode.on && liveSplit('Deny', 'x', 'Always deny', 'reject_once', 'reject_always')}
       ${!isQ && liveMode.on && opts.filter((o) => !['allow_once', 'allow_always', 'reject_once', 'reject_always'].includes(o.kind)
@@ -289,6 +307,7 @@ function BriefCard({ s, r, openThread, who }) {
       ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
       ${!isQ && !liveMode.on && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
       ${!isQ && !liveMode.on && split('Deny', 'x', 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
+      `}
       <button type="button" class="btn" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
       ${thread}
     </div>

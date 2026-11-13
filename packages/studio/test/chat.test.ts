@@ -23,7 +23,7 @@ describe("Home mapping", () => {
   it("keeps harness option ids, complete options and answered labels", () => {
     const row = { ...engineSnapshot.requests[0], kind: "permission", status: "answered", canAnswer: false, optionId: "custom-yes", answeredAt: 99 } as ClientRequest
     const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "Run checks", toolInput: { command: "pnpm test" }, options: [{ id: "custom-yes", name: "Allow this check", kind: "allow_once" }, { id: "custom-no", name: "Refuse", kind: "reject_once" }] }))!
-    expect(result).toMatchObject({ command: "pnpm test", body: "Run checks", status: "answered", answer: "Allow this check", answeredAt: 99, options: [{ id: "custom-yes", label: "Allow this check", primary: true }, { id: "custom-no", label: "Refuse", primary: false }] })
+    expect(result).toMatchObject({ command: "pnpm test", body: "Run checks", status: "answered", answer: "Allow this check", answerKind: "allow_once", answeredAt: 99, options: [{ id: "custom-yes", label: "Allow this check", primary: true }, { id: "custom-no", label: "Refuse", primary: false }] })
   })
   it("preserves cancellation and agent-held identity", () => {
     expect(mapHomeRequest({ ...question, status: "cancelled", holder: { _tag: "agent", agentId: "ag-lead" as never } }, agents)).toMatchObject({ status: "cancelled", heldBy: "ag-lead" })

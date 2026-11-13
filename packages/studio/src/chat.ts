@@ -23,6 +23,7 @@ export function mapHomeRequest(row: ClientRequest, agents: ReadonlyArray<StoreAg
     options: row.kind === "question" ? (proposed ? [{ id: "proposed", label: proposed, primary: true }] : [])
       : options.map((o) => ({ id: o.id, label: o.name, kind: o.kind, primary: o.kind === "allow_once" })),
     answer: row.answer ?? options.find((o) => o.id === row.optionId)?.name ?? row.optionId ?? row.reason ?? (row.status === "cancelled" ? "Cancelled" : ""),
+    answerKind: options.find((o) => o.id === row.optionId)?.kind ?? null,
     answeredAt: row.answeredAt ?? null }
 }
 

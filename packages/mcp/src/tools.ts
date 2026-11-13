@@ -61,7 +61,7 @@ export const descriptions: Record<ToolName, string> = {
   prompt: "Send a prompt to an agent.",
   answer: "Answer a permission request (kind permission, id, optionId) or a question (kind question, id, text) held for you.",
   "pass-up": "Pass a permission request or question up to the agent above you.",
-  ask: "Ask the agent above you, or the owner, a question.",
+  ask: "Ask the agent above you, or the owner, a question. The recipient sees the question, your recommendation and your proposed answer as a card with answer buttons. Do not repeat or announce the question in your reply text afterwards. End your turn and wait for the answer.",
   wait: "Wait for agents to settle. With block true the call stays open until the wait is satisfied or cancelled.",
   "cancel-reply": "Cancel only an active reply of an agent you manage, keeping the process running.",
   stop: "Stop an agent.",

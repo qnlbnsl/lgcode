@@ -11475,3 +11475,25 @@ The dialog now uses the repository's recorded local folder.
 It does not construct a folder from an unknown workspace setting.
 A regression test opens the dialog and checks the actual registered path.
 This problem is fixed in the merge.
+
+## 666. An answered question or approval card lost its contents.
+
+The owner reported this on 2026-11-13.
+An answered card in a thread shrank to its title and a short answer line.
+The summary, the recommendation and the report under "Details" were gone.
+The card now keeps everything it showed before the answer.
+The answer buttons leave, and one line states the outcome.
+The outcome line reads "Allowed", "Denied", "Accepted the recommendation", "You answered" with the owner's words, or "Cancelled".
+The change is in `BriefCard` in `design/mock/js/ui.js`, and the live website carries the chosen option's kind as `answerKind`.
+This is a change to the visible mock, and it awaits the owner's approval of the look.
+
+## 667. A lead repeated its question as a message after asking it.
+
+The owner reported this on 2026-11-13.
+The project lead called the `ask` tool, and the owner saw the question as a card.
+The lead then wrote "Sent through LGTM Studio:" and the same question again as an ordinary message.
+The tool's description did not say that the recipient already sees the question.
+The description in `packages/mcp/src/tools.ts` now says so, and it tells the agent not to repeat the question.
+This has not been checked against a real agent.
+A running agent keeps the old description until it is started again.
+The website does not hide a repeated question, because hiding an agent's free text could hide a real message.
