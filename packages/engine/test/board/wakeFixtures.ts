@@ -40,12 +40,13 @@ export const provideBoard = <A, E, R>(
   program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>),
   secrets: ReadonlyArray<string> = [],
   options: {
+    readonly lists?: import("../../src/pieces/lists.ts").EngineLists;
     readonly capacityHoldCondition?: (id: import("@lgtm/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
   } = {},
   beforeHandlerTransaction: Effect.Effect<void> = Effect.void,
 ) => Effect.gen(function* () {
   const runner = yield* makeFakeRunner();
-  const lists = { ...engineLists, services: { ...engineLists.services,
+  const lists = { ...(options.lists ?? engineLists), services: { ...(options.lists ?? engineLists).services,
     "test.board": ["board.post", "board.close", "board.status", "board.flush"],
   } };
   const redactor = makeRedactor({ secrets: () => secrets.map((value) => Redacted.make(value)), tokenHashes: () => new Set() });

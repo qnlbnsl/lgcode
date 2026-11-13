@@ -28,7 +28,7 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
   // A project team and its group channel are one atomic record operation.
   // This exception permits only the matching channel, never arbitrary board writes.
   const teamChannel = (event: Event): boolean => {
-    if (namespace !== "project" || event._tag !== "board.ChannelOpened" || event.kind !== "group") return false;
+    if (lists.boardEnabled === false || namespace !== "project" || event._tag !== "board.ChannelOpened" || event.kind !== "group") return false;
     const team = batch.events.find((row) => row._tag === "project.TeamAdded" && row.channelId === event.channelId);
     if (team?._tag !== "project.TeamAdded") return false;
     const project = own(projectView(snapshot).projects, team.projectId);
@@ -44,7 +44,7 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
   // Match every field, reject duplicate ids, and leave all other board events
   // subject to the existing namespace boundary.
   const defaultChannels = new Set<Event>();
-  if (namespace === "project" && caller?._tag === "owner") {
+  if (lists.boardEnabled !== false && namespace === "project" && caller?._tag === "owner") {
     const created = batch.events.filter((event) => event._tag === "project.Created");
     if (created.length === 1) {
       const project = created[0]!;

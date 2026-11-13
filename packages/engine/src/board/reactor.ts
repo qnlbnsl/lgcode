@@ -177,7 +177,7 @@ export const boardReactor = Effect.scoped(Effect.gen(function* () {
   yield* syncProjectChannels();
   for (const agent of Object.values(initial.agents)) yield* run(agent.agentId);
   yield* subscribe(initial.sequence).pipe(Stream.runForEachArray((batch) => Effect.gen(function* () {
-    if (batch.some(({ event }) => ["project.Created", "project.TeamAdded", "AgentStarted", "AgentGrouped"].includes(event._tag))) yield* syncProjectChannels();
+    if (batch.some(({ event }) => ["project.Created", "project.Restored", "project.TeamAdded", "AgentStarted", "AgentGrouped", "SessionOpened"].includes(event._tag))) yield* syncProjectChannels();
     const snapshot = yield* views.snapshot;
     for (const [target, sequence] of touchedTargets(snapshot, batch)) {
       if (sequence > (inspected.get(target) ?? 0)) yield* run(target, sequence);

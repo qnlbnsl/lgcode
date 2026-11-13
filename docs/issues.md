@@ -11828,3 +11828,40 @@ The field remained disabled until the browser's ten-second action timeout expire
 The shared file-action helper now waits for the Git view to finish each action.
 The merge step also waits for Stage all before it fills the message.
 The wait uses the journey's existing thirty-second assertion budget.
+
+
+## 690. Default project channels did not respect the board's membership rules.
+
+Found in the review of commit be84dd6 on 2026-11-13.
+Fixed on the worker/s4-channels branch.
+The Leads channel now recognizes the contracts' lead role and its named variants.
+A lead must share a team group from the same project.
+The reactor uses the existing member-removal history to preserve the owner's removals.
+It excludes stopped and crashed agents from new admissions.
+It skips archived and archiving projects.
+It shares the board's 64-member limit.
+A skipped admission produces one service post in that channel.
+The post identifies the agent and tells the owner how to add it manually after making room.
+The post's stable identifier prevents repeated notices and automatic retries across restarts.
+The reactor does not remove members already recorded in older events.
+Project creation refuses with "board disabled" when the board is switched off.
+This matches team creation and prevents creation side effects before the refusal.
+
+## 691. An agent can give its child a lead role in its own project.
+
+Reviewed and accepted for the default project channels on 2026-11-13.
+The team record has a group and has no separate team-lead identity.
+An agent allowed to start a child can assign a lead role and its project's team group.
+That child can join the Leads channel of its own project.
+The project ancestry check excludes agents from other projects even if they claim that group.
+The channel does not grant project-management authority.
+Changing this behavior would require a firmer team-lead identity in the engine.
+
+## 692. Default project channel names conflict with the manager's unique-name rule.
+
+Open after the default-channel review on 2026-11-13.
+The owner manages a General channel and a Leads channel for each project.
+These automatic channels can repeat those names across projects.
+The board's manual open command still requires a unique name for each manager.
+The owner therefore cannot manually open another General channel or another Leads channel.
+The rule remains unchanged pending an owner decision.

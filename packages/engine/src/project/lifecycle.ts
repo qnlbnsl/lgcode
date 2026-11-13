@@ -115,6 +115,7 @@ const checkCreationBindings = (observed: Input, current: Input, plan: ProjectCre
     || !same(locations(before), locations(now)) || !same(workspaces(before), workspaces(now))) return yield* refused("project state changed; refresh and retry")
 })
 const admitCreation = (input: Input, plan: ProjectCreation) => Effect.gen(function* () {
+  if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled")
   yield* dedicatedCreation(plan)
   const view = projectView(input.snapshot)
   if (duplicateName(input, { repoId: plan.repository.repoId, machineId: plan.workspace.machineId, name: plan.name }, plan.projectId)
@@ -133,6 +134,7 @@ const admitCreation = (input: Input, plan: ProjectCreation) => Effect.gen(functi
 export const prepareProjectLifecycle = (input: Input, name: string, payload: Record<string, unknown>, bodyHash: string) => Effect.gen(function* () {
   const runtime = input.runtime
   if (name === "project.create") {
+    if (runtime.lists?.boardEnabled === false) return yield* refused("board disabled")
     const p = payload as Payload<"project.create">
     const existing = own(projectView(input.snapshot).creations, p.requestId)
     if (existing !== undefined && existing.bodyHash !== bodyHash) return yield* refused("request id reused")

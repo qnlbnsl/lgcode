@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type AgentId, type Event, type EventEnvelope } from "@lgtm/contracts";
 import { ChannelId, PostId, type BoardAddressee, type BoardAuthor } from "@lgtm/contracts/board/ids";
+import { boardLimits } from "@lgtm/contracts/board/limits";
 import { holdsIncoming, holdsUnsettled } from "@lgtm/contracts/board/conditions";
 import type { BoardPostView } from "@lgtm/contracts/board/view";
 import { BoardChannelName, BoardPostText } from "@lgtm/contracts/board/schemas";
@@ -59,7 +60,7 @@ const members: Planner = (input, raw) => Effect.gen(function* () {
     if (![...retained, ...added].some((candidate) => sameAuthor(candidate, member))) added.push(member);
   }
   const memberCount = retained.length + added.length;
-  if (memberCount > 64) return yield* refused("a plain channel has at most 64 members");
+  if (memberCount > boardLimits.channelMembers) return yield* refused("a plain channel has at most 64 members");
   const events: Event[] = added.length === 0 && removed.length === 0 ? [] : [{ _tag: "board.ChannelMembersChanged",
     channelId: payload.channelId, membersAdded: added, membersRemoved: removed }];
   return { ...withWakes(input, events, []), reply: () => ({ requestId: payload.requestId, memberCount }) };
