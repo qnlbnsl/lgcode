@@ -11131,6 +11131,7 @@ State: fixed.
 Reconnect now claimed success before the connection answered.
 Update checks, workflow checks, restarts, and harness scans also simulated successful work.
 The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
 Unconnected actions now show the required refusal notice before their simulation starts.
 Reconnect now leaves its status to the real connection.
 The standalone mock retains its simulation.
@@ -11144,3 +11145,19 @@ The previous rendering test supplied an ended session and empty records itself.
 Its name now describes that limited assertion.
 New tests invoke the actual logout control through the real connection.
 They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## connect-fix-9. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: open.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.

@@ -152,3 +152,15 @@ it("sign-in refuses before showing a simulated account flow (finding 7)", async 
   expect(store.state.dialog).toBeNull()
   expect(calls).toEqual([])
 })
+
+it("a refused full run starts no delayed simulation (finding 7)", async () => {
+  const { store, calls } = await mount("/p/pj-orchard/workflow/runs")
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+  try {
+    button("Start full run").click()
+    await vi.advanceTimersByTimeAsync(3300)
+    noticeOnly(store.state)
+    expect(store.state.workflow["pj-orchard"].runs).toEqual([])
+    expect(calls).toEqual([])
+  } finally { vi.useRealTimers() }
+})
