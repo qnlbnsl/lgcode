@@ -30,6 +30,11 @@ describe("Home mapping", () => {
     const result = mapThread([{ sequence: 1, occurredAt: 1000, event: { _tag: "ThreadItem", agentId: "ag-lead", itemId: "i1", content: { _tag: "tool-call", callId: "c1", title, status: "completed", output: "x".repeat(200) } } }] as never, "ag-lead" as never)
     expect(result.items.find((row) => row.type === "tools")).toMatchObject({ summary: "python3 - <<'PY'", full: title, output: "x".repeat(200), lines: [{ res: "" }] })
   })
+  it("gives a plain title to a command whose input arrived cut", () => {
+    const row = { ...engineSnapshot.requests[0], kind: "permission", display: { ...engineSnapshot.requests[0]!.display, title: undefined, preview: "printf '%s' \\\n  'one'", toolKind: "execute" } } as unknown as ClientRequest
+    const result = mapHomeRequest(row, agents, envelope(row.sourceSequence, { _tag: "PermissionRequested", permissionRequestId: row.id, agentId: row.agentId, description: "printf '%s' \\\n  'one' \\\n  'two'", toolKind: "execute", toolInput: "{\"command\":\"printf", options: [] }))!
+    expect(result).toMatchObject({ title: 'Run "printf" and other commands in the terminal', command: "printf '%s' \\\n  'one' \\\n  'two'" })
+  })
   it("names what a command attempts and keeps a harness's own description", () => {
     expect(attemptTitle("rm -- /tmp/probe", "rm -- /tmp/probe", "execute")).toBe('Run "rm" in the terminal')
     expect(attemptTitle("cd app && pnpm test", "cd app && pnpm test", "execute")).toBe('Run "cd" and other commands in the terminal')
