@@ -26,7 +26,6 @@ let current = local;
 
 export function setConnection(connection) { current = connection || local; }
 export function connection() { return current; }
-export function request(tag, payload) { return current.request(tag, payload); }
 
 // A request from the website to the engine. `tag` is the RPC's tag in @lgtm/contracts.
 export function call(tag, payload) {
@@ -37,3 +36,6 @@ export function call(tag, payload) {
 export function push(kind, payload) {
   try { current.push(kind, payload); } catch (e) { console.error('The connection failed to deliver', kind, e); }
 }
+
+// Resolves with the engine reply, or rejects with its refusal reason.
+export function request(tag, payload) { return current.request(tag, payload); }

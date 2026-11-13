@@ -7,6 +7,7 @@ import {
   projectOf, repoOf, agentOf, teamOf, teamName, machineOf, subOf, byId, HARNESSES, openRequests, agentStatus, projectStatus, routeForAgent,
 } from './data.js';
 import * as act from './actions.js';
+import * as board from './live/board.js';
 import { Dialog, registerDialog, Avatar, MergeFacts } from './ui.js';
 
 // ---- quick switcher ---------------------------------------------------------------
@@ -103,37 +104,40 @@ export function SubscriptionTable({ s, machine, value, onPick, name = 'lead-sub'
         <td class="muted wrap">${h.models.join(', ')}</td></tr>`; })}</tbody></table></div>`;
 }
 function NewProject({ s, d }) {
-  const [machine, setMachine] = useState(d.machine || 'studio');
-  const [repo, setRepo] = useState(d.repo || s.repos[0].id);
+  const [machine, setMachine] = useState(live.on ? 'local' : d.machine || 'studio');
+  const [repo, setRepo] = useState(d.repo || s.repos[0]?.id || '__new');
   const [newRepo, setNewRepo] = useState('');
   const [goal, setGoal] = useState(d.goal || '');
   const ready = s.subscriptions.filter((x) => x.signedIn && x.enabled && x.machine === machine);
   const [sub, setSub] = useState(ready[0]?.id);
   useEffect(() => { if (!ready.some((x) => x.id === sub)) setSub(ready[0]?.id); }, [machine]);
+  useEffect(() => { if (live.on) void board.loadSetup(); }, []);
+  const creating = live.on && board.busy('create-project');
+  const defaults = s.setupData?.lead;
   const m = machineOf(s, machine); const r = byId(s.repos, repo);
   const isNew = repo === '__new';
   const hasRepo = isNew || !!r?.folders[machine];
-  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !goal.trim() ? 'Write the goal.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !sub ? `No subscription is signed in on ${m.name}.` : null;
-  const create = () => { if (why || !hasRepo) return; act.closeDialog(); act.createProject({ repo, goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
+  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !goal.trim() ? 'Write the goal.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !live.on && !sub ? `No subscription is signed in on ${m.name}.` : null;
+  const create = () => { if (why || !hasRepo || creating) return; if (!live.on) act.closeDialog(); act.createProject({ repo, goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
   return html`<${Dialog} title="New project" size="wide" onClose=${act.closeDialog} onSubmit=${create}
-    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo}>Create project</button>`}>
+    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo || creating} aria-busy=${creating}>${creating ? 'Creating…' : 'Create project'}</button>`}>
     <div class="field"><label for="np-goal">Goal</label>
       <textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="Make a mock for the LGTM Studio phone app" autofocus
         onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); create(); } }}></textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
       <div class="field"><label for="np-machine">Run on</label>
         <select id="np-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
-          ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
+          ${s.machines.filter((x) => !live.on || x.id === 'local').map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
       <div class="field"><label for="np-repo">Repository</label>
         <select id="np-repo" class="select" value=${repo} onChange=${(e) => setRepo(e.target.value)}>
           ${s.repos.map((x) => html`<option value=${x.id}>${x.name}${x.folders[machine] ? '' : ` (not on ${m.name})`}</option>`)}
           <option value="__new">New repository…</option></select></div>
     </div>
     ${isNew && html`<div class="field"><label for="np-newrepo">New repository name</label><input id="np-newrepo" class="input" value=${newRepo} onInput=${(e) => setNewRepo(e.target.value)} placeholder="notes-site" /></div>`}
-    ${!hasRepo && html`<div class="callout warn"><${Icon} name="triangle-alert" size=${15} /><span class="grow">${r.name} is not on ${m.name}.</span>
+    ${!hasRepo && r && html`<div class="callout warn"><${Icon} name="triangle-alert" size=${15} /><span class="grow">${r.name} is not on ${m.name}.</span>
       <button type="button" class="btn sm" onClick=${() => { act.openDialog({ type: 'add-repository', machine, repo, back: { type: 'new-project', machine, repo, goal } }); }}>Add to ${m.name}</button></div>`}
     <div class="field"><span class="label">Project lead</span>
-      <${SubscriptionTable} s=${s} machine=${machine} value=${sub} onPick=${setSub} /></div>
+      ${live.on ? html`<p class="muted" aria-live="polite">${board.busy('read-setup') ? 'Loading lead settings…' : defaults ? `${defaults.harness} · ${defaults.account._tag === 'named' ? defaults.account.accountId : 'Any ready account'}${defaults.model ? ' · ' + defaults.model : ''}${defaults.effort ? ' · ' + defaults.effort : ''}` : 'The service chooses the lead from its configured defaults.'}</p>` : html`<${SubscriptionTable} s=${s} machine=${machine} value=${sub} onPick=${setSub} />`}</div>
   <//>`;
 }
 registerDialog('new-project', NewProject);

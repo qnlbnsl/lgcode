@@ -4,6 +4,7 @@ import * as liveGit from './live/git.js';
 // engine is also reported to engine.js, under the RPC tag the real client API uses.
 import { store, update, notify, uid, remember, go, MIN, live, refuse, engineWrite } from './lib.js';
 import * as engine from './engine.js';
+import * as board from './live/board.js';
 import {
   agentOf, projectOf, teamOf, threadOf, openRequests, agentLabel, byId, tasksOfSprint, teamName, HARNESSES,
 } from './data.js';
@@ -222,7 +223,7 @@ export function nameFromGoal(goal) {
   return name ? name[0].toUpperCase() + name.slice(1) : 'New project';
 }
 export function createProject({ repo, goal, machine, subscription, newRepo }) {
-  if (refused()) return;
+  if (live.on) return board.createProject({ repo, goal, machine, subscription, newRepo });
   const s = S();
   let repoId = repo;
   if (newRepo) {
@@ -256,7 +257,7 @@ export function createProject({ repo, goal, machine, subscription, newRepo }) {
   return id;
 }
 export function archiveProject(pid, archived = true) {
-  if (refused()) return;
+  if (live.on) return board.archiveProject(pid, archived);
   engine.call(archived ? 'archive' : 'restore', { projectId: pid });
   update((s) => {
     const p = projectOf(s, pid); p.archived = archived;

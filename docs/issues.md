@@ -11070,7 +11070,67 @@ The service prints "socket path exceeds 100 bytes", but `serve --detach` discard
 The launcher reports only "lgtm: service failed to start".
 Running `node packages/engine/src/service.ts` directly shows the reason.
 
-## s2-git-1. A fast connection reply could leave a reloaded page blank.
+## 627. The live board inferred sprint status from its phase.
+
+The first connection put a sprint into a column from its phase and completion time.
+The engine derives status from its completion text and task states.
+This change maps those four engine states and leaves Backlog empty.
+It also removes the mock's default priority, roadmap dates, and eight-phase progress from live board rendering.
+
+## 628. Project settings rendered values the engine does not store.
+
+The first connection supplied enabled test and review switches and a derived task prefix.
+The settings page also proposed a work assignment from the mock's model lists.
+This change leaves these live fields empty and keeps their actions on the explicit refusal.
+The lead's model and effort choices now come from the configuration read.
+
+## 629. A failed Git read hid independent task history.
+
+The new task detail read initially treated history and changed files as one successful operation.
+A refused Git read therefore hid history that the engine had returned.
+This change applies each successful read and shows the reason for each failed read.
+The browser fixture now registers a real temporary Git repository and its workspace settings.
+
+## 630. The sidebar did not refresh the owner's saved name.
+
+The connection originally read the owner's name only when it connected.
+Saving a display name during first run left the sidebar showing its old value.
+The connection now reads the settings again when their change arrives on the stream.
+
+## 631. The mock hides message post actions in a narrow panel.
+
+The existing message styles hide the post action buttons when the panel is narrower than 720 pixels.
+This also happens on a desktop when the sidebar and channel list reduce the panel width.
+The browser test uses a wide viewport to exercise those existing controls.
+Changing this layout remains outside this connection change.
+
+## 632. Generic dialogs closed before a live request finished.
+
+The mock's rename and confirmation dialogs close before their callbacks run.
+A live rename or archive therefore had no pending control and lost its draft on refusal.
+These dialogs now support waiting for a reply when the caller requests it.
+The connected project actions use this option.
+The standalone mock retains its immediate callbacks.
+
+## 633. Repository placeholders asserted that unknown data was absent.
+
+The repository page rendered a missing remote address as "None".
+Project settings rendered the same missing address as "No remote".
+The engine does not hold a remote address, so these statements were not supported by its records.
+The live fields now remain empty.
+The live repository description also omits the mock's promise that a lead will write it.
+
+## 634. The full browser check failed in three unchanged website cases.
+
+The full check at `04eb7aa` passed all TypeScript checks and all 528 test files.
+Its browser run passed the three Studio cases and failed three existing website cases.
+The Git staging case could not find the expected disabled "Commit 2 files" button after staging.
+The Git synchronization case retained "1 incoming" after Pull.
+The registered component preview case did not observe the expected document response.
+The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
+The result file records the baseline checks for these failures.
+
+## 635. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11080,7 +11140,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## s2-git-2. Registered workspaces need their project and team links joined.
+## 636. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11089,7 +11149,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## s2-git-3. The settings contract does not return effective role defaults.
+## 637. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11101,7 +11161,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## s2-git-4. Notification retries need the original receipt after a lost reply.
+## 638. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11112,7 +11172,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## s2-git-5. Git destinations must keep their workspace identifiers.
+## 639. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11122,7 +11182,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## s2-git-6. The existing website's browser assertions failed in the full check.
+## 640. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11145,3 +11205,15 @@ The implementation branch's full run passed that logout test.
 The baseline run finished with 43 passed tests and three failed tests.
 The implementation run finished with 45 passed browser tests and two failed browser tests.
 The complete comparison is recorded in the builder's result.
+
+## 641. The automatic merge retained duplicate shared declarations.
+
+Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
+State: fixed in the merge.
+
+Both builders added a request method to the live website's test connection.
+The automatic merge kept both methods without reporting a conflict.
+The Studio type check rejected the duplicate identifier.
+The automatic merge also duplicated the JavaScript request export and the dialog's live import.
+The merge now keeps one request method, one request export, and one live import.
+The test connection keeps the board builder's request recording.
