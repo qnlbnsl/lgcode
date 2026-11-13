@@ -39,9 +39,9 @@ export function seedService(st) {
     cursor: { name: 'Cursor', models: [], efforts: [], noEffort: [], runMode: 'ACP' },
   });
   for (const [id, h] of Object.entries(HARNESSES)) {
-    const pkg = { claude: '@anthropic-ai/claude-code@2.1.325', codex: '@openai/codex@0.166.0', gemini: '@google/gemini-cli@0.68.0' }[id];
+    const pkg = { claude: '@anthropic-ai/claude-code@2.1.325', gemini: '@google/gemini-cli@0.68.0' }[id];
     Object.assign(h, { installed: ['claude', 'codex'].includes(id), version: more.studio.harnesses[id], defaultModel: h.models[0] || '', defaultEffort: h.efforts[1] || '' });
-    h.recipe = { automatic: !['claude', 'cursor'].includes(id), packages: pkg ? [pkg] : [], commands: [id === 'claude' ? `npm install -g ${pkg}` : pkg ? `'/usr/local/bin/node' '/usr/local/lib/node_modules/npm/bin/npm-cli.js' 'ci' '--prefix' '/home/maya/.local/share/lgtm/harnesses/${id}' '--registry' 'https://registry.npmjs.org' '--ignore-scripts' '--no-audit' '--no-fund'` : 'curl https://cursor.com/install -fsS | bash'], source: { claude: 'https://code.claude.com/docs/en/setup', codex: 'https://learn.chatgpt.com/docs/changelog', gemini: 'https://geminicli.com/docs/get-started/installation/', cursor: 'https://cursor.com/docs/cli/installation' }[id], signInCommand: { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini', cursor: 'agent login' }[id], reason: ['claude', 'cursor'].includes(id) ? 'Run the official installer in your terminal, then check again.' : 'Install scripts are disabled. The committed lockfile fixes the dependency tree and integrity hashes.' };
+    h.recipe = { automatic: id === 'gemini', packages: pkg ? [pkg] : [], commands: id === 'codex' ? [] : [id === 'claude' ? `npm install -g ${pkg}` : pkg ? `'/usr/local/bin/node' '/usr/local/lib/node_modules/npm/bin/npm-cli.js' 'ci' '--prefix' '/home/maya/.local/share/lgtm/harnesses/${id}' '--registry' 'https://registry.npmjs.org' '--ignore-scripts' '--no-audit' '--no-fund'` : 'curl https://cursor.com/install -fsS | bash'], source: { claude: 'https://code.claude.com/docs/en/setup', codex: '', gemini: 'https://geminicli.com/docs/get-started/installation/', cursor: 'https://cursor.com/docs/cli/installation' }[id], signInCommand: { claude: 'claude auth login', codex: 'codex login', gemini: 'gemini', cursor: 'agent login' }[id], reason: id === 'codex' ? 'Codex is bundled. There is nothing to install.' : ['claude', 'cursor'].includes(id) ? 'Run the official installer in your terminal, then check again.' : 'Install scripts are disabled. The committed lockfile fixes the dependency tree and integrity hashes.' };
   }
 
   // What the bell has shown, newest first, and whether each one reached the phone.
@@ -291,7 +291,7 @@ function SubRow({ s, x, now }) {
   const remove = () => act.confirm({ title: `Remove ${h.name} · ${x.name}?`, body: live.on ? 'The account is removed. Its sign-in and running agents are kept.' : 'The subscription and its sign-in are removed from LGTM Studio.', action: 'Remove subscription',
     lost: ags.length ? [`${plural(ags.length, 'agent')} will need another subscription`] : [],
     onConfirm: () => { if (live.on) return liveGit.accountAction(x.id, 'remove'); update((stt) => { stt.subscriptions = stt.subscriptions.filter((y) => y.id !== x.id); }); act.toast('Subscription removed'); } });
-  const signIn = () => act.openDialog({ type: 'harness-signin', account: x.id });
+  const signIn = () => { if (live.on) return act.openDialog({ type: 'harness-signin', account: x.id }); update(() => { x.signedIn = true; x.account = 'owner@example.com'; }); act.toast(`Signed in to ${h.name} · ${x.name}`); };
   return html`<div class=${cx('svc-sub', st.tone === 'warn' && 'warn', st.tone === 'error' && 'error', !x.enabled && 'dim')}>
     <div class="svc-sub-row">
       <div class="c-name"><button type="button" class=${cx('svc-twist', open && 'open')} aria-expanded=${open} aria-label=${(open ? 'Hide' : 'Show') + ' agents on ' + x.name} onClick=${() => act.toggleExpanded(k)}><${Icon} name="chevron-right" size=${13} /></button>

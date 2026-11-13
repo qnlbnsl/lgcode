@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs"
+import { constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs"
 import { access, copyFile, mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect"
 import { credentialSourceFor, type CredentialRegistry } from "../accounts/credentialSource.ts"
 import { linuxProcessReader } from "../recovery/orphans.ts"
 import { installRecipes, type RecipeDefinition } from "./recipes.ts"
+import { isPackageProgram, verifyStagedTree } from "./verification.ts"
 
 export interface InstallStep { readonly executable: string; readonly args: ReadonlyArray<string> }
 export interface ProcessResult { readonly ok: boolean; readonly output: string; readonly reason?: string }
@@ -85,7 +86,7 @@ export async function runRecipe(steps: ReadonlyArray<InstallStep>, options: RunO
 }
 const executableFile = async (path: string) => { try { return (await stat(path)).isFile() && await access(path, constants.X_OK).then(() => true) } catch { return false } }
 const inside = (root: string, path: string) => path.startsWith(root + sep)
-interface Receipt { readonly path: string; readonly hash: string; readonly version: string; readonly files: Readonly<Record<string, string>> }
+interface Receipt { readonly path: string; readonly hash: string; readonly version?: string; readonly files: Readonly<Record<string, string>> }
 const digest = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex")
 // Check every link, including intermediate links that leave and re-enter the
 // prefix. A realpath comparison alone would miss those intermediate escapes.
@@ -120,7 +121,7 @@ const treeIdentity = (prefix: string): Record<string, string> => {
   visit(prefix)
   return files
 }
-export function recordManagedInstallation(home: string, id: string, path: string, version: string, stateFolder?: string): void {
+export function recordManagedInstallation(home: string, id: string, path: string, version: string | undefined, stateFolder?: string): void {
   if (!installRecipes.some((r) => r.harnessId === id)) throw new Error("unknown harness")
   const prefix = join(userHarnessPrefix(home), id), identity = managedIdentity(prefix, path), files = treeIdentity(prefix), records = receiptFolder(home, stateFolder)
   mkdirSync(records, { recursive: true, mode: 0o700 })
@@ -169,15 +170,24 @@ export interface HarnessPrograms {
   readonly inspect: (id: string, configured?: HarnessSettings, refresh?: boolean, signal?: AbortSignal) => Promise<HarnessInstallation>
   readonly install: (id: string, signal: AbortSignal) => Promise<ProcessResult>
   readonly defaultSettings: (id: string, path: string) => HarnessSettings | undefined
-  readonly recover?: () => Promise<void>
+  readonly recover?: () => Promise<void | ReadonlyArray<string>>
   readonly close?: () => Promise<void>
+}
+// Embedders must opt in explicitly. Status can inspect an owner-configured
+// file, but this default never resolves an installer or launches a process.
+export const embeddedHarnessPrograms: HarnessPrograms = {
+  ids: [], recipe: () => undefined, defaultSettings: () => undefined,
+  inspect: async (id, configured) => ({ harnessId: id as HarnessInstallation["harnessId"],
+    installed: configured !== undefined && await executableFile(configured.adapterPath),
+    ...(configured ? { path: configured.adapterPath } : {}), reason: "Found, version not checked yet. No installer is configured for this embedded engine." }),
+  install: async () => ({ ok: false, output: "", reason: "No automatic install recipe is shipped for this harness." })
 }
 export function makeHarnessPrograms(options: { home: string; path: string; stateFolder?: string; credentials?: CredentialRegistry }): HarnessPrograms {
   const definitions = installRecipes, root = userHarnessPrefix(options.home), records = receiptFolder(options.home, options.stateFolder)
   let toolchain: Toolchain | undefined
   try { toolchain = resolveToolchain() } catch {}
   const find = (id: string) => definitions.find((r) => r.harnessId === id)
-  const probes = new Map<string, { signal: AbortSignal; operation: string }>()
+  const probes = new Map<string, { signal: AbortSignal; operation: string; timeoutMs: number }>()
   const cache = new Map<string, HarnessInstallation>(), active = new Map<AbortController, Promise<ProcessResult>>()
   const protect = async (id: string) => { if (options.credentials) await Effect.runPromise(options.credentials.open(credentialSourceFor({ harnessId: id, home: options.home, variables: {} }))) }
   const protectAll = async () => {
@@ -197,7 +207,8 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
       try {
         const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as Receipt
         validateManagedProgram(options.home, receipt.path, options.stateFolder)
-        if (!refresh) return result(cache.get(id)?.path === receipt.path ? cache.get(id)! : { installed: true, path: receipt.path, version: receipt.version })
+        if (!refresh) return result(cache.get(id)?.path === receipt.path ? cache.get(id)! : { installed: true, path: receipt.path,
+          ...(receipt.version ? { version: receipt.version } : { reason: "Installed, version unknown. Press Check again." }) })
         found = receipt.path
       } catch { return result({ installed: false, reason: "The harness executable changed since install." }) }
     }
@@ -210,17 +221,22 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
         if (!await executableFile(candidate)) continue
         const real = realpathSync(candidate)
         const recognized = id === "cursor" ? inside(join(options.home, ".local", "share", "cursor-agent"), real)
-          : id === "gemini" ? real.includes(`${sep}node_modules${sep}@google${sep}gemini-cli${sep}`) : false
+          : id === "gemini" ? isPackageProgram(real, "@google/gemini-cli") : false
         if (recognized) { found = real; break }
       }
     }
     if (!found) return result({ installed: false })
     if (id === "cursor" && !inside(join(options.home, ".local", "share", "cursor-agent"), realpathSync(found)))
       return result({ installed: false, reason: "The program is not in a recognized Cursor installation." })
-    if (!refresh) return result(cache.get(id)?.path === found ? cache.get(id)! : { installed: r === undefined, path: found, reason: "Found, version unknown. Press Check again." })
+    if (!refresh) return result(cache.get(id)?.path === found ? cache.get(id)! : { installed: true, path: found, reason: "Found, version not checked yet. Press Check again." })
     if (!await protectAll()) return result({ ...(cache.get(id) ?? { installed: false, path: found }), reason: "Cannot read the sign-in state needed to redact the version output." })
     if (inside(root, found)) { try { validateManagedProgram(options.home, found, options.stateFolder) } catch { return result({ installed: false, reason: "The harness executable changed since install." }) } }
     const version = await runRecipe([{ executable: found, args: ["--version"] }], { home: options.home, timeoutMs: 2000, ...(signal ? { signal } : {}), ...probes.get(id) })
+    if (existsSync(receiptPath) && version.reason === "The install exceeded its time limit.") {
+      const unknown = result({ installed: true, path: found, reason: "Installed, version unknown. Press Check again." })
+      cache.set(id, unknown)
+      return unknown
+    }
     const text = version.output.trim(), reported = text.match(/\b\d+\.\d+\.\d+\b/)?.[0]
     const identified = r === undefined || id === "cursor" ? r === undefined || /cursor|^\d{4}\.\d{2}\.\d{2}/i.test(text) : reported !== undefined
     const installation = result({ installed: version.ok && identified, path: found, ...(version.ok ? { version: version.output } : {}),
@@ -237,7 +253,7 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
       const automatic = r.automatic && toolchain !== undefined && process.platform === "linux"
       const executable = bundledHarness(id)?.path ?? (id === "cursor" ? join(options.home, ".local", "bin", "agent") : join(root, id, "node_modules", ".bin", r.executable))
       return { harnessId: id as HarnessRecipe["harnessId"], name: r.name, automatic, packages: r.packages, source: r.source, signInSource: r.signInSource, registry: r.registry,
-        commands: r.automatic && toolchain ? [installPlan(options.home, r, toolchain).command] : [r.manualCommand ?? ""],
+        commands: r.automatic && toolchain ? [installPlan(options.home, r, toolchain).command] : r.manualCommand ? [r.manualCommand] : [],
         signInCommand: quoteCommand([executable, ...r.signIn.slice(1)]), signInArguments: r.signIn.slice(1),
         reason: r.reason ?? (!toolchain ? "The Node.js installation has no adjacent npm program." : process.platform !== "linux" ? "Automatic installs require Linux process recovery support." : "The engine first copies the committed package manifest and lockfile into the prefix. Install scripts are disabled. The lockfile fixes the dependency tree and integrity hashes.") }
     },
@@ -253,7 +269,8 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
         if (realpathSync(root) !== root) return { ok: false, output: "", reason: "The install prefix must not use a symbolic link." }
         // Persist intent before spawn. Recovery scans inherited operation tags,
         // including descendants whose original process-group leader has exited.
-        writeFileSync(pending, JSON.stringify({ operation, id, boot: linuxProcessReader.bootId(), user: process.getuid!() }), { mode: 0o600 })
+        writeFileSync(pending + ".tmp", JSON.stringify({ operation, id, boot: linuxProcessReader.bootId(), user: process.getuid!() }), { mode: 0o600 })
+        renameSync(pending + ".tmp", pending)
         let result: ProcessResult = { ok: false, output: "", reason: "The install command could not run." }
         try {
           await rm(plan.prefix, { recursive: true, force: true }); await mkdir(plan.prefix, { mode: 0o700 })
@@ -262,10 +279,14 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
           // one deadline. Failure removes the partial tree and its receipt.
           result = await runRecipe([plan], { home: options.home, timeoutMs: 600_000, signal: controller.signal, operation })
           if (!result.ok) return result
-          recordManagedInstallation(options.home, id, join(plan.prefix, "node_modules", ".bin", r.executable), r.version!, options.stateFolder)
-          probes.set(id, { signal: controller.signal, operation })
+          try { verifyStagedTree(plan.prefix, r) }
+          catch { return result = { ok: false, output: "", reason: "The installed tree does not match the committed recipe." } }
+          recordManagedInstallation(options.home, id, join(plan.prefix, "node_modules", ".bin", r.executable), undefined, options.stateFolder)
+          probes.set(id, { signal: controller.signal, operation, timeoutMs: 30_000 })
           const installed = await inspect(id, undefined, true)
+          if (installed.installed && !installed.version) return result
           if (!installed.installed || !installed.version || installed.version.match(/\b\d+\.\d+\.\d+\b/)?.[0] !== r.version) return result = { ok: false, output: result.output, reason: installed.reason ?? "The installed executable did not report the pinned version." }
+          recordManagedInstallation(options.home, id, installed.path!, r.version!, options.stateFolder)
           // Preserve the complete capture for redaction; requests trim it only
           // after redaction. Receipt versions are fixed repository data.
           cache.set(id, installed)
@@ -285,9 +306,20 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
     close: async () => { for (const controller of active.keys()) controller.abort(); await Promise.allSettled(active.values()) },
     recover: async () => {
       if (process.platform !== "linux" || !existsSync(records)) return
-      for (const name of readdirSync(records).filter((n) => n.endsWith(".pending.json"))) {
-        const pending = join(records, name), intent = JSON.parse(readFileSync(pending, "utf8"))
-        if (!find(intent.id) || typeof intent.operation !== "string" || intent.user !== process.getuid!()) throw new Error("Install recovery identity is unavailable.")
+      const warnings: string[] = []
+      for (const name of readdirSync(records).filter((n) => /\.pending\.json(?:\.tmp)?$/.test(n))) {
+        const pending = join(records, name)
+        let intent: { id?: string; operation?: string; boot?: string; user?: number } | undefined
+        try { intent = JSON.parse(readFileSync(pending, "utf8")) } catch {}
+        if (!intent || typeof intent.id !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(intent.id) || typeof intent.operation !== "string" || typeof intent.boot !== "string" || intent.user !== process.getuid!()) {
+          // A broken intent cannot authorize a signal. Remove only known,
+          // unreceipted partial prefixes and let the event log close its audit.
+          for (const recipe of definitions) if (!existsSync(join(records, recipe.harnessId + ".json"))) await rm(join(root, recipe.harnessId), { recursive: true, force: true })
+          await rm(pending, { recursive: true, force: true })
+          warnings.push("A damaged install intent was removed. The interrupted install failed; its process identity could not be verified.")
+          continue
+        }
+        if (!find(intent.id)) warnings.push("An install intent for a removed harness was cleaned up and recorded as failed.")
         if (intent.boot === linuxProcessReader.bootId()) for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
           let matched = false
           try {
@@ -303,6 +335,7 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
         }
         await rm(join(root, intent.id), { recursive: true, force: true }); await rm(join(records, intent.id + ".json"), { force: true }); await rm(pending)
       }
+      return warnings
     },
     defaultSettings: (id, path) => {
       if (!["claude", "codex", "gemini", "cursor"].includes(id)) return undefined

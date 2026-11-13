@@ -47,6 +47,17 @@ user. It is still planned. On 2026-11-03 the owner approved building remote
 access before it, so that LGTM Studio is in use sooner. Until it is built, any
 agent can read LGTM Studio's state folder, including the stored account keys.
 
+The harness installation receipts are in that state folder.
+A hostile process running as the same user can rewrite a receipt and make a
+changed program pass the "changed since install" check.
+That check guards against accidents and changes by install scripts.
+It does not stop a hostile process running as the same user.
+The installer compares its staged manifests and installed package metadata
+with the repository's pinned files before executing an installed program.
+A file rewritten after extraction can still pass those metadata checks and
+be included in the first receipt.
+The installer does not close that race against a same-user writer.
+
 Agents can also read the web password. Agents run as the owner's user, so an
 agent can read the engine's first environment through `/proc`, even though the
 engine deletes the variable and agents do not inherit it. The password protects

@@ -10,16 +10,13 @@ import { freshRequest, readHarnesses, refused, type Input } from "../commands/in
 import { accountReadiness } from "../project/leadDefaults.ts"
 import { resolveCodexHome } from "../accounts/shadowHome.ts"
 import { harnessLogin, homeConflict } from "../runner/harnesses.ts"
-import { makeHarnessPrograms, quoteCommand, type HarnessPrograms } from "./programs.ts"
+import { embeddedHarnessPrograms, quoteCommand, type HarnessPrograms } from "./programs.ts"
 
 const instances = new WeakMap<object, { programs: HarnessPrograms; running: Set<string> }>()
 function instance(input: Input) {
   let value = instances.get(input.runtime.log)
   if (!value) {
-    // The production entry point supplies the real search path explicitly.
-    // An embedded engine (including every test rig) probes configured fake
-    // executables only, so a test can never launch a host's CLI bootstrap shim.
-    value = { programs: input.runtime.harnessPrograms ?? makeHarnessPrograms({ home: input.runtime.home, path: "" }), running: new Set() }
+    value = { programs: input.runtime.harnessPrograms ?? embeddedHarnessPrograms, running: new Set() }
     instances.set(input.runtime.log, value)
   }
   return value

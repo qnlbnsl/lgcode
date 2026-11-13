@@ -11958,6 +11958,9 @@ Status and runner entry points refuse a changed tree before executing it.
 Version reads happen after installation or an explicit owner refresh.
 Ordinary status reads use saved versions.
 This check does not provide an operating-system boundary against another process with full access to the engine user's state and source files.
+A hostile process running as the same user can rewrite the receipt and bless a tampered program.
+The "changed since install" check guards against accidents and changes by install scripts.
+It does not stop a hostile process running as the same user.
 
 ## s5-harnesses-10. A package version does not pin its dependency tree.
 
@@ -12060,3 +12063,104 @@ The admin journey failed while waiting for its token-cleared label.
 An immediate isolated rerun passed without a source change.
 This matter remains open because notifications are outside this builder's assignment.
 The other failure was the permission-picker test location recorded above.
+
+## s5-harnesses-23. Staged installation inputs could be replaced before npm used them.
+
+The second review replaced both staged manifest files while an installation was running.
+The original receipt then accepted the replacement tree.
+The engine now compares both staged files byte for byte with the committed files before recording a receipt or running any installed program.
+It compares the names, versions, resolved locations and integrity hashes in npm's hidden lockfile with every committed package entry.
+It refuses extra and missing entries.
+The executable must resolve inside the expected package folder.
+Every mismatch removes the prefix and reports a fixed failure reason.
+These checks do not detect a file rewritten after extraction if the package metadata remains unchanged.
+A same-user writer can still make that rewritten file enter the first receipt.
+This remaining limit is also recorded in SECURITY.md.
+
+## s5-harnesses-24. Damaged install intents blocked engine startup.
+
+Pending intents are now published by writing a temporary file and renaming it.
+Recovery removes malformed and unreadable intents and known unreceipted partial prefixes.
+It also cleans an intent for a harness whose recipe has been removed.
+The event log records interrupted operations as failed while the engine starts.
+A damaged intent cannot authorize a process signal without a verified identity.
+Recovery logs that identity limit instead of claiming that such a process was stopped.
+
+## s5-harnesses-25. The separate Codex installation was unused by its adapter.
+
+The engine uses its bundled Codex adapter and vendor runtime.
+The separate automatic Codex recipe and its lockfile have been removed.
+The page describes Codex as bundled with nothing to install.
+
+## s5-harnesses-26. A slow version probe deleted a verified installation.
+
+The probe immediately after installation now has a fixed thirty-second limit.
+A timeout keeps the verified tree and reports that it is installed with an unknown version.
+The saved receipt retains that state across an engine restart.
+An explicit refresh that times out also keeps a previously verified installation available.
+An ordinary explicit refresh retains its two-second limit.
+
+## s5-harnesses-27. A recognized program looked missing until its version was checked.
+
+A program found through the service search path now reports that it was found with its version not checked yet.
+It allows account creation without offering another installation.
+Package identity uses the nearest exact package boundary in the real path.
+A nested dependency cannot inherit the identity of a package higher in its path.
+A program on the service search path is trusted to the same degree that the runner already trusts that path.
+This trust does not protect against a same-user process changing that program.
+
+## s5-harnesses-28. An embedded engine implicitly enabled real installations.
+
+An embedded engine now defaults to a read-only file check and refuses installation.
+Only the production service explicitly supplies the real installer.
+A test can opt in by injecting a harmless installer dependency.
+
+## s5-harnesses-29. A sample account could no longer simulate signing in.
+
+The sample Sign in control now updates the sample account again.
+The live control still displays the owner's provider command without running it.
+The browser journey adds a sample account and signs it in.
+
+## s5-harnesses-30. Whole-tree receipt checks can block the engine.
+
+This matter is open.
+The engine hashes the whole managed tree synchronously on every status read and agent launch.
+Large installations can therefore delay other work on the engine's event loop.
+
+## s5-harnesses-31. The page has no control to cancel an installation.
+
+This matter is open.
+The installation can run for ten minutes.
+The owner cannot cancel it from the page.
+Engine shutdown and request interruption still stop its process group.
+
+## s5-harnesses-32. A symbolic link in the home path refuses automatic installation.
+
+This matter is open.
+The managed root must equal its absolute real path.
+A home folder reached through a symbolic link therefore refuses automatic installation.
+
+## s5-harnesses-33. npm can read configuration from the managed prefix.
+
+This matter is open.
+A project .npmrc placed in the managed prefix can affect npm or break an installation.
+The npm cache is also inside the agent-writable managed root.
+The post-install checks reject changed manifests or package metadata before executing the installed program.
+Those checks do not create a boundary against another process running as the same user.
+
+## s5-harnesses-34. Gemini's real installation still needs an owner trial.
+
+This matter is open.
+No real vendor installation has run during this assignment.
+Gemini CLI has not been verified with install scripts disabled.
+It has not been checked for writes to its own package folder during normal operation.
+The strict hidden-lock comparison can also reject a tree missing a platform-specific optional entry from the committed lockfile.
+The owner must try a real installation manually before release.
+The automated tests use local fake package trees and never contact a registry.
+
+## s5-harnesses-35. Recipe citations cannot be verified from this repository alone.
+
+This matter is open.
+The repository records source addresses but does not include snapshots of those pages.
+Their contents can change or become unavailable.
+The recipe's documentation claims therefore cannot be confirmed from this repository alone.

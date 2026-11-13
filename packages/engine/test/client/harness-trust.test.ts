@@ -5,6 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { DatabaseSync } from "node:sqlite"
+import { pathToFileURL } from "node:url"
 import * as Effect from "effect/Effect"
 import { makeHarnessPrograms, userHarnessPrefix, recordManagedInstallation, validateManagedProgram } from "../../src/harnesses/programs.ts"
 import { guardedRunner } from "../../src/harnesses/guardedRunner.ts"
@@ -12,11 +14,12 @@ import { Runner } from "../../src/runner/Runner.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { harnessSettings } from "../support/handlerRig.ts"
 import { linuxProcessReader } from "../../src/recovery/orphans.ts"
+import { fakeAgentPath, fakeHarness, makeServiceRoot, ownerClient, requestId, startService, stopAllServices, waitFor, waitServing } from "../support/serviceProcess.ts"
 registerRebuildCheck({ noLog: true })
 
 const roots: string[] = []
 const root = () => { const path = mkdtempSync(join(tmpdir(), "lgtm-trust-")); roots.push(path); return path }
-afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
+afterEach(async () => { await stopAllServices(); for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
 const fixture = () => {
   const home = root(), stateFolder = join(home, "state"), prefix = join(userHarnessPrefix(home), "gemini"), executable = join(prefix, "node_modules", ".bin", "gemini")
   mkdirSync(join(prefix, "node_modules", ".bin"), { recursive: true }); writeFileSync(executable, "#!/bin/sh\necho 0.68.0\n", { mode: 0o700 })
@@ -74,3 +77,41 @@ it("recovers a leftover install group and its grandchild using a durable operati
     expect(existsSync(join(records, operation + ".pending.json"))).toBe(false)
   } finally { try { process.kill(-child.pid!, "SIGKILL") } catch {} }
 })
+
+it("a pending intent from another boot cleans its tree without signalling a matching current process", async () => {
+  const f = fixture(), operation = randomUUID(), records = join(f.stateFolder, "harness-installations"), ready = join(f.home, "ready")
+  mkdirSync(records, { recursive: true })
+  writeFileSync(join(records, operation + ".pending.json"), JSON.stringify({ operation, id: "gemini", boot: "another-boot", user: process.getuid!() }))
+  const child = spawn(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');setInterval(()=>{},1000)`], { detached: true, stdio: "ignore", env: { LGTM_INSTALL_OPERATION: operation } })
+  try {
+    while (!existsSync(ready)) await new Promise((r) => setTimeout(r, 10))
+    await makeHarnessPrograms({ home: f.home, path: "", stateFolder: f.stateFolder }).recover!()
+    expect(readFileSync(`/proc/${child.pid}/stat`, "utf8").split(") ")[1]?.[0]).not.toBe("Z")
+    expect(existsSync(f.prefix)).toBe(false)
+    expect(existsSync(join(records, operation + ".pending.json"))).toBe(false)
+  } finally { try { process.kill(-child.pid!, "SIGKILL") } catch {} }
+})
+
+it.live("the production service wires the managed launch guard ahead of ACP discovery and start", () => Effect.scoped(Effect.gen(function* () {
+  const root = makeServiceRoot(), prefix = join(userHarnessPrefix(root.home), "gemini"), executable = join(prefix, "fixture.cjs"), marker = join(root.root, "launched")
+  mkdirSync(prefix, { recursive: true })
+  const script = `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)},'ran');import(${JSON.stringify(pathToFileURL(fakeAgentPath).href)});\n`
+  writeFileSync(executable, script, { mode: 0o700 })
+  recordManagedInstallation(root.home, "gemini", executable, "fixture", root.state)
+  const service = startService(root)
+  yield* waitServing(root, service)
+  const owner = yield* ownerClient(root)
+  yield* owner.harnesses({ requestId: requestId(), operation: "set", harness: fakeHarness(executable) } as never)
+  yield* owner.accounts({ requestId: requestId(), operation: "add", account: { id: "fixture-account", harness: "fake", displayName: "Fixture account", enabled: true, environment: {} } } as never)
+  yield* owner["client.harness.choices"]({ requestId: requestId(), harnessId: "fake", refresh: true } as never)
+  expect(existsSync(marker)).toBe(true)
+  rmSync(marker); writeFileSync(executable, script + "// changed after receipt\n")
+  yield* owner["client.harness.choices"]({ requestId: requestId(), harnessId: "fake", refresh: true } as never)
+  expect(existsSync(marker)).toBe(false)
+  const reply = yield* owner.start({ requestId: requestId(), name: "Builder", role: "worker", harness: "fake", account: { _tag: "named", accountId: "fixture-account" }, permission: "ask", folder: root.work, runMode: "acp", groups: [] } as never)
+  yield* waitFor("the guarded start's terminal audit", () => {
+    const db = new DatabaseSync(join(root.state, "events.sqlite"), { readOnly: true })
+    try { return db.prepare("SELECT 1 FROM events WHERE event_type = 'AgentStartFailed' AND json_extract(payload_json, '$.agentId') = ?").get(reply.agentId) !== undefined } finally { db.close() }
+  })
+  expect(existsSync(marker)).toBe(false)
+})), 60_000)

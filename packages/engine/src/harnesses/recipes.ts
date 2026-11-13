@@ -27,10 +27,8 @@ export const installRecipes: ReadonlyArray<RecipeDefinition> = [
     version: "2.1.325", source: "https://code.claude.com/docs/en/setup#install-with-npm",
     signInSource: "https://code.claude.com/docs/en/cli-reference", manualCommand: "npm install -g @anthropic-ai/claude-code@2.1.325",
     reason: "Claude Code's npm package needs its postinstall script to link a native binary. This automatic installer disables all scripts. The bundled Claude adapter can already run without a separate CLI install.", signIn: ["claude", "auth", "login"] },
-  { harnessId: "codex", name: "Codex", executable: "codex", automatic: true,
-    // Matches the CLI version pinned by this repository's ACP adapter.
-    packages: ["@openai/codex@0.166.0"], registry: "https://registry.npmjs.org",
-    version: "0.166.0", source: "https://learn.chatgpt.com/docs/changelog",
+  { harnessId: "codex", name: "Codex", executable: "codex", automatic: false,
+    packages: [], registry: "", source: "", reason: "Codex is bundled. There is nothing to install.",
     signInSource: "https://learn.chatgpt.com/docs/developer-commands?surface=cli#codex-login", signIn: ["codex", "login"] },
   { harnessId: "gemini", name: "Gemini CLI", executable: "gemini", automatic: true,
     packages: ["@google/gemini-cli@0.68.0"], registry: "https://registry.npmjs.org",

@@ -105,7 +105,7 @@ it.live("refuses overlapping installs, client-supplied recipes and automatic Cur
     while (!calls) yield* Effect.sleep(5)
     const concurrent = yield* call(ownerCredential, "client.harness.install", { harnessId: "gemini", commands: ["malicious"] })
     expect(concurrent).toMatchObject({ _tag: "Failure", failure: { reason: "An install is already running for this harness." } })
-    expect(yield* call(ownerCredential, "client.harness.install", { harnessId: "codex" })).toMatchObject({ _tag: "Failure", failure: { reason: "Another harness install is already running." } })
+    expect(yield* call(ownerCredential, "client.harness.install", { harnessId: "codex" })).toMatchObject({ _tag: "Failure", failure: { reason: "Codex is bundled. There is nothing to install." } })
     release!()
     expect(success(yield* Fiber.join(first))).toMatchObject({ state: "failed", reason: "Fixture failure." })
     expect(calls).toBe(1)

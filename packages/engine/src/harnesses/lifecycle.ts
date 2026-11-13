@@ -6,7 +6,8 @@ import type { Runtime } from "../commands/internal.ts"
 // Keep this module independent of the API read table's initialization cycle.
 export const recoverInstalls = (runtime: Runtime) => Effect.gen(function* () {
   if (!runtime.harnessPrograms?.recover) return
-  yield* Effect.tryPromise({ try: () => runtime.harnessPrograms!.recover!(), catch: () => new Error("A leftover harness install could not be stopped.") })
+  const warnings = yield* Effect.tryPromise({ try: () => runtime.harnessPrograms!.recover!(), catch: () => new Error("A leftover harness install could not be stopped.") })
+  for (const warning of warnings ?? []) yield* Effect.logWarning(warning)
   const rows = yield* runtime.sql<{ payload_json: string }>`SELECT payload_json FROM events WHERE event_type = 'HarnessInstallStarted'
     AND NOT EXISTS (SELECT 1 FROM events finished WHERE finished.event_type = 'HarnessInstallFinished'
       AND json_extract(finished.payload_json, '$.operationRequestId') = json_extract(events.payload_json, '$.operationRequestId'))`
@@ -15,6 +16,6 @@ export const recoverInstalls = (runtime: Runtime) => Effect.gen(function* () {
     if (event._tag !== "HarnessInstallStarted") continue
     yield* runtime.log.append({ _tag: "owner" }, Schema.decodeUnknownSync(RequestId)(randomUUID()), randomUUID(),
       [{ _tag: "HarnessInstallFinished", harnessId: event.harnessId, operationRequestId: event.operationRequestId,
-        state: "failed", reason: "The service stopped during the install. Leftover processes were stopped and the partial installation was removed." }], {}, false)
+        state: "failed", reason: "The service stopped during the install. Recovery removed the partial installation it could identify." }], {}, false)
   }
 })
