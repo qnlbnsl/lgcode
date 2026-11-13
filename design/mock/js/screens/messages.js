@@ -135,6 +135,7 @@ function sendPost({ channel, kind, action, to, text, replyTo }) {
 }
 const setClosed = (id, closed) => update((s) => { byId(s.posts, id).closed = closed; });
 function nudge(agentId) {
+  if (act.refused()) return;
   const s0 = store.state; const a = agentOf(s0, agentId);
   const ch = s0.channels.find((c) => c.team === a.team) || s0.channels.find((c) => c.project === a.project && c.kind === 'leads') || s0.channels.find((c) => c.project === a.project);
   const wasStalled = a.stalled; const id = uid('p');

@@ -52,6 +52,7 @@ export function Login({ s }) {
     <div class="auth-card">
       <${Brand} sub=${master ? `Sign in to the service on ${master.name}` : 'Sign in to the service'} />
 
+      ${status === 'logout-unconfirmed' && html`<div class="callout error" role="alert"><span><b>Session revocation was not confirmed.</b> Records were removed from this browser. The service may still accept this session. Sign in and try logging out again when the service is reachable.</span></div>`}
       ${status === 'expired' && !insecure && html`<div class="callout info" role="status"><${Icon} name="clock" size=${14} /><span>You were signed out because the session expired. Sign in again and you return to where you were.</span></div>`}
       ${down && !insecure && html`<div class="callout error" role="alert"><${Icon} name="wifi-off" size=${14} />
         <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
