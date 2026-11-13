@@ -1,0 +1,1758 @@
+{
+  "version": 1,
+  "name": "Build loop",
+  "settings": {
+    "tests": true,
+    "agentReview": true,
+    "fullReviewRounds": 3,
+    "approvalAfterRound": 4,
+    "maxReviewRounds": null,
+    "stuckPoints": 12,
+    "stuckShare": 30,
+    "stuckRounds": 3,
+    "autoMergeFix": true
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Define",
+      "blocks": [
+        {
+          "id": "phase-1-state-1",
+          "name": "V0 exists",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-2",
+          "name": "Config file?",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-3",
+          "name": "Project set up",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-4",
+          "name": "Change described",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-5",
+          "name": "Mockups made if screens change",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-6",
+          "name": "End-result page written",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-7",
+          "name": "Page read",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-8",
+          "name": "Build this?",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-9",
+          "name": "Project read",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-10",
+          "name": "Project explained",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-11",
+          "name": "Direction set",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-12",
+          "name": "Want tests?",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-13",
+          "name": "Test commands ready",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-14",
+          "name": "Config file written",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-15",
+          "name": "Agent review?",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-1-state-16",
+          "name": "Tests wanted later",
+          "role": "owner",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "Design and teams",
+      "blocks": [
+        {
+          "id": "phase-2-state-1",
+          "name": "Change approved",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-2",
+          "name": "Tests on?",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-3",
+          "name": "Valid checkpoint?",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-4",
+          "name": "Code read",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-5",
+          "name": "Full run passes?",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-6",
+          "name": "Fix sprint added",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-7",
+          "name": "Findings reconciled",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-8",
+          "name": "Split by domain",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-9",
+          "name": "Sized in points",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-10",
+          "name": "Teams decided",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-11",
+          "name": "User-flow tests written",
+          "role": "orchestrator",
+          "steps": []
+        },
+        {
+          "id": "phase-2-state-12",
+          "name": "Teams started",
+          "role": "engine",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "Plan",
+      "blocks": [
+        {
+          "id": "phase-3-state-4",
+          "name": "Teams started",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-5",
+          "name": "Plan read",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-6",
+          "name": "Subitems split",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-7",
+          "name": "Plan written",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-8",
+          "name": "Question sets picked",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-9",
+          "name": "Plan reviewed",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-10",
+          "name": "Blocker?",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-11",
+          "name": "Report clean?",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-12",
+          "name": "Plans compared",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-state-13",
+          "name": "Plans work together?",
+          "role": "planning-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-3-block-1",
+          "name": "Write each plan",
+          "role": "planner",
+          "steps": [
+            {
+              "from": "Subitems split",
+              "to": "Code read",
+              "when": "Read the code",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Code read",
+              "to": "Question answered",
+              "when": "Answer next, with citations [OWNER IF NEEDED]",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Question answered",
+              "to": "Answered enough?",
+              "when": "Judge own answer",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Answered enough?",
+              "to": "All answered?",
+              "when": "yes",
+              "role": "planning-lead"
+            },
+            {
+              "from": "All answered?",
+              "to": "Citations real?",
+              "when": "yes: script checks",
+              "role": "engine"
+            },
+            {
+              "from": "Citations real?",
+              "to": "Plan written",
+              "when": "yes",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Answered enough?",
+              "to": "Code read",
+              "when": "no: read more",
+              "role": "planning-lead"
+            },
+            {
+              "from": "All answered?",
+              "to": "Code read",
+              "when": "no: next question",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Citations real?",
+              "to": "Code read",
+              "when": "no: fix the citation",
+              "role": "planning-lead"
+            }
+          ]
+        },
+        {
+          "id": "phase-3-block-2",
+          "name": "Review each plan",
+          "role": "reviewer",
+          "steps": [
+            {
+              "from": "Sets picked",
+              "to": "Question answered",
+              "when": "Answer next question",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Question answered",
+              "to": "Blocker?",
+              "when": "Continue",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Blocker?",
+              "to": "Answer logged",
+              "when": "no: log any problem",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Answer logged",
+              "to": "All answered?",
+              "when": "Continue",
+              "role": "planning-lead"
+            },
+            {
+              "from": "All answered?",
+              "to": "Statement stuck?",
+              "when": "yes: script scores",
+              "role": "engine"
+            },
+            {
+              "from": "Statement stuck?",
+              "to": "Statement settled",
+              "when": "yes: ping the owner; keep, change or drop it [OWNER]",
+              "role": "owner"
+            },
+            {
+              "from": "Statement settled",
+              "to": "Plan reviewed",
+              "when": "Write it in the plan",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Blocker?",
+              "to": "Blocker raised",
+              "when": "yes",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Statement stuck?",
+              "to": "Plan reviewed",
+              "when": "no",
+              "role": "planning-lead"
+            },
+            {
+              "from": "All answered?",
+              "to": "Question answered",
+              "when": "no: next question",
+              "role": "planning-lead"
+            }
+          ]
+        },
+        {
+          "id": "phase-3-block-3",
+          "name": "Next round",
+          "role": "reviewer",
+          "steps": [
+            {
+              "from": "Scope changed",
+              "to": "Full review",
+              "when": "the owner changes it: count restarts [OWNER]",
+              "role": "owner"
+            },
+            {
+              "from": "Report not clean",
+              "to": "All folded",
+              "when": "Fold everything",
+              "role": "planning-lead"
+            },
+            {
+              "from": "All folded",
+              "to": "Round 3 done?",
+              "when": "Script counts",
+              "role": "engine"
+            },
+            {
+              "from": "Round 3 done?",
+              "to": "Full review",
+              "when": "no",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Round 3 done?",
+              "to": "Round 4 done?",
+              "when": "yes",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Round 4 done?",
+              "to": "Blockers, majors review",
+              "when": "no",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Round 4 done?",
+              "to": "Round 6 done?",
+              "when": "yes",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Round 6 done?",
+              "to": "Approve next round?",
+              "when": "no: ping the owner, says why [OWNER]",
+              "role": "owner"
+            },
+            {
+              "from": "Approve next round?",
+              "to": "Blockers, majors review",
+              "when": "yes [OWNER]",
+              "role": "owner"
+            },
+            {
+              "from": "Approve next round?",
+              "to": "Plan cut, split or accepted",
+              "when": "no [OWNER]",
+              "role": "owner"
+            },
+            {
+              "from": "Plan cut, split or accepted",
+              "to": "Plans compared",
+              "when": "Continue",
+              "role": "planning-lead"
+            },
+            {
+              "from": "Round 6 done?",
+              "to": "Approve next round?",
+              "when": "yes: ask the owner before every further round, with no hard limit [OWNER]",
+              "role": "owner"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "Build",
+      "blocks": [
+        {
+          "id": "phase-4-state-4",
+          "name": "Plans agreed",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-5",
+          "name": "Tests on?",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-6",
+          "name": "All teams merged",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-7",
+          "name": "Plans read",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-8",
+          "name": "Subitems assigned",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-9",
+          "name": "Configs built",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-10",
+          "name": "Subitems building",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-11",
+          "name": "Subitems built",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-12",
+          "name": "Passing report?",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-13",
+          "name": "Temp merge made",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-14",
+          "name": "All pass?",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-15",
+          "name": "Subitems merged",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-state-16",
+          "name": "More subitems?",
+          "role": "build-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-4-block-1",
+          "name": "Build subitems",
+          "role": "builder",
+          "steps": [
+            {
+              "from": "Building",
+              "to": "Tests and stubs written",
+              "when": "Write stubs, tests: unit, integration, behavior",
+              "role": "build-lead"
+            },
+            {
+              "from": "Tests and stubs written",
+              "to": "Fail on the assertion?",
+              "when": "Script runs them",
+              "role": "engine"
+            },
+            {
+              "from": "Fail on the assertion?",
+              "to": "Tests match the page?",
+              "when": "yes: check tests against page",
+              "role": "build-lead"
+            },
+            {
+              "from": "Tests match the page?",
+              "to": "Tests approved",
+              "when": "yes",
+              "role": "build-lead"
+            },
+            {
+              "from": "Tests approved",
+              "to": "Code written",
+              "when": "Write code, edit old work, narrow runs [OWNER IF NEEDED]",
+              "role": "build-lead"
+            },
+            {
+              "from": "Code written",
+              "to": "Code committed",
+              "when": "Commit; tell build lead: done",
+              "role": "build-lead"
+            },
+            {
+              "from": "Code committed",
+              "to": "Checks pass?",
+              "when": "Build lead calls lgtm check; test runner runs builder's config",
+              "role": "build-lead"
+            },
+            {
+              "from": "Checks pass?",
+              "to": "Risky tests?",
+              "when": "yes: script finds risky labels",
+              "role": "engine"
+            },
+            {
+              "from": "Risky tests?",
+              "to": "Code broken on temp",
+              "when": "yes: break it on a temp branch",
+              "role": "build-lead"
+            },
+            {
+              "from": "Code broken on temp",
+              "to": "Tests go red?",
+              "when": "Script runs risky tests",
+              "role": "engine"
+            },
+            {
+              "from": "Tests go red?",
+              "to": "Subitem built",
+              "when": "yes",
+              "role": "build-lead"
+            },
+            {
+              "from": "Checks pass?",
+              "to": "Type of failure?",
+              "when": "no: report to builder, notice to lead",
+              "role": "build-lead"
+            },
+            {
+              "from": "Type of failure?",
+              "to": "3 Plan",
+              "when": "plan: tell lead",
+              "role": "build-lead"
+            },
+            {
+              "from": "Fail on the assertion?",
+              "to": "Building",
+              "when": "no: fix the test",
+              "role": "build-lead"
+            },
+            {
+              "from": "Tests match the page?",
+              "to": "Building",
+              "when": "no: rewrite",
+              "role": "build-lead"
+            },
+            {
+              "from": "Tests go red?",
+              "to": "Building",
+              "when": "no: tests too weak",
+              "role": "build-lead"
+            },
+            {
+              "from": "Risky tests?",
+              "to": "Subitem built",
+              "when": "no",
+              "role": "build-lead"
+            },
+            {
+              "from": "Type of failure?",
+              "to": "Building",
+              "when": "test: tell lead",
+              "role": "build-lead"
+            },
+            {
+              "from": "Type of failure?",
+              "to": "Tests approved",
+              "when": "code: tell lead",
+              "role": "build-lead"
+            }
+          ]
+        },
+        {
+          "id": "phase-4-block-2",
+          "name": "Build without tests",
+          "role": "builder",
+          "steps": [
+            {
+              "from": "Tests off",
+              "to": "Plans read",
+              "when": "Read the plans",
+              "role": "build-lead"
+            },
+            {
+              "from": "Plans read",
+              "to": "Subitems assigned",
+              "when": "Assign up to its cap",
+              "role": "build-lead"
+            },
+            {
+              "from": "Subitems assigned",
+              "to": "Code written",
+              "when": "Write code",
+              "role": "build-lead"
+            },
+            {
+              "from": "Code written",
+              "to": "Agent review on?",
+              "when": "Continue",
+              "role": "build-lead"
+            },
+            {
+              "from": "Agent review on?",
+              "to": "Subitems merged",
+              "when": "no: merge, fix conflicts",
+              "role": "build-lead"
+            },
+            {
+              "from": "Agent review on?",
+              "to": "Looks good?",
+              "when": "yes: review the code",
+              "role": "build-lead"
+            },
+            {
+              "from": "Subitems merged",
+              "to": "More subitems?",
+              "when": "Continue",
+              "role": "build-lead"
+            },
+            {
+              "from": "More subitems?",
+              "to": "All teams merged",
+              "when": "no: orchestrator merges teams",
+              "role": "build-lead"
+            },
+            {
+              "from": "Looks good?",
+              "to": "Subitems merged",
+              "when": "yes: merge",
+              "role": "build-lead"
+            },
+            {
+              "from": "Looks good?",
+              "to": "Code written",
+              "when": "no: fix",
+              "role": "build-lead"
+            },
+            {
+              "from": "More subitems?",
+              "to": "Subitems assigned",
+              "when": "yes: assign next",
+              "role": "build-lead"
+            }
+          ]
+        },
+        {
+          "id": "phase-4-block-3",
+          "name": "Fix team",
+          "role": "build-lead",
+          "steps": [
+            {
+              "from": "Failure report",
+              "to": "Report read",
+              "when": "Read the report",
+              "role": "build-lead"
+            },
+            {
+              "from": "Report read",
+              "to": "Fix team started",
+              "when": "Set up a fix team",
+              "role": "build-lead"
+            },
+            {
+              "from": "Fix team started",
+              "to": "Fixes built",
+              "when": "Build subitems",
+              "role": "build-lead"
+            },
+            {
+              "from": "Fixes built",
+              "to": "Passing report?",
+              "when": "LGTM Studio merge: looks up commit",
+              "role": "engine"
+            },
+            {
+              "from": "Passing report?",
+              "to": "5 Verify",
+              "when": "yes: merge",
+              "role": "build-lead"
+            },
+            {
+              "from": "Passing report?",
+              "to": "Fix team started",
+              "when": "no: run the check",
+              "role": "build-lead"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "name": "Verify",
+      "blocks": [
+        {
+          "id": "phase-5-state-1",
+          "name": "Teams merged",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-2",
+          "name": "Tests on?",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-3",
+          "name": "Install smoke-tested",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-4",
+          "name": "Full suite run",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-5",
+          "name": "User flows run",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-6",
+          "name": "Evidence checked",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-7",
+          "name": "All pass?",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-8",
+          "name": "Agent review on?",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-9",
+          "name": "Product checked",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-10",
+          "name": "Looks good?",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-11",
+          "name": "Failure report written",
+          "role": "test-runner",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-12",
+          "name": "Fixes merged",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-5-state-13",
+          "name": "Failed, related tests run",
+          "role": "engine",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "name": "Review",
+      "blocks": [
+        {
+          "id": "phase-6-state-1",
+          "name": "Verified",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-2",
+          "name": "Changes listed",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-3",
+          "name": "Slices reviewed",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-4",
+          "name": "Findings verified",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-5",
+          "name": "Severity settled",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-6",
+          "name": "Findings sorted",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-7",
+          "name": "Statement stuck?",
+          "role": "engine",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-8",
+          "name": "All closed?",
+          "role": "reviewer",
+          "steps": []
+        },
+        {
+          "id": "phase-6-state-9",
+          "name": "Statement settled",
+          "role": "owner",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": "phase-7",
+      "name": "Hand over",
+      "blocks": [
+        {
+          "id": "phase-7-state-1",
+          "name": "Review closed",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-2",
+          "name": "Work merged",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-3",
+          "name": "Fix users can't see?",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-4",
+          "name": "Product tried",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-5",
+          "name": "Device checked",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-6",
+          "name": "Approve release?",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-7",
+          "name": "Deployed",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-8",
+          "name": "Live product tested",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-9",
+          "name": "Evaluation round run",
+          "role": "project-lead",
+          "steps": []
+        },
+        {
+          "id": "phase-7-state-10",
+          "name": "More sprints?",
+          "role": "project-lead",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": "phase-8",
+      "name": "Keep running",
+      "blocks": [
+        {
+          "id": "phase-8-state-1",
+          "name": "Released",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-2",
+          "name": "Tests on?",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-3",
+          "name": "Next change",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-4",
+          "name": "Nightly run done",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-5",
+          "name": "Skipped tests checked",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-6",
+          "name": "Failures explained",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-7",
+          "name": "Lessons in skills",
+          "role": "evaluator",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-8",
+          "name": "Owner told",
+          "role": "owner",
+          "steps": []
+        },
+        {
+          "id": "phase-8-state-9",
+          "name": "Bug?",
+          "role": "evaluator",
+          "steps": []
+        }
+      ]
+    }
+  ],
+  "moves": [
+    {
+      "from": "phase-1-state-1",
+      "to": "phase-1-state-2",
+      "when": "LGTM Studio looks for the file"
+    },
+    {
+      "from": "phase-1-state-2",
+      "to": "phase-1-state-3",
+      "when": "yes"
+    },
+    {
+      "from": "phase-1-state-3",
+      "to": "phase-1-state-4",
+      "when": "Say what to change [OWNER]"
+    },
+    {
+      "from": "phase-1-state-4",
+      "to": "phase-1-state-5",
+      "when": "Make mockups"
+    },
+    {
+      "from": "phase-1-state-5",
+      "to": "phase-1-state-6",
+      "when": "Write the page (HTML)"
+    },
+    {
+      "from": "phase-1-state-6",
+      "to": "phase-1-state-7",
+      "when": "Read page, open mockups [OWNER]"
+    },
+    {
+      "from": "phase-1-state-7",
+      "to": "phase-1-state-8",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-1-state-8",
+      "to": "phase-2-state-1",
+      "when": "yes"
+    },
+    {
+      "from": "phase-1-state-2",
+      "to": "phase-1-state-9",
+      "when": "no: read V0, what it was made in"
+    },
+    {
+      "from": "phase-1-state-9",
+      "to": "phase-1-state-10",
+      "when": "Hear languages, architecture [OWNER]"
+    },
+    {
+      "from": "phase-1-state-10",
+      "to": "phase-1-state-11",
+      "when": "Say direction, changes [OWNER]"
+    },
+    {
+      "from": "phase-1-state-11",
+      "to": "phase-1-state-12",
+      "when": "Talk testing, pros, cons [OWNER]"
+    },
+    {
+      "from": "phase-1-state-12",
+      "to": "phase-1-state-13",
+      "when": "yes: write test scripts, plugins"
+    },
+    {
+      "from": "phase-1-state-13",
+      "to": "phase-1-state-14",
+      "when": "Write config"
+    },
+    {
+      "from": "phase-1-state-12",
+      "to": "phase-1-state-15",
+      "when": "no"
+    },
+    {
+      "from": "phase-1-state-16",
+      "to": "phase-1-state-11",
+      "when": "Say: turn tests on [OWNER]"
+    },
+    {
+      "from": "phase-1-state-15",
+      "to": "phase-1-state-14",
+      "when": "yes"
+    },
+    {
+      "from": "phase-1-state-15",
+      "to": "phase-1-state-14",
+      "when": "no"
+    },
+    {
+      "from": "phase-1-state-14",
+      "to": "phase-1-state-3",
+      "when": "config saved"
+    },
+    {
+      "from": "phase-1-state-8",
+      "to": "phase-1-state-4",
+      "when": "no: say what to change again [OWNER]"
+    },
+    {
+      "from": "phase-2-state-1",
+      "to": "phase-2-state-2",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-2-state-2",
+      "to": "phase-2-state-3",
+      "when": "yes: LGTM Studio looks for full-run report"
+    },
+    {
+      "from": "phase-2-state-3",
+      "to": "phase-2-state-4",
+      "when": "yes: read page and code"
+    },
+    {
+      "from": "phase-2-state-3",
+      "to": "phase-2-state-5",
+      "when": "no: full run"
+    },
+    {
+      "from": "phase-2-state-5",
+      "to": "phase-2-state-6",
+      "when": "no: add a fix sprint"
+    },
+    {
+      "from": "phase-2-state-4",
+      "to": "phase-2-state-7",
+      "when": "Orchestrator reconciles"
+    },
+    {
+      "from": "phase-2-state-7",
+      "to": "phase-2-state-8",
+      "when": "Split into database, server, mobile"
+    },
+    {
+      "from": "phase-2-state-8",
+      "to": "phase-2-state-9",
+      "when": "Size; split what's over a lead's cap"
+    },
+    {
+      "from": "phase-2-state-9",
+      "to": "phase-2-state-10",
+      "when": "Decide sprints, how many teams [OWNER IF NEEDED]"
+    },
+    {
+      "from": "phase-2-state-10",
+      "to": "phase-2-state-2",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-2-state-2",
+      "to": "phase-2-state-11",
+      "when": "yes: write from page, mockups"
+    },
+    {
+      "from": "phase-2-state-11",
+      "to": "phase-2-state-12",
+      "when": "List teams in LGTM Studio, send each its plan"
+    },
+    {
+      "from": "phase-2-state-12",
+      "to": "phase-3-state-4",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-2-state-2",
+      "to": "phase-2-state-4",
+      "when": "no"
+    },
+    {
+      "from": "phase-2-state-6",
+      "to": "phase-2-state-4",
+      "when": "it runs first"
+    },
+    {
+      "from": "phase-2-state-5",
+      "to": "phase-2-state-4",
+      "when": "yes"
+    },
+    {
+      "from": "phase-2-state-2",
+      "to": "phase-2-state-12",
+      "when": "no"
+    },
+    {
+      "from": "phase-3-state-4",
+      "to": "phase-3-state-5",
+      "when": "Read the plan"
+    },
+    {
+      "from": "phase-3-state-5",
+      "to": "phase-3-state-6",
+      "when": "Split it"
+    },
+    {
+      "from": "phase-3-state-6",
+      "to": "phase-3-state-7",
+      "when": "Write each plan"
+    },
+    {
+      "from": "phase-3-state-7",
+      "to": "phase-3-state-8",
+      "when": "Pick by domain"
+    },
+    {
+      "from": "phase-3-state-8",
+      "to": "phase-3-state-9",
+      "when": "Review each plan"
+    },
+    {
+      "from": "phase-3-state-9",
+      "to": "phase-3-state-10",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-3-state-10",
+      "to": "phase-3-state-11",
+      "when": "no"
+    },
+    {
+      "from": "phase-3-state-11",
+      "to": "phase-3-state-12",
+      "when": "yes, or minors past round 3: compare"
+    },
+    {
+      "from": "phase-3-state-12",
+      "to": "phase-3-state-13",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-3-state-13",
+      "to": "phase-4-state-4",
+      "when": "yes"
+    },
+    {
+      "from": "phase-3-state-10",
+      "to": "phase-3-state-6",
+      "when": "yes: back to the planner lead"
+    },
+    {
+      "from": "phase-3-state-11",
+      "to": "phase-3-state-7",
+      "when": "no: next round"
+    },
+    {
+      "from": "phase-3-state-13",
+      "to": "phase-3-state-7",
+      "when": "no: planner agents fix"
+    },
+    {
+      "from": "phase-4-state-4",
+      "to": "phase-4-state-5",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-4-state-5",
+      "to": "phase-4-state-6",
+      "when": "no: build without tests"
+    },
+    {
+      "from": "phase-4-state-6",
+      "to": "phase-5-state-1",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-4-state-5",
+      "to": "phase-4-state-7",
+      "when": "yes: read the plans"
+    },
+    {
+      "from": "phase-4-state-7",
+      "to": "phase-4-state-8",
+      "when": "Assign up to its cap"
+    },
+    {
+      "from": "phase-4-state-8",
+      "to": "phase-4-state-9",
+      "when": "Script builds configs"
+    },
+    {
+      "from": "phase-4-state-9",
+      "to": "phase-4-state-10",
+      "when": "Start builders, send configs"
+    },
+    {
+      "from": "phase-4-state-10",
+      "to": "phase-4-state-11",
+      "when": "Build subitems"
+    },
+    {
+      "from": "phase-4-state-10",
+      "to": "phase-3-state-4",
+      "when": "plan wrong"
+    },
+    {
+      "from": "phase-4-state-11",
+      "to": "phase-4-state-12",
+      "when": "LGTM Studio merge looks up commit"
+    },
+    {
+      "from": "phase-4-state-12",
+      "to": "phase-4-state-13",
+      "when": "yes: temp merge; lead fixes conflicts"
+    },
+    {
+      "from": "phase-4-state-13",
+      "to": "phase-4-state-14",
+      "when": "Run all merged workers' tests"
+    },
+    {
+      "from": "phase-4-state-14",
+      "to": "phase-4-state-15",
+      "when": "yes: lead's branch moves"
+    },
+    {
+      "from": "phase-4-state-15",
+      "to": "phase-4-state-16",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-4-state-16",
+      "to": "phase-4-state-8",
+      "when": "yes: assign next"
+    },
+    {
+      "from": "phase-4-state-16",
+      "to": "phase-4-state-6",
+      "when": "no: orchestrator merges teams"
+    },
+    {
+      "from": "phase-4-state-12",
+      "to": "phase-4-state-10",
+      "when": "no: run the check"
+    },
+    {
+      "from": "phase-4-state-14",
+      "to": "phase-4-state-10",
+      "when": "no: drop temp, tell newest worker"
+    },
+    {
+      "from": "phase-5-state-1",
+      "to": "phase-5-state-2",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-5-state-2",
+      "to": "phase-5-state-3",
+      "when": "yes: install, walk main flow"
+    },
+    {
+      "from": "phase-5-state-3",
+      "to": "phase-5-state-4",
+      "when": "Run every test type"
+    },
+    {
+      "from": "phase-5-state-4",
+      "to": "phase-5-state-5",
+      "when": "Run flows: web, phone size, Mac simulator [OWNER IF NEEDED]"
+    },
+    {
+      "from": "phase-5-state-5",
+      "to": "phase-5-state-6",
+      "when": "Check text, screenshots, report"
+    },
+    {
+      "from": "phase-5-state-6",
+      "to": "phase-5-state-7",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-5-state-7",
+      "to": "phase-6-state-1",
+      "when": "yes"
+    },
+    {
+      "from": "phase-5-state-2",
+      "to": "phase-5-state-8",
+      "when": "no"
+    },
+    {
+      "from": "phase-5-state-8",
+      "to": "phase-6-state-1",
+      "when": "no"
+    },
+    {
+      "from": "phase-5-state-8",
+      "to": "phase-5-state-9",
+      "when": "yes: open it, check against the page"
+    },
+    {
+      "from": "phase-5-state-9",
+      "to": "phase-5-state-10",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-5-state-10",
+      "to": "phase-6-state-1",
+      "when": "yes"
+    },
+    {
+      "from": "phase-5-state-7",
+      "to": "phase-5-state-11",
+      "when": "no: write report"
+    },
+    {
+      "from": "phase-5-state-12",
+      "to": "phase-5-state-13",
+      "when": "Script picks failed, related"
+    },
+    {
+      "from": "phase-5-state-13",
+      "to": "phase-5-state-6",
+      "when": "Check evidence"
+    },
+    {
+      "from": "phase-5-state-10",
+      "to": "phase-5-state-11",
+      "when": "no"
+    },
+    {
+      "from": "phase-5-state-11",
+      "to": "phase-4-state-4",
+      "when": "fix team"
+    },
+    {
+      "from": "phase-6-state-1",
+      "to": "phase-6-state-2",
+      "when": "List changes, who uses them"
+    },
+    {
+      "from": "phase-6-state-2",
+      "to": "phase-6-state-3",
+      "when": "Review slices, main flows"
+    },
+    {
+      "from": "phase-6-state-3",
+      "to": "phase-6-state-4",
+      "when": "Attack code, verify findings"
+    },
+    {
+      "from": "phase-6-state-4",
+      "to": "phase-6-state-5",
+      "when": "Settle severity"
+    },
+    {
+      "from": "phase-6-state-5",
+      "to": "phase-6-state-6",
+      "when": "Sort findings [OWNER IF NEEDED]"
+    },
+    {
+      "from": "phase-6-state-6",
+      "to": "phase-6-state-7",
+      "when": "Script scores"
+    },
+    {
+      "from": "phase-6-state-7",
+      "to": "phase-6-state-8",
+      "when": "no"
+    },
+    {
+      "from": "phase-6-state-7",
+      "to": "phase-6-state-9",
+      "when": "yes: ping the owner; keep, change or drop it [OWNER]"
+    },
+    {
+      "from": "phase-6-state-8",
+      "to": "phase-7-state-1",
+      "when": "yes"
+    },
+    {
+      "from": "phase-6-state-9",
+      "to": "phase-6-state-8",
+      "when": "write it down"
+    },
+    {
+      "from": "phase-6-state-8",
+      "to": "phase-6-state-3",
+      "when": "no: fix, re-verify"
+    },
+    {
+      "from": "phase-7-state-1",
+      "to": "phase-7-state-2",
+      "when": "Merge; full run if none yet; write finished page"
+    },
+    {
+      "from": "phase-7-state-2",
+      "to": "phase-7-state-3",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-7-state-4",
+      "to": "phase-7-state-5",
+      "when": "Check on a real device [OWNER IF NEEDED]"
+    },
+    {
+      "from": "phase-7-state-5",
+      "to": "phase-7-state-6",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-7-state-6",
+      "to": "phase-7-state-7",
+      "when": "yes: approve deploy [OWNER]"
+    },
+    {
+      "from": "phase-7-state-7",
+      "to": "phase-7-state-8",
+      "when": "Test the live product"
+    },
+    {
+      "from": "phase-7-state-8",
+      "to": "phase-7-state-9",
+      "when": "Grade each task, update the model ledger"
+    },
+    {
+      "from": "phase-7-state-9",
+      "to": "phase-7-state-10",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-7-state-10",
+      "to": "phase-2-state-1",
+      "when": "yes"
+    },
+    {
+      "from": "phase-7-state-10",
+      "to": "phase-8-state-1",
+      "when": "no"
+    },
+    {
+      "from": "phase-7-state-6",
+      "to": "phase-4-state-4",
+      "when": "no: ask for a change [OWNER]"
+    },
+    {
+      "from": "phase-7-state-3",
+      "to": "phase-7-state-4",
+      "when": "no: try the product [OWNER]"
+    },
+    {
+      "from": "phase-7-state-3",
+      "to": "phase-2-state-1",
+      "when": "yes: no deploy, next sprint"
+    },
+    {
+      "from": "phase-8-state-1",
+      "to": "phase-8-state-2",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-8-state-2",
+      "to": "phase-8-state-3",
+      "when": "no: tests off"
+    },
+    {
+      "from": "phase-8-state-2",
+      "to": "phase-8-state-4",
+      "when": "yes: full run if code changed"
+    },
+    {
+      "from": "phase-8-state-4",
+      "to": "phase-8-state-5",
+      "when": "Check skipped tests"
+    },
+    {
+      "from": "phase-8-state-5",
+      "to": "phase-8-state-6",
+      "when": "Explain what failed and why [OWNER IF NEEDED]"
+    },
+    {
+      "from": "phase-8-state-6",
+      "to": "phase-8-state-7",
+      "when": "Write lessons into skills, grades into the model ledger"
+    },
+    {
+      "from": "phase-8-state-7",
+      "to": "phase-8-state-8",
+      "when": "Send owner a one-line summary [OWNER]"
+    },
+    {
+      "from": "phase-8-state-8",
+      "to": "phase-8-state-9",
+      "when": "Continue"
+    },
+    {
+      "from": "phase-8-state-9",
+      "to": "phase-4-state-4",
+      "when": "yes"
+    },
+    {
+      "from": "phase-8-state-9",
+      "to": "phase-8-state-4",
+      "when": "no: wait for next night"
+    },
+    {
+      "from": "phase-4-state-16",
+      "to": "phase-3-state-4",
+      "when": "Plan wrong"
+    },
+    {
+      "from": "phase-5-state-13",
+      "to": "phase-4-state-4",
+      "when": "Failure report"
+    },
+    {
+      "from": "phase-6-state-9",
+      "to": "phase-5-state-1",
+      "when": "Fix, re-verify"
+    },
+    {
+      "from": "phase-6-state-9",
+      "to": "phase-3-state-4",
+      "when": "Design wrong"
+    },
+    {
+      "from": "phase-7-state-10",
+      "to": "phase-2-state-1",
+      "when": "Next sprint"
+    },
+    {
+      "from": "phase-7-state-10",
+      "to": "phase-4-state-4",
+      "when": "Small change, owner approval"
+    },
+    {
+      "from": "phase-7-state-10",
+      "to": "phase-1-state-1",
+      "when": "Big change, owner approval"
+    },
+    {
+      "from": "phase-8-state-9",
+      "to": "phase-4-state-4",
+      "when": "Nightly bug"
+    },
+    {
+      "from": "phase-8-state-9",
+      "to": "phase-1-state-1",
+      "when": "Next change, owner approval"
+    },
+    {
+      "from": "phase-3-state-6",
+      "to": "phase-3-block-1",
+      "when": "Enter Write each plan"
+    },
+    {
+      "from": "phase-3-block-1",
+      "to": "phase-3-state-7",
+      "when": "Complete Write each plan"
+    },
+    {
+      "from": "phase-3-state-8",
+      "to": "phase-3-block-2",
+      "when": "Enter Review each plan"
+    },
+    {
+      "from": "phase-3-block-2",
+      "to": "phase-3-state-9",
+      "when": "Complete Review each plan"
+    },
+    {
+      "from": "phase-3-state-11",
+      "to": "phase-3-block-3",
+      "when": "Enter Next round"
+    },
+    {
+      "from": "phase-3-block-3",
+      "to": "phase-3-state-7",
+      "when": "Complete Next round"
+    },
+    {
+      "from": "phase-4-state-10",
+      "to": "phase-4-block-1",
+      "when": "Enter Build subitems"
+    },
+    {
+      "from": "phase-4-block-1",
+      "to": "phase-4-state-11",
+      "when": "Complete Build subitems"
+    },
+    {
+      "from": "phase-4-state-5",
+      "to": "phase-4-block-2",
+      "when": "Enter Build without tests"
+    },
+    {
+      "from": "phase-4-block-2",
+      "to": "phase-4-state-6",
+      "when": "Complete Build without tests"
+    },
+    {
+      "from": "phase-5-state-11",
+      "to": "phase-4-block-3",
+      "when": "Start the fix team"
+    }
+  ]
+}

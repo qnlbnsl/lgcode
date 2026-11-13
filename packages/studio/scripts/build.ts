@@ -19,7 +19,7 @@ const mock = fileURLToPath(new URL("../../../design/mock/", import.meta.url))
 const defaultDist = join(root, "dist")
 
 // The parts of design/mock that the page loads. Its notes and briefs stay behind.
-const parts = ["css", "js", "fonts", "vendor", "plans"]
+const parts = ["css", "js", "fonts", "vendor", "plans", "workflows"]
 
 export function rewriteIndex(html: string): { readonly page: string; readonly theme: string } {
   const inline = /<script>\s*([\s\S]*?)\s*<\/script>/.exec(html)

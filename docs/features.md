@@ -962,3 +962,7 @@ The build loop is shown in a "Workflows" tab.
 A user sees the default workflow as a picture.
 A user clones it and changes the copy in a visual editor.
 A user can also make a workflow from nothing.
+The definition store, typed API, terminal commands, and visual clone editor are implemented.
+The format and storage rules are in [the workflow document](workflows.md).
+The visual editor can add and remove every phase and block in a copy.
+A separate creation action and project workflow selection remain planned.

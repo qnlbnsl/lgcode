@@ -1,3 +1,4 @@
+import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "./workflowCommands.ts"
 import { QuestionMetadataFields } from "./questions.ts"
 import { ChoiceId } from "./agentConfiguration.ts"
 import { ContextReferences } from "./project/context.ts"
@@ -145,13 +146,14 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-export const WebRpcGroup = ClientRpcGroup.omit(
+const StandardClientRpcGroup = ClientRpcGroup.omit(...workflowCommandNames)
+export const WebRpcGroup = StandardClientRpcGroup.omit(
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
 )
-export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
-const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup)
+export const ClientReadsRpcGroup = StandardClientRpcGroup.omit("client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
+const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup).merge(WorkflowRpcGroup)
 export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(InstalledClientRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup).merge(ProjectRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
@@ -163,6 +165,7 @@ export const commandAccess = {
   "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
   "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
   "client.alerts.carrier.clear-token": ["owner"],
+  ...workflowAccess,
   ...boardAccess,
   ...rolesAccess,
   ...projectAccess,

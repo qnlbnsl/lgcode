@@ -11802,3 +11802,35 @@ The owner reported this on 2026-11-13.
 The owner said that "Service settings" needs a lot of work and is acceptable for now.
 The owner said that "Subscriptions" needs work before a release.
 The owner did not yet say what is missing on either page.
+
+## s5-workflows-1. The build-loop diagram still contains a hard exit after round six.
+
+The owner removed the review limit on 2026-11-11.
+The prose now asks for approval before every further round.
+The steps under "Next round" still send round six to cutting, splitting, or accepting the plan.
+The default workflow definition follows the newer decision and repeats the approval request.
+The historical specification was left unchanged.
+
+## s5-workflows-2. Workflow editing does not select or execute a project's workflow.
+
+The engine had no stored workflow definition when this work began.
+The new definition store and visual editor provide configuration operations.
+Project selection and workflow execution remain the later build-loop work.
+The Workflows page states that projects still run the default workflow.
+
+## s5-workflows-3. The remote helper needs approval outside the restricted tool environment.
+
+The local package installation first failed because its store lock was read-only.
+The remote test helper first failed because the restricted environment presented an unsafe system Secure Shell configuration file.
+Automatic approval review initially rejected the remote sync because the destination was unverified.
+The repository's remote-checks document identifies the default address as the owner's test computer.
+Providing that evidence allowed the required helper and the pinned dependency installation to run.
+No system configuration was changed.
+
+## s5-workflows-4. An existing project push command parity test failed once in the full run.
+
+The first full check failed the dotted `project.push` terminal dispatch case.
+The same case passed immediately when run by itself.
+No project push implementation was changed in this work.
+The final full check determines whether the failure repeats.
+The initial output is retained in the worker's result artifacts.
