@@ -6,6 +6,7 @@
 // A field the engine does not hold gets an empty value, never a sample value. The list of
 // those fields is in .foundry/result.md and in the plan for connecting the mock.
 import type { ClientSnapshot, RosterEntry } from "@lgtm/contracts"
+import { workspaceIdentity } from "./git.ts"
 import { startFailureText } from "@lgtm/contracts/startFailure"
 
 type ProjectSection = NonNullable<ClientSnapshot["project"]>
@@ -150,14 +151,11 @@ export function mapRepository(repo: EngineRepository, workspaces: ReadonlyArray<
   }
 }
 
-export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<EngineWorkspace>, projects: ReadonlyArray<EngineProject>): StoreWorktree {
-  const parent = row.parentId === undefined ? undefined : workspaces.find((other) => other.worktreeId === row.parentId)
-  const project = row.projectId === undefined ? undefined : projects.find((p) => p.projectId === row.projectId)
-  const kind = row.teamId !== undefined ? "team" : row.projectId !== undefined ? "project" : "base"
+export function mapWorktree(row: EngineWorkspace, workspaces: ReadonlyArray<EngineWorkspace>, projects: ReadonlyArray<EngineProject>, teams: ReadonlyArray<EngineTeam> = []): StoreWorktree {
   return {
-    id: row.worktreeId, repo: row.repoId, kind, branch: row.branch, parent: parent?.branch ?? null, machine: row.machineId,
+    id: row.worktreeId, repo: row.repoId, branch: row.branch, machine: row.machineId,
     folder: row.path, files: [], commits: [], ahead: 0, behind: 0, merge: null,
-    owner: kind === "project" ? project?.leadAgentId ?? null : null, team: row.teamId ?? null, project: row.projectId ?? null
+    ...workspaceIdentity(row, workspaces, projects, teams)
   }
 }
 
@@ -316,7 +314,7 @@ export function mapSnapshot(snapshot: Pick<ClientSnapshot, "agents" | "requests"
     machines, subscriptions: mapSubscriptions(snapshot.accounts, snapshot.agents, machines[0]?.id ?? ""),
     repos: section.repositories.map((r) => mapRepository(r, section.workspaces)),
     projects, teams: section.teams.map((t) => mapTeam(t, section.workspaces)), agents, requests,
-    worktrees: section.workspaces.map((w) => mapWorktree(w, section.workspaces, section.projects)),
+    worktrees: section.workspaces.map((w) => mapWorktree(w, section.workspaces, section.projects, section.teams)),
     sprints: section.sprints.map((s) => mapSprint(s, section.tasks)), tasks: section.tasks.map(mapTask)
   }
 }

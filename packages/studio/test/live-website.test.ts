@@ -32,6 +32,7 @@ function fakeConnection() {
   const connection: LiveConnection = {
     kind: "engine", label: "the test engine",
     call(tag) { calls.push(tag) }, push() {},
+    async request() { throw new Error("This test connection has no screen reads.") },
     open(next) { write = next; write({ session: { status: "in", firstRun: false }, conn: { status: "live", lastHeard: 1 }, owner: { name: "Test Owner", initials: "TO" }, ...mapSnapshot(engineSnapshot, Date.now()) }) },
     async signIn() { return "in" }, async signOut() { write({ session: { status: "out", firstRun: false } }) },
     reconnect() {}, close() {}

@@ -1,0 +1,45 @@
+import { expect, type Page } from '@playwright/test'
+// All requests go through the real engine. The notification carrier is loopback only.
+export async function exerciseStudioService(page: Page, origin: string) {
+  const root = `${origin}/studio/`
+  await page.goto(`${root}#/subscriptions`)
+  await expect(page.locator('.svc-sub')).toContainText('Primary')
+  await page.getByRole('button', { name: 'Add subscription', exact: true }).click()
+  await page.locator('#as-name').fill('Browser account')
+  await page.locator('.dialog').getByRole('button', { name: 'Add subscription', exact: true }).click()
+  const row = page.locator('.svc-sub').filter({ hasText: 'Browser account' })
+  await expect(row).toBeVisible()
+  await row.getByRole('button', { name: 'Actions for Browser account', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^Turn off/ }).click()
+  await expect(row).toContainText('Turned off')
+  await row.getByRole('button', { name: 'Actions for Browser account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Turn on', exact: true }).click()
+  await expect(row).toContainText('Signed in')
+
+  await page.goto(`${root}#/settings?section=stall-watch`)
+  await page.locator('#sd-w').fill('37')
+  await expect(page.locator('#sd-w')).toHaveValue('37')
+  await expect(page.getByText('Saving…', { exact: true })).toHaveCount(0)
+  await page.reload()
+  await expect(page.locator('#sd-w')).toHaveValue('37')
+  await expect(page.locator('#sd-a')).toHaveValue('')
+  await page.getByRole('switch', { name: 'Wake it once first', exact: true }).click()
+  await expect(page.locator('.toasts')).toContainText('not connected to the service yet')
+
+  await page.goto(`${root}#/notifications`)
+  await expect(page.locator('#nt-server')).toHaveValue('')
+  await page.locator('#nt-server').fill('http://127.0.0.1:1')
+  await page.locator('#nt-topic').fill('studio-browser-test')
+  await page.getByRole('button', { name: 'Turn on', exact: true }).click()
+  await expect(page.getByText('Sending to', { exact: false })).toContainText('studio-browser-test')
+  await expect(page.getByRole('button', { name: 'Send a test', exact: true })).toBeDisabled()
+  await page.getByRole('switch', { name: 'An agent asks you a question', exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'An agent asks you a question', exact: true })).toHaveAttribute('aria-checked', 'false')
+  await page.reload()
+  await expect(page.locator('#nt-server')).toHaveValue('http://127.0.0.1:1')
+  await expect(page.getByRole('switch', { name: 'An agent asks you a question', exact: true })).toHaveAttribute('aria-checked', 'false')
+  // No real phone notification is sent, and no saved credential is revealed.
+  await page.getByRole('button', { name: 'Turn off', exact: true }).click()
+  await page.locator('.dialog').getByRole('button', { name: 'Turn off', exact: true }).click()
+  await expect(page.locator('#nt-server')).toHaveValue('')
+}

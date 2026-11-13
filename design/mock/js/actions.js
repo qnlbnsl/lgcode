@@ -1,3 +1,4 @@
+import * as liveGit from './live/git.js';
 // Everything that changes the mock's state, and the small simulation that makes agents
 // answer and move. Nothing here talks to a service. Each change the real product sends to the
 // engine is also reported to engine.js, under the RPC tag the real client API uses.
@@ -158,6 +159,7 @@ export function setAgentConfig(agentId, patch) { if (refused()) return; engine.c
 
 // ---- requests ------------------------------------------------------------------
 export function answerRequest(requestId, optionId, text) {
+  if (live.on && S().worktrees?.some((w) => w.review?.id === requestId)) return liveGit.answerReview(requestId, optionId);
   if (refused()) return;
   const s = S(); const r = byId(s.requests, requestId); if (!r || r.status !== 'open') return;
   const a = agentOf(s, r.agent); const opt = (r.options || []).find((o) => o.id === optionId);
@@ -208,7 +210,7 @@ export function answerRequest(requestId, optionId, text) {
     threadOf(st, ag.id).push(message);
   }), 1400);
 }
-export function declinePhoneOffer() { update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
+export function declinePhoneOffer() { if (live.on) return liveGit.dismissOffer(); update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
 
 // ---- projects ------------------------------------------------------------------
 export function slug(name) { return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'; }

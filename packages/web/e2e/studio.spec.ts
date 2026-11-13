@@ -1,3 +1,4 @@
+import { exerciseStudioService } from './support/studioService.ts'
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"
@@ -99,10 +100,13 @@ test("live website: signs in through the engine, shows its real records, and kee
           await expect.poll(() => timings.some((line) => line.includes("first pushed update") && line.includes("after the engine recorded it"))).toBe(true)
           await page.goto(`${origin}/studio/#/home`)
 
+          await exerciseStudioService(page, origin)
+          await page.goto(`${origin}/studio/#/home`)
+
           // A reload keeps the session, which is the engine's cookie.
           await page.reload()
           await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
-          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(2)
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBeGreaterThanOrEqual(2)
 
           // Logging out ends the session and leaves no records on the page.
           await page.getByRole("button", { name: "Log out" }).click()

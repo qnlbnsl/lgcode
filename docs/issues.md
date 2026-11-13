@@ -11067,3 +11067,34 @@ With a long `LGTM_HOME`, the engine's socket path exceeds 100 bytes, and the ser
 The service prints "socket path exceeds 100 bytes", but `serve --detach` discards the child's output.
 The launcher reports only "lgtm: service failed to start".
 Running `node packages/engine/src/service.ts` directly shows the reason.
+
+## s2-git-1. A fast connection reply could leave a reloaded page blank.
+
+Found: 2026-11-13, while testing the service screens against the real engine.
+State: fixed in this change.
+
+The store subscribed after the browser painted the page.
+A fast session check and snapshot could arrive before that subscription existed.
+The page then kept its initial checking screen until another update arrived.
+The store now subscribes during layout, before asynchronous connection replies can arrive.
+
+## s2-git-2. Registered workspaces need their project and team links joined.
+
+Found: 2026-11-13, while connecting the Git picker.
+State: fixed in this change.
+
+A registered workspace need not hold a project identifier or a team identifier.
+Projects and teams name their workspaces in their own records.
+The mapping now joins those records so that the Git picker includes their worktrees.
+
+## s2-git-3. The settings contract does not return effective role defaults.
+
+Found: 2026-11-13, while connecting Service settings.
+State: open.
+
+The role settings request returns stored overrides.
+It does not return the effective limits after the engine applies its defaults and role files.
+The website shows an empty number for an unset limit.
+An unset switch is labelled as not set by the service.
+Worker stall time edits the service-wide stall limit.
+The separate lead and assigned timers have no matching setting and remain empty.

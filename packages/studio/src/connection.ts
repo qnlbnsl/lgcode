@@ -12,6 +12,7 @@ import { connect, type Client, type ClientEnvelope } from "@lgtm/client/browser"
 import type { ClientSnapshot, EventSequence, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
+import * as Redacted from "effect/Redacted"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable"
@@ -28,6 +29,7 @@ export interface LiveConnection {
   readonly label: string
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
+  request(tag: string, payload: object): Promise<unknown>
   open(write: Write): void
   signIn(password: string): Promise<"in" | "rejected" | "unavailable">
   signOut(): Promise<void>
@@ -58,7 +60,7 @@ const refreshTags = new Set([
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
   "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
 ])
-const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("project.") || tag.startsWith("client.Alert")
+const needsRefresh = (tag: string) => ["AccountChanged", "AccountAvailable", "AccountNeedsSignIn", "AccountOutOfUsage", "HarnessChanged", "roles.SettingsChanged", "roles.RoleFileSet"].includes(tag) || refreshTags.has(tag) || tag.startsWith("project.") || tag.startsWith("client.Alert")
 
 const emptyRecords: EngineRecords = { machines: [], subscriptions: [], repos: [], projects: [], teams: [], agents: [], requests: [], worktrees: [], sprints: [], tasks: [] }
 
@@ -86,6 +88,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
+  let activeClient: Client | undefined
 
   const setConn = (status: ConnectionStatus) => {
     clearTimeout(offlineTimer)
@@ -107,7 +110,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     } catch { return undefined }
   }
 
-  const stop = () => { controller?.abort(); controller = undefined }
+  const stop = () => { activeClient = undefined; controller?.abort(); controller = undefined }
 
   // Reads the snapshot, then follows the stream, until the session ends or the page closes.
   const follow = () => {
@@ -126,6 +129,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       while (!ended && !signal.aborted) {
         yield* Effect.scoped(Effect.gen(function* () {
           const client: Client = yield* open({ url })
+          activeClient = client
           const refresh = (minimum = 0) => Effect.gen(function* () {
             for (;;) {
               const started = clock()
@@ -163,6 +167,8 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
           })))
         })).pipe(Effect.catch((error) => Effect.gen(function* () {
           if (signal.aborted) return
+          console.debug('follow failed', error)
+          activeClient = undefined
           setConn("reconnecting")
           // A browser hides an HTTP refusal of a WebSocket. Ask the session route instead.
           const status = yield* Effect.promise(() => post("/api/session"))
@@ -198,6 +204,23 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     // each action before it reaches this point.
     call() {},
     push() {},
+    async request(tag, payload) {
+      const client = activeClient
+      if (client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
+      const invoke = (client as unknown as Record<string, (input: object) => Effect.Effect<unknown, unknown>>)[tag]
+      if (typeof invoke !== "function" || tag.endsWith("subscribe")) throw new Error("Unknown service request.")
+      // Credential ingress is decoded by the existing client, which requires Redacted.
+      const secret = tag === "client.alerts.carrier.set-token" && "value" in payload
+        ? Redacted.make(String(payload.value), { label: "secret value" }) : undefined
+      try {
+        const result = await Effect.runPromise(invoke({ ...payload, ...(secret ? { value: secret } : {}), requestId: requestId() }).pipe(Effect.result), { signal: controller!.signal })
+        if (result._tag === "Failure") {
+          const error = result.failure as { reason?: unknown; message?: unknown }
+          throw new Error(typeof error.reason === "string" ? error.reason : typeof error.message === "string" ? error.message : "The service refused the request.")
+        }
+        return result.success
+      } finally { if (secret) Redacted.wipeUnsafe(secret) }
+    },
     open(next) {
       write = next
       setSession("checking")

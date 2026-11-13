@@ -1,3 +1,5 @@
+import * as liveGit from '../live/git.js';
+import { live, refuse } from '../lib.js';
 // The service pages: Machines, Subscriptions, Phone notifications and Service settings,
 // plus one project's Settings tab and the Add repository dialog.
 import { html, useState, useEffect, Icon, cx, update, store, go, href, ago, clock, dayLabel, useNow, uid, plural, MIN, HOUR, DAY } from '../lib.js';
@@ -58,12 +60,12 @@ function markSaved() {
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => update((s) => { s.ui.saved = null; }), 1800);
 }
-const setS = (patch) => { update((s) => { Object.assign(s.settings, patch); }); markSaved(); };
+const setS = (patch) => { if (live.on) return liveGit.saveSettings(patch); update((s) => { Object.assign(s.settings, patch); }); markSaved(); };
 function Saved({ s }) {
   return html`<span class=${cx('svc-saved', s.ui.saved && 'on')} role="status" aria-live="polite">${s.ui.saved && html`<${Icon} name="check" size=${13} />Saved`}</span>`;
 }
 function Switch({ on, onChange, label, disabled }) {
-  return html`<button type="button" class="switch" role="switch" aria-checked=${!!on} aria-label=${label} disabled=${disabled} onClick=${() => onChange(!on)}></button>`;
+  return html`<button type="button" class="switch" role="switch" aria-checked=${!!on} title=${live.on && on == null ? 'Not set by the service' : null} aria-label=${label} disabled=${disabled} onClick=${() => onChange(!on)}></button>`;
 }
 function Seg({ value, options, onChange, label }) {
   return html`<div class="seg" role="group" aria-label=${label}>${options.map((o) => html`<button key=${o.id} type="button" aria-pressed=${value === o.id} onClick=${() => onChange(o.id)}>
@@ -84,7 +86,7 @@ function Row({ label, hint, children, id, top }) {
   </div>`;
 }
 function Num({ id, value, unit, min = 0, max = 999, onChange }) {
-  return html`<span class="row" style="gap:6px"><input id=${id} class="input num-field" type="number" inputmode="numeric" min=${min} max=${max} value=${value}
+  return html`<span class="row" style="gap:6px"><input id=${id} class="input num-field" type="number" inputmode="numeric" min=${min} max=${max} value=${value ?? ''}
     onInput=${(e) => { const v = +e.target.value; if (e.target.value !== '' && v >= min && v <= max) onChange(v); }} />${unit && html`<span class="muted">${unit}</span>`}</span>`;
 }
 function Section({ title, sub, children, action }) {
@@ -159,7 +161,7 @@ export function Machines({ s }) {
             <td class="muted c-mid">${m.role === 'master' ? 'Master' : 'Worker'}</td>
             <td><span class="row" style="gap:6px"><i class=${cx('dot', off ? 'waiting' : m.status === 'pairing' ? 'starting' : 'working')}></i><span class=${cx(off && 'warn-text')} style=${off ? 'font-weight:var(--weight-medium)' : ''}>${off ? 'Offline' : m.status === 'pairing' ? 'Pairing' : 'Online'}</span></span></td>
             <td class="mono muted c-wide">${m.address}</td>
-            <td class="c-wide">${Object.keys(HARNESSES).map((h) => m.harnesses?.[h] ? html`<span key=${h} class="tag" style="margin-right:4px">${HARNESSES[h].name}</span>` : null)}${m.harnesses && !m.harnesses.codex && html`<span class="warn-text" style="font-size:var(--text-sm)">Codex missing</span>`}${!m.harnesses && html`<span class="muted">Scanning…</span>`}</td>
+            <td class="c-wide">${Object.keys(HARNESSES).map((h) => m.harnesses?.[h] ? html`<span key=${h} class="tag" style="margin-right:4px">${HARNESSES[h]?.name || ''}</span>` : null)}${m.harnesses && !m.harnesses.codex && html`<span class="warn-text" style="font-size:var(--text-sm)">Codex missing</span>`}${!m.harnesses && html`<span class="muted">Scanning…</span>`}</td>
             <td class="num" style="text-align:left"><span class=${cx(full && 'warn-text')}>${n}</span><span class="muted"> of ${m.slots.limit}</span></td>
             <td class="c-mid">${off || m.status === 'pairing' ? html`<span class="faint">—</span>` : html`<${Meter} pct=${m.cpu} />`}</td>
             <td class="c-mid">${off || m.status === 'pairing' ? html`<span class="faint">—</span>` : html`<${Meter} pct=${m.mem} />`}</td>
@@ -201,7 +203,7 @@ function PairMachine({ s }) {
     <ol class="svc-steps">
       <li class="done"><span class="n">1</span><div><b>Install LGTM Studio on the other machine.</b><${Command} text="npm install -g lgtm" /></div></li>
       <li class=${step > 0 ? 'done' : 'now'}><span class="n">2</span><div><b>Run this command there.</b>
-        <${Command} text=${`lgtm connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
+        <${Command} text=${`lgtm connect ${master?.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
       <li class=${step > 0 ? 'now' : ''}><span class="n">3</span><div><b>Confirm the machine here.</b>
         ${step === 0 ? html`<p class="row muted"><${Icon} name="loader-circle" size=${14} class="svc-spin" />Waiting for a machine to use the code…</p>`
           : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.1.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
@@ -257,6 +259,7 @@ registerDialog('add-repository', AddRepository);
 
 // ---- subscriptions ---------------------------------------------------------------
 function subState(x) {
+  if (x.status === 'out-of-usage') return { word: 'Limit reached', tone: 'error', dot: 'failed' };
   if (!x.signedIn) return { word: 'Signed out', tone: 'warn', dot: 'waiting' };
   if (!x.enabled) return { word: 'Turned off', tone: null, dot: 'idle' };
   if (x.window && x.window.pct >= 100) return { word: 'Limit reached', tone: 'error', dot: 'failed' };
@@ -265,41 +268,42 @@ function subState(x) {
   return { word: 'Signed in', tone: null, dot: 'working' };
 }
 function SubRow({ s, x, now }) {
-  const st = subState(x); const m = machineOf(s, x.machine); const h = HARNESSES[x.harness]; const ags = subAgents(s, x.id); const live = ags.filter(running).length;
+  const st = subState(x); const m = machineOf(s, x.machine) || { name: '' }; const h = HARNESSES[x.harness]; const ags = subAgents(s, x.id); const active = ags.filter(running).length;
   const k = 'sub:' + x.id; const open = !!s.expanded[k];
-  const makeDefault = () => { update((stt) => { for (const y of stt.subscriptions) if (y.harness === x.harness && y.machine === x.machine) y.useForNew = y.id === x.id; }); act.toast(`New ${h.name} agents on ${m.name} use ${x.name}`); };
-  const signOut = () => act.confirm({ title: `Sign out of ${h.name} · ${x.name}?`, body: `The sign-in on ${m.name} is removed. Sign in again at any time.`, action: 'Sign out',
+  const makeDefault = () => { if (live.on) return liveGit.makeDefault(x.id); update((stt) => { for (const y of stt.subscriptions) if (y.harness === x.harness && y.machine === x.machine) y.useForNew = y.id === x.id; }); act.toast(`New ${h.name} agents on ${m.name} use ${x.name}`); };
+  const signOut = () => live.on ? refuse() : act.confirm({ title: `Sign out of ${h.name} · ${x.name}?`, body: `The sign-in on ${m.name} is removed. Sign in again at any time.`, action: 'Sign out',
     lost: ags.length ? [`${plural(ags.length, 'agent')} ${ags.length === 1 ? 'uses' : 'use'} it and will pause at the next turn`] : [],
     onConfirm: () => { update(() => { x.signedIn = false; x.usage = null; x.window = null; x.useForNew = false; }); act.toast(`Signed out of ${h.name} · ${x.name}`); } });
-  const remove = () => act.confirm({ title: `Remove ${h.name} · ${x.name}?`, body: 'The subscription and its sign-in are removed from LGTM Studio.', action: 'Remove subscription',
+  const remove = () => act.confirm({ title: `Remove ${h.name} · ${x.name}?`, body: live.on ? 'The account is removed. Its sign-in and running agents are kept.' : 'The subscription and its sign-in are removed from LGTM Studio.', action: 'Remove subscription',
     lost: ags.length ? [`${plural(ags.length, 'agent')} will need another subscription`] : [],
-    onConfirm: () => { update((stt) => { stt.subscriptions = stt.subscriptions.filter((y) => y.id !== x.id); }); act.toast('Subscription removed'); } });
-  const signIn = () => act.openDialog({ type: 'signin', subscription: x.id });
+    onConfirm: () => { if (live.on) return liveGit.accountAction(x.id, 'remove'); update((stt) => { stt.subscriptions = stt.subscriptions.filter((y) => y.id !== x.id); }); act.toast('Subscription removed'); } });
+  const signIn = () => live.on ? refuse() : act.openDialog({ type: 'signin', subscription: x.id });
   return html`<div class=${cx('svc-sub', st.tone === 'warn' && 'warn', st.tone === 'error' && 'error', !x.enabled && 'dim')}>
     <div class="svc-sub-row">
       <div class="c-name"><button type="button" class=${cx('svc-twist', open && 'open')} aria-expanded=${open} aria-label=${(open ? 'Hide' : 'Show') + ' agents on ' + x.name} onClick=${() => act.toggleExpanded(k)}><${Icon} name="chevron-right" size=${13} /></button>
         <div class="col"><span class="row" style="gap:6px"><b>${x.name}</b>${x.useForNew && x.signedIn && html`<span class="badge outline" data-tip=${`New ${h.name} agents on ${m.name} use it`}>Default</span>`}</span>
-          <span class="muted truncate" style="font-size:var(--text-sm)">${x.account || 'No account'} · ${m.name}</span></div></div>
+          <span class="muted truncate" style="font-size:var(--text-sm)">${live.on ? '' : (x.account || 'No account') + ' · ' + m.name}</span></div></div>
       <div class="c-state"><span class="row" style="gap:6px"><i class=${cx('dot', st.dot)}></i><span class=${cx(st.tone === 'warn' && 'warn-text', st.tone === 'error' && 'error-text')} style=${st.tone ? 'font-weight:var(--weight-medium)' : ''}>${st.word}</span></span></div>
       <div class="c-use" data-label="5 hours">${x.window ? html`<${Meter} pct=${x.window.pct} wide /><small class=${cx(x.window.pct >= 100 ? 'error-text' : 'muted')}>Resets in ${until(x.window.resetsAt, now)}</small>` : html`<span class="faint">—</span>`}</div>
       <div class="c-use" data-label="This week">${x.usage ? html`<${Meter} pct=${x.usage.pct} wide /><small class="muted">Resets ${x.usage.resetsAt - now < DAY ? 'in ' + until(x.usage.resetsAt, now) : new Date(x.usage.resetsAt).toLocaleDateString('en-GB', { weekday: 'long' })}</small>` : html`<span class="faint">—</span>`}</div>
-      <div class="c-agents" data-label="Agents">${ags.length ? html`<button type="button" class="link" onClick=${() => act.toggleExpanded(k, true)}>${ags.length}</button><span class="muted"> · ${live} running</span>` : html`<span class="faint">None</span>`}</div>
-      <div class="c-model" data-label="Model for new agents"><select class="select" aria-label=${'Model for new agents on ' + x.name} value=${x.model} disabled=${!x.signedIn} onChange=${(e) => { const v = e.target.value; update(() => { x.model = v; }); markSaved(); }}>
-        ${h.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select></div>
+      <div class="c-agents" data-label="Agents">${ags.length ? html`<button type="button" class="link" onClick=${() => act.toggleExpanded(k, true)}>${ags.length}</button><span class="muted"> · ${active} running</span>` : html`<span class="faint">None</span>`}</div>
+      <div class="c-model" data-label="Model for new agents"><select class="select" aria-label=${'Model for new agents on ' + x.name} value=${x.model} disabled=${!x.signedIn} onChange=${(e) => { const v = e.target.value; if (live.on) return liveGit.accountModel(x.harness, v); update(() => { x.model = v; }); markSaved(); }}>
+        ${live.on && !x.model && html`<option value=""></option>`}${h.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select></div>
       <div class="c-act">
         ${!x.signedIn ? html`<button type="button" class="btn sm primary" onClick=${signIn}>Sign in</button>` : null}
         <${Menu} class="icon-btn sm" label=${'Actions for ' + x.name} align="end" width=${250} trigger=${html`<${Icon} name="ellipsis" size=${15} />`}
           items=${[
-            x.signedIn && { label: `Use for new agents on ${m.name}`, icon: 'star', checked: x.useForNew, disabled: !x.enabled, onSelect: makeDefault },
-            { label: x.enabled ? 'Turn off' : 'Turn on', icon: x.enabled ? 'pause' : 'play', hint: x.enabled ? 'No agent starts on it. Running agents finish their turn.' : null, onSelect: () => { update(() => { x.enabled = !x.enabled; if (!x.enabled) x.useForNew = false; }); act.toast(x.enabled ? 'Subscription turned on' : 'Subscription turned off'); } },
-            { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: 'Rename subscription', value: x.name, taken: s.subscriptions.filter((y) => y.harness === x.harness).map((y) => y.name), onRename: (v) => { update(() => { x.name = v; }); act.toast('Subscription renamed'); } }) },
+            x.signedIn && { label: live.on ? 'Use for new project leads' : `Use for new agents on ${m.name}`, icon: 'star', checked: x.useForNew, disabled: !x.enabled, onSelect: makeDefault },
+            { label: x.enabled ? 'Turn off' : 'Turn on', icon: x.enabled ? 'pause' : 'play', hint: x.enabled ? 'No agent starts on it. Running agents finish their turn.' : null, onSelect: () => { if (live.on) return liveGit.accountAction(x.id, x.enabled ? 'disable' : 'set', { enabled: true }); update(() => { x.enabled = !x.enabled; if (!x.enabled) x.useForNew = false; }); act.toast(x.enabled ? 'Subscription turned on' : 'Subscription turned off'); } },
+            { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: 'Rename subscription', value: x.name, taken: s.subscriptions.filter((y) => y.harness === x.harness).map((y) => y.name), onRename: (v) => { if (live.on) return liveGit.accountAction(x.id, 'set', { displayName: v }); update(() => { x.name = v; }); act.toast('Subscription renamed'); } }) },
+            live.on && { label: 'Account works again', icon: 'play', onSelect: () => liveGit.markAvailable(x.id) },
             { sep: true },
             x.signedIn ? { label: 'Sign out', icon: 'log-out', onSelect: signOut } : { label: 'Sign in', icon: 'log-in', onSelect: signIn },
             { label: 'Remove', icon: 'trash-2', danger: true, onSelect: remove },
           ].filter(Boolean)} />
       </div>
     </div>
-    ${st.word === 'Limit reached' && html`<div class="svc-sub-note error-text"><${Icon} name="circle-alert" size=${14} /><span>The five-hour limit is used up. Agents on this subscription wait, and try again every ${s.settings.capacityBackoff} minutes until ${clock(x.window.resetsAt)}.</span></div>`}
+    ${!live.on && st.word === 'Limit reached' && html`<div class="svc-sub-note error-text"><${Icon} name="circle-alert" size=${14} /><span>The five-hour limit is used up. Agents on this subscription wait, and try again every ${s.settings.capacityBackoff} minutes until ${clock(x.window.resetsAt)}.</span></div>`}
     ${!x.signedIn && html`<div class="svc-sub-note warn-text"><${Icon} name="triangle-alert" size=${14} /><span>No sign-in on ${m.name}. ${ags.length ? `${plural(ags.length, 'agent')} cannot start until you sign in.` : 'No agent can start on it.'}</span></div>`}
     ${open && html`<div class="svc-sub-agents">${ags.length === 0 ? html`<span class="muted">No agent uses this subscription.</span>` : ags.map((a) => { const as = agentStatus(s, a);
       return html`<a key=${a.id} class="list-row" href=${href(routeForAgent(s, a))}><${Avatar} agent=${a} s=${s} size="sm" /><b style="font-weight:var(--weight-medium)">${a.name}</b><span class="muted truncate grow">${projectOf(s, a.project).name}</span>
@@ -307,13 +311,14 @@ function SubRow({ s, x, now }) {
   </div>`;
 }
 export function Subscriptions({ s }) {
+  useEffect(() => liveGit.openScreen('subscriptions'), []);
   const now = useNow(30_000);
   const out = s.subscriptions.filter((x) => !x.signedIn).length; const capped = s.subscriptions.filter((x) => subState(x).tone === 'error').length;
   return html`<div class="view-body"><div class="page">
     <div class="page-head"><h1 class="page-title">Subscriptions</h1>
       <span class="sub">${s.subscriptions.length - out} of ${s.subscriptions.length} signed in${capped ? html` · <span class="error-text">${capped} at its limit</span>` : ''}</span><${Saved} s=${s} /><span class="grow"></span>
-      <button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'add-subscription' })}><${Icon} name="plus" size=${14} />Add subscription</button></div>
-    <div data-main>
+      <button type="button" class="btn primary" disabled=${live.on && liveGit.busy('read-service')} onClick=${() => act.openDialog({ type: 'add-subscription' })}><${Icon} name="plus" size=${14} />Add subscription</button></div>
+    <fieldset disabled=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0" aria-busy=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('read-service'))}><div data-main>
     ${Object.entries(HARNESSES).map(([hid, h]) => { const list = s.subscriptions.filter((x) => x.harness === hid);
       return html`<section key=${hid} class="svc-harness">
         <div class="section-head"><h2>${h.name}</h2><span class="count">${list.length}</span><span class="faint truncate not-phone" style="font-size:var(--text-sm)">${h.runMode} mode · ${h.models.join(', ')}</span></div>
@@ -324,24 +329,25 @@ export function Subscriptions({ s }) {
         </div>
       </section>`; })}
     </div>
-    <p class="svc-foot-note">A subscription is one sign-in for one harness on one machine. The sign-in happens in the harness's own program, and LGTM Studio never sees the password.</p>
+    </fieldset>
+    ${live.on ? html`<p class="svc-foot-note">Accounts belong to the service. Models are harness defaults. Provider sign-in is not available here.</p>` : html`<p class="svc-foot-note">A subscription is one sign-in for one harness on one machine. The sign-in happens in the harness's own program, and LGTM Studio never sees the password.</p>`}
   </div></div>`;
 }
 function AddSubscription({ s }) {
-  const [harness, setHarness] = useState('claude'); const [name, setName] = useState(''); const [machine, setMachine] = useState('studio');
-  const m = machineOf(s, machine); const h = HARNESSES[harness];
+  const [harness, setHarness] = useState(live.on ? Object.keys(HARNESSES)[0] : 'claude'); const [name, setName] = useState(''); const [machine, setMachine] = useState(live.on ? '' : 'studio');
+  const m = machineOf(s, machine) || { name: '', status: 'online' }; const h = HARNESSES[harness];
   const dup = s.subscriptions.some((x) => x.harness === harness && x.machine === machine && x.name.toLowerCase() === name.trim().toLowerCase());
   const missing = m.harnesses && !m.harnesses[harness];
   const why = !name.trim() ? 'Give it a name you will recognise, such as the plan.' : dup ? `${m.name} already has a ${h.name} subscription with that name.` : missing ? `${h.name} is not installed on ${m.name}.` : m.status !== 'online' ? `${m.name} is offline.` : null;
-  const add = () => { if (why) return; const id = uid('sub');
+  const add = () => { if (why) return; if (live.on) return liveGit.addAccount(harness, name.trim()); const id = uid('sub');
     update((st) => { st.subscriptions.push({ id, harness, name: name.trim(), machine, enabled: true, signedIn: false, useForNew: false, usage: null, window: null, account: null, model: h.models[1] || h.models[0] }); });
     act.openDialog({ type: 'signin', subscription: id }); };
   return html`<${Dialog} title="Add subscription" size="narrow" onClose=${act.closeDialog} onSubmit=${add}
-    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why}>Add and sign in</button>`}>
+    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || (live.on && liveGit.busy('subscriptions'))}>${live.on ? (liveGit.busy('subscriptions') ? 'Adding…' : 'Add subscription') : 'Add and sign in'}</button>`}>
     <div class="field"><label>Harness</label><${Seg} label="Harness" value=${harness} onChange=${setHarness} options=${Object.entries(HARNESSES).map(([id, x]) => ({ id, label: x.name }))} /></div>
     <div class="field"><label for="as-name">Name</label><input id="as-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Max" autofocus />${why && name.trim() ? html`<span class="error">${why}</span>` : html`<span class="hint">Shown as "${h.name} · ${name.trim() || 'Max'}".</span>`}</div>
-    <div class="field"><label for="as-machine">Machine</label><select id="as-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
-      ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : ''}</option>`)}</select></div>
+    ${!live.on && html`<div class="field"><label for="as-machine">Machine</label><select id="as-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
+      ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : ''}</option>`)}</select></div>`}
   <//>`;
 }
 registerDialog('add-subscription', AddSubscription);
@@ -356,7 +362,7 @@ const EVENTS = [
 ];
 const NOTE_KIND = { ...KIND_LABEL, sprint: 'Sprint done', test: 'Test' };
 const DELIVERY = { sent: ['Sent to phone', 'muted'], off: ['Not sent', 'faint'], failed: ['Failed', 'error-text'], quiet: ['Held · quiet hours', 'muted'], muted: ['Not sent · turned off', 'faint'] };
-function sendTest() {
+function sendTest() { if (live.on) return liveGit.sendTest();
   const s = store.state; const server = s.settings.ntfyServer;
   const ok = /\./.test(server) && !/localhost/.test(server);
   update((st) => { st.notifications.unshift({ id: uid('n'), ts: Date.now(), kind: 'test', title: 'Test notification from LGTM Studio', read: true, delivery: ok ? 'sent' : 'failed', error: ok ? null : `Could not reach ${server}` }); });
@@ -369,31 +375,33 @@ function NtfyForm({ s }) {
   const bad = f.server.trim() && !/^https?:\/\/\S+$/.test(f.server.trim()) ? 'Start the address with https://' : null;
   const badTopic = f.topic && !/^[\w-]+$/.test(f.topic) ? 'A topic has letters, digits, hyphens and underscores only.' : null;
   const can = f.server.trim() && f.topic.trim() && !bad && !badTopic && dirty;
-  const save = () => { if (!can) return; setS({ ntfyServer: f.server.trim(), ntfyTopic: f.topic.trim(), ntfyToken: f.token }); act.toast('Phone notifications are on'); };
-  const off = () => act.confirm({ title: 'Turn off phone notifications?', body: 'The server, topic and token are forgotten. Requests still show on Home and in the bell.', action: 'Turn off', onConfirm: () => { setS({ ntfyServer: '', ntfyTopic: '', ntfyToken: '' }); setF({ server: '', topic: '', token: '' }); } });
+  const save = async () => { if (!can) return; if (live.on) { const token = f.token; setF({ ...f, token: '' }); await liveGit.saveCarrier({ ...f, token }); return; } setS({ ntfyServer: f.server.trim(), ntfyTopic: f.topic.trim(), ntfyToken: f.token }); act.toast('Phone notifications are on'); };
+  const off = () => act.confirm({ title: 'Turn off phone notifications?', body: 'The server, topic and token are forgotten. Requests still show on Home and in the bell.', action: 'Turn off', onConfirm: () => { if (live.on) return liveGit.saveCarrier({ server: '', topic: '', token: '' }); setS({ ntfyServer: '', ntfyTopic: '', ntfyToken: '' }); setF({ server: '', topic: '', token: '' }); } });
   const fld = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return html`<form class="svc-form" onSubmit=${(e) => { e.preventDefault(); save(); }}>
     <div class="field"><label for="nt-server">ntfy server</label><input id="nt-server" class="input mono" value=${f.server} onInput=${fld('server')} placeholder="https://ntfy.example.com" spellcheck="false" autocapitalize="off" />${bad && html`<span class="error">${bad}</span>`}</div>
     <div class="field"><label for="nt-topic">Topic</label><input id="nt-topic" class="input mono" value=${f.topic} onInput=${fld('topic')} placeholder="lgtm-alerts" spellcheck="false" autocapitalize="off" />
       ${badTopic ? html`<span class="error">${badTopic}</span>` : html`<span class="hint">Subscribe to the same topic in the ntfy app on your phone. Anyone who knows the topic can read the alerts, so pick a long one.</span>`}</div>
     <div class="field"><label for="nt-token">Access token <span class="faint" style="font-weight:var(--weight-body)">· optional</span></label>
-      <span class="row"><input id="nt-token" class="input mono grow" type=${show ? 'text' : 'password'} value=${f.token} onInput=${fld('token')} placeholder="tk_…" autocomplete="off" spellcheck="false" />
+      <span class="row"><input id="nt-token" class="input mono grow" type=${show ? 'text' : 'password'} value=${f.token} onInput=${fld('token')} placeholder=${live.on && set.tokenSet ? 'Token is set. Enter a replacement.' : 'tk_…'} autocomplete="off" spellcheck="false" />
         <button type="button" class="btn icon" aria-label=${show ? 'Hide the token' : 'Show the token'} aria-pressed=${show} onClick=${() => setShow(!show)}><${Icon} name=${show ? 'eye-off' : 'eye'} size=${14} /></button></span></div>
     <div class="row" style="flex-wrap:wrap">
-      <button type="submit" class="btn primary" disabled=${!can}>${on ? 'Save changes' : 'Turn on'}</button>
-      <button type="button" class="btn" disabled=${!on || dirty} data-tip=${!on ? 'Turn notifications on first' : dirty ? 'Save your changes first' : null} onClick=${sendTest}><${Icon} name="send" size=${13} />Send a test</button>
+      <button type="submit" class="btn primary" disabled=${!can || (live.on && liveGit.busy('notifications'))}>${live.on && liveGit.busy('notifications') ? 'Saving…' : on ? 'Save changes' : 'Turn on'}</button>
+      <button type="button" class="btn" disabled=${!on || dirty || (live.on && (!set.tokenSet || liveGit.busy('notifications')))} data-tip=${!on ? 'Turn notifications on first' : dirty ? 'Save your changes first' : null} onClick=${sendTest}><${Icon} name="send" size=${13} />Send a test</button>
       <span class="grow"></span>
+      ${live.on && set.tokenSet && html`<button type="button" class="btn ghost" onClick=${liveGit.clearToken}>Clear token</button>`}
       ${on && html`<button type="button" class="btn ghost" onClick=${off}>Turn off</button>`}
     </div>
   </form>`;
 }
 export function Notifications({ s }) {
+  useEffect(() => liveGit.openScreen('notifications'), []);
   const now = useNow(); const set = s.settings; const on = !!set.ntfyServer;
   const list = s.notifications; const unread = list.filter((n) => !n.read).length; const failed = list.filter((n) => n.delivery === 'failed').length;
   const [showAll, setShowAll] = useState(false); const shown = showAll ? list : list.slice(0, 12);
-  const open = (n) => { update(() => { n.read = true; }); const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); };
-  const retry = (n) => { act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
-  const setOn = (k, v) => setS({ notifyOn: { ...set.notifyOn, [k]: v } });
+  const open = (n) => { if (live.on) { const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); return; } update(() => { n.read = true; }); const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); };
+  const retry = (n) => { if (live.on) return liveGit.retryAlert(n); act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
+  const setOn = (k, v) => live.on ? liveGit.notifyKind(k, v) : setS({ notifyOn: { ...set.notifyOn, [k]: v } });
   const setQuiet = (patch) => setS({ quiet: { ...set.quiet, ...patch } });
   let lastDay = null;
   return html`<div class="view-body"><div class="page">
@@ -405,10 +413,10 @@ export function Notifications({ s }) {
           ${!on && s.phoneOffer === 'open' && html`<div class="callout info" style="align-items:center;margin-bottom:var(--space-3)"><${Icon} name="smartphone" size=${15} />
             <span class="grow">Alerts reach your phone when an agent waits for you. Until then, requests show here, on Home and in the bell.</span>
             <button type="button" class="icon-btn sm" aria-label="Dismiss" onClick=${act.declinePhoneOffer}><${Icon} name="x" size=${13} /></button></div>`}
-          <${NtfyForm} s=${s} />
+          ${(!live.on || s.settings.notifyOn && Object.keys(s.settings.notifyOn).length > 0) && html`<${NtfyForm} key=${live.on ? set.ntfyServer + set.ntfyTopic : 'mock'} s=${s} />`}
         <//>
         <${Section} title="Notify me when">
-          <div class=${cx('svc-rows', !on && 'svc-off')}>${EVENTS.map(([k, label, hint]) => html`<${Row} key=${k} label=${label} hint=${hint}><${Switch} on=${set.notifyOn[k]} label=${label} onChange=${(v) => setOn(k, v)} /><//>`)}</div>
+          <div class=${cx('svc-rows', !on && 'svc-off')}>${(live.on ? Object.keys(set.notifyOn).map((k) => [k, EVENTS.find((x) => x[0] === k)?.[1] || k, '']) : EVENTS).map(([k, label, hint]) => html`<${Row} key=${k} label=${label} hint=${hint}><${Switch} on=${set.notifyOn[k]} label=${label} onChange=${(v) => setOn(k, v)} /><//>`)}</div>
         <//>
         <${Section} title="Quiet hours">
           <div class=${cx('svc-rows', !on && 'svc-off')}>
@@ -420,16 +428,16 @@ export function Notifications({ s }) {
         <//>
       </div>
       <div class="svc-main" data-main>
-        <${Section} title="Recent notifications" sub=${unread ? `${unread} unread` : 'All read'}
-          action=${html`<button type="button" class="btn sm ghost" disabled=${!unread} onClick=${() => update((st) => { for (const n of st.notifications) n.read = true; })}><${Icon} name="check" size=${13} />Mark all read</button>`}>
+        <${Section} title="Recent notifications" sub=${unread ? `${unread} ${live.on ? 'open' : 'unread'}` : live.on ? 'All cleared' : 'All read'}
+          action=${html`<button type="button" class="btn sm ghost" disabled=${!unread} onClick=${() => live.on ? liveGit.dismissAlerts() : update((st) => { for (const n of st.notifications) n.read = true; })}><${Icon} name="check" size=${13} />${live.on ? 'Dismiss all' : 'Mark all read'}</button>`}>
           ${list.length === 0 && html`<${Empty} title="No notifications yet" icon="bell">A row appears here each time an agent waits for you.<//>`}
           <ul class="svc-notes">${shown.map((n) => { const d = dayLabel(n.ts, now); const head = d !== lastDay ? html`<li class="svc-day" key=${'d' + n.id}>${d}</li>` : null; lastDay = d;
             const a = n.agent && agentOf(s, n.agent); const p = n.project && projectOf(s, n.project); const r = n.request && byId(s.requests, n.request);
             const del = n.delivery === 'off' && on ? (set.notifyOn[n.kind] === false ? 'muted' : 'off') : n.delivery; const [dw, dc] = DELIVERY[del] || DELIVERY.off;
             const clickable = !!(r || n.to);
             return html`${head}<li key=${n.id} class=${cx('svc-note', !n.read && 'unread', n.kind === 'failed' && 'failed')}>
-              <i class="pip" aria-label=${n.read ? null : 'Unread'}></i>
-              <span class=${cx('kind', n.kind === 'failed' ? 'failed' : r && r.status === 'open' ? n.kind : 'closed')}>${NOTE_KIND[n.kind]}</span>
+              <i class="pip" aria-label=${n.read ? null : live.on ? 'Open' : 'Unread'}></i>
+              <span class=${cx('kind', n.kind === 'failed' ? 'failed' : r && r.status === 'open' ? n.kind : 'closed')}>${NOTE_KIND[n.kind] || n.kind}</span>
               ${clickable ? html`<a class="title truncate" href=${href(r ? routeForRequest(s, r) : n.to)} onClick=${(e) => { e.preventDefault(); open(n); }}>${n.title}</a>` : html`<span class="title truncate">${n.title}</span>`}
               <span class="from muted truncate">${a ? a.name : 'LGTM Studio'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : ''}</span>
               <span class=${cx('del', dc)} title=${n.error || (del === 'off' ? 'Phone notifications were not set up' : null)}>${del === 'failed' ? html`<${Icon} name="circle-alert" size=${13} />` : del === 'sent' ? html`<${Icon} name="check" size=${13} />` : null}${dw}
@@ -472,12 +480,12 @@ function Appearance({ s }) {
   </div>`;
 }
 function Defaults({ s }) {
-  const set = s.settings; const h = HARNESSES[set.defaultHarness];
+  const set = s.settings; const h = HARNESSES[set.defaultHarness] || { models: [], efforts: [] };
   return html`<div class="svc-rows">
     <${Row} label="Harness" hint="The program a new agent runs in.">
-      <${Seg} label="Harness" value=${set.defaultHarness} onChange=${(v) => setS({ defaultHarness: v, defaultModel: HARNESSES[v].models[HARNESSES[v].models.length > 2 ? 2 : 0], defaultEffort: 'Medium' })} options=${Object.entries(HARNESSES).map(([id, x]) => ({ id, label: x.name }))} /><//>
-    <${Row} label="Model" id="df-model" hint="Leads start one step above this model.">
-      <select id="df-model" class="select" style="width:200px" value=${set.defaultModel} onChange=${(e) => setS({ defaultModel: e.target.value })}>${h.models.map((m) => html`<option value=${m}>${m}</option>`)}</select><//>
+      <${Seg} label="Harness" value=${set.defaultHarness} onChange=${(v) => setS({ defaultHarness: v, defaultModel: live.on ? undefined : HARNESSES[v].models[HARNESSES[v].models.length > 2 ? 2 : 0], defaultEffort: 'Medium' })} options=${Object.entries(HARNESSES).map(([id, x]) => ({ id, label: x.name }))} /><//>
+    <${Row} label="Model" id="df-model" hint=${live.on ? 'Defaults for new project leads.' : 'Leads start one step above this model.'}>
+      <select id="df-model" class="select" style="width:200px" value=${set.defaultModel} onChange=${(e) => setS({ defaultModel: e.target.value })}>${live.on && !set.defaultModel && html`<option value=""></option>`}${h.models.map((m) => html`<option value=${m}>${m}</option>`)}</select><//>
     <${Row} label="Effort"><${Seg} label="Effort" value=${set.defaultEffort} onChange=${(v) => setS({ defaultEffort: v })} options=${h.efforts.map((e) => ({ id: e, label: e }))} /><//>
     <${Row} label="Permission" hint="What a new agent may do without asking. A project can set its own." top>
       <${PermissionPicker} name="df-perm" value=${set.defaultPermission} onChange=${(v) => setS({ defaultPermission: v })} /><//>
@@ -492,10 +500,10 @@ function Remote({ s }) {
   const [f, setF] = useState({ webEnabled: set.webEnabled, port: set.port, checkIn: set.checkIn, proxyMode: set.proxyMode, publicAddress: set.publicAddress });
   const dirty = Object.keys(f).some((k) => f[k] !== set[k]);
   const bad = f.proxyMode && !/^https:\/\/\S+\.\S+/.test(f.publicAddress.trim()) ? (f.publicAddress.trim() ? 'The public address must start with https://. Plain HTTP is refused.' : 'Give the address your proxy serves.') : null;
-  const badPort = !(f.port >= 1024 && f.port <= 65535) ? 'Use a port from 1024 to 65535.' : null;
-  const save = () => { if (bad || badPort || !dirty) return; const portChanged = f.port !== set.port; setS({ ...f, publicAddress: f.publicAddress.trim() }); act.toast(portChanged ? 'Saved. The new port applies at the next start.' : 'Saved. Web connections were closed and reopened.'); };
+  const badPort = !(f.port >= (live.on ? 1 : 1024) && f.port <= 65535) ? 'Use a port from 1024 to 65535.' : null;
+  const save = () => { if (bad || badPort || !dirty) return; if (live.on) return setS({ ...f, publicAddress: f.publicAddress.trim() }); const portChanged = f.port !== set.port; setS({ ...f, publicAddress: f.publicAddress.trim() }); act.toast(portChanged ? 'Saved. The new port applies at the next start.' : 'Saved. Web connections were closed and reopened.'); };
   const master = s.machines.find((m) => m.role === 'master');
-  const fwd = `ssh -L ${f.port}:127.0.0.1:${f.port} ${master.name.toLowerCase()}`;
+  const fwd = live.on ? '' : `ssh -L ${f.port}:127.0.0.1:${f.port} ${master?.name.toLowerCase()}`;
   return html`<form onSubmit=${(e) => { e.preventDefault(); save(); }}>
     <div class="svc-rows">
       <${Row} label="Web page" hint="Turn it off to use LGTM Studio from the terminal only."><${Switch} on=${f.webEnabled} label="Web page" onChange=${(v) => setF({ ...f, webEnabled: v })} /><//>
@@ -516,7 +524,7 @@ function Remote({ s }) {
   </form>`;
 }
 function StallWatch({ s }) {
-  const set = s.settings; const off = !set.stallWatch;
+  const set = s.settings; const off = live.on ? set.stallWatch === false : !set.stallWatch;
   return html`<div class="svc-rows">
     <${Row} label="Stall watch" hint="The part of the service that keeps every agent moving without spending its turns. It never decides what the work is.">
       <${Switch} on=${set.stallWatch} label="Stall watch" onChange=${(v) => setS({ stallWatch: v })} /><//>
@@ -546,44 +554,44 @@ function WorkflowSettings({ s }) {
       <span class="row"><b style="font-weight:var(--weight-medium)">Build loop</b><span class="badge outline">Default</span></span><//>
     <${Row} label="Your overrides" id="wf-path" hint="Files here replace the default workflow for every repository." top>
       <span class="row"><input id="wf-path" class="input mono grow" value=${set.workflowPath} onInput=${(e) => setS({ workflowPath: e.target.value })} spellcheck="false" />
-        <button type="button" class="btn" onClick=${() => { setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
-      <ul class="svc-lines" style="margin-top:8px">
+        <button type="button" class="btn" onClick=${() => { if (live.on) return refuse(); setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
+      ${live.on ? html`<span class="svc-hint">${set.roleFile?.name || ''} ${Object.keys(set.roleFile?.roles || {}).join(', ')}</span>` : html`<ul class="svc-lines" style="margin-top:8px">
         <li><${Icon} name="circle" size=${14} class="faint" /><span class="mono">${set.workflowPath}/workflow.md</span><span class="muted">Not found. The default is used.</span></li>
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span class="mono">${set.workflowPath}/roles/reviewer.md</span><span class="muted">Replaces the Reviewer's instructions.</span></li>
-      </ul>${checked && checked !== 'loading' && html`<span class="svc-hint">Checked at ${clock(checked)}. Nothing changed.</span>`}<//>
+      </ul>${checked && checked !== 'loading' && html`<span class="svc-hint">Checked at ${clock(checked)}. Nothing changed.</span>`}`}<//>
     <${Row} label="One repository" hint="A .lgtm folder in a repository wins over your overrides." top>
       <ul class="svc-lines">${s.repos.map((r) => html`<li key=${r.id}><${Icon} name="folder-git-2" size=${14} class="faint" /><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a>
-        <span class="muted">${r.id === 'billing-api' ? '.lgtm/workflow.md turns agent review off' : 'No .lgtm folder'}</span></li>`)}</ul><//>
+        <span class="muted">${live.on ? '' : r.id === 'billing-api' ? '.lgtm/workflow.md turns agent review off' : 'No .lgtm folder'}</span></li>`)}</ul><//>
     <${Row} label="Write tests first" hint="New projects start with tests on. A project lead can turn them off when you say so."><${Switch} on=${set.testsDefault} label="Write tests first" onChange=${(v) => setS({ testsDefault: v })} /><//>
     <${Row} label="Agent review" hint="Reviewers score each change in rounds."><${Switch} on=${set.reviewDefault} label="Agent review" onChange=${(v) => setS({ reviewDefault: v })} /><//>
     <${Row} label="Review rounds" id="wf-r" hint="A minor finding scores 1 point, a major 3, and a blocker 9."><${Num} id="wf-r" value=${set.maxRounds} min=${1} max=${12} unit="at most" onChange=${(v) => setS({ maxRounds: v })} /><//>
   </div>`;
 }
 function GitMessages({ s }) {
-  const set = s.settings; const m = set.gitModel || 'Haiku 5.5'; const h = harnessOfModel(m) || 'claude';
+  const set = s.settings; const m = set.gitModel || (live.on ? '' : 'Haiku 5.5'); const h = harnessOfModel(m) || (live.on ? '' : 'claude');
   const signed = new Set(s.subscriptions.filter((x) => x.signedIn).map((x) => x.harness));
   return html`<div class="svc-rows">
     <${Row} label="Model" id="gm-model" hint="Writes commit messages from the staged diff, and pull request titles and descriptions from the commits.">
       <select id="gm-model" class="select" style="width:240px" value=${m} onChange=${(e) => setS({ gitModel: e.target.value })}>
-        ${Object.entries(HARNESSES).map(([id, x]) => html`<optgroup label=${x.name + (signed.has(id) ? '' : ' (signed out)')}>${x.models.map((mo) => html`<option value=${mo} disabled=${!signed.has(id)}>${mo}</option>`)}</optgroup>`)}</select><//>
-    <${Row} label="Runs on"><span>${HARNESSES[h].name}</span><//>
+        ${live.on && html`<option value=""></option>`}${Object.entries(HARNESSES).map(([id, x]) => html`<optgroup label=${x.name + (signed.has(id) ? '' : ' (signed out)')}>${x.models.map((mo) => html`<option value=${mo} disabled=${!signed.has(id)}>${mo}</option>`)}</optgroup>`)}</select><//>
+    <${Row} label="Runs on"><span>${HARNESSES[h]?.name || ''}</span><//>
     <${Row} label="Commit message"><span class="row" style="gap:6px"><span class="badge outline">Conventional commit</span><span class="badge outline">One line</span><span class="badge outline">No attribution</span></span><//>
     <${Row} label="Pull request title" id="gm-limit"><span class="row" style="gap:6px"><span class="num">${act.PR_TITLE_LIMIT}</span><span class="muted">characters at most</span></span><//>
-    <${Row} label="Example" top><pre class="code svc-example">${act.commitMessage(['packages/web/src/shell/Sidebar.tsx', 'packages/web/src/shell/NavRail.tsx'])}</pre><//>
+    <${Row} label="Example" top><pre class="code svc-example">${live.on ? '' : act.commitMessage(['packages/web/src/shell/Sidebar.tsx', 'packages/web/src/shell/NavRail.tsx'])}</pre><//>
   </div>`;
 }
 function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
     <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGTM Studio ${set.version}</b><span class="tag">${set.commit}</span>
-      <button type="button" class="btn sm" onClick=${() => { setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
+      <button type="button" class="btn sm" onClick=${() => { if (live.on) return refuse(); setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
       ${chk === 'done' && html`<span class="row success-text" style="gap:4px;font-size:var(--text-sm)"><${Icon} name="check" size=${13} />Up to date</span>`}</span><//>
-    <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? `Running on ${master.name}` : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
+    <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? (live.on ? 'Running' : `Running on ${master.name}`) : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
     <${Row} label="Data folder"><span class="mono">${set.dataFolder}</span><//>
     <${Row} label="Machines"><a class="link" href=${href('/machines')}>${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</a><//>
     <${Row} label="Licence"><span>Apache License 2.0</span><//>
     <${Row} label="Restart the service" hint="Agents keep their place. Web connections close and reconnect.">
-      <button type="button" class="btn" onClick=${() => act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
+      <button type="button" class="btn" onClick=${() => live.on ? refuse() : act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
         onConfirm: () => { act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
   </div>`;
 }
@@ -597,6 +605,7 @@ const SECTIONS = [
   ['about', 'About', 'info', About, 'The version and the service.'],
 ];
 export function ServiceSettings({ s, route }) {
+  useEffect(() => liveGit.openScreen('settings'), []);
   const want = route.query.get('section');
   useEffect(() => { if (want === 'notifications') go('/notifications'); }, [want]);
   const cur = SECTIONS.find((x) => x[0] === want) || SECTIONS[0]; const Body = cur[3];
@@ -606,7 +615,7 @@ export function ServiceSettings({ s, route }) {
       <a class="nav-item" href=${href('/notifications')}><${Icon} name="smartphone" size=${15} /><span>Phone notifications</span><${Icon} name="arrow-up-right" size=${12} class="faint" /></a></nav>
     <div class="svc-pane" data-main>
       <div class="page-head"><h1 class="page-title">${cur[1]}</h1><span class="sub">${cur[4]}</span><${Saved} s=${s} /></div>
-      <${Body} key=${cur[0]} s=${s} />
+      <fieldset disabled=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} aria-busy=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0">${live.on && liveGit.busy('settings') && html`<span role="status">Saving…</span>`}<${Body} key=${cur[0] + (live.on ? String(s.settings.port ?? '') : '')} s=${s} /></fieldset>
     </div>
   </div></div>`;
 }

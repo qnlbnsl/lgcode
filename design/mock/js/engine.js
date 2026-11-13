@@ -26,6 +26,7 @@ let current = local;
 
 export function setConnection(connection) { current = connection || local; }
 export function connection() { return current; }
+export function request(tag, payload) { return current.request(tag, payload); }
 
 // A request from the website to the engine. `tag` is the RPC's tag in @lgtm/contracts.
 export function call(tag, payload) {

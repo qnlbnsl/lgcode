@@ -1,3 +1,4 @@
+import * as liveGit from './live/git.js';
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
   html, render, useState, useEffect, useRef, Icon, cx, store, update, useStore, useRoute, go, href, ago, useNow, useKey, useMedia,
@@ -386,6 +387,8 @@ export function mount(el, { connection, slots: fills, mode = 'mock' } = {}) {
 function mountLive(el) {
   const state = emptyState();
   state.ui = {};
+  for (const key of Object.keys(state.settings)) state.settings[key] = typeof state.settings[key] === 'boolean' || typeof state.settings[key] === 'number' ? null : typeof state.settings[key] === 'string' ? '' : {};
+  state.settings.quiet = { on: null, from: '', to: '', failed: null };
   seedTerminal(state);
   Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, notifications: [], workflow: {}, mocks: {}, design: {} });
   store.state = guardStore(state);
@@ -405,6 +408,7 @@ function mountLive(el) {
     for (const x of [...(patch.agents || []), ...(patch.subscriptions || [])]) {
       if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
     }
+    liveGit.observe(patch);
     engineWrite(patch);
     // The sidebar opens each repository the first time the engine names it, as the sample does.
     if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
