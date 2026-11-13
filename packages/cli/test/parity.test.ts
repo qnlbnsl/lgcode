@@ -34,6 +34,7 @@ for (const { command, words, form } of invocations) {
   it(`P03 ${command} ${form} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
+      "client.service.version": { check: true }, "client.service.restart": { confirmed: true },
       "client.alerts.retry": { alertId: "alert-1", generation: 7, attempt: 2 },
       "client.alerts.test": {}, "client.alerts.prompt.dismiss": {},
       "client.alerts.list": { after: 0, limit: 1, status: "open" },
@@ -158,10 +159,12 @@ for (const { command, words, form } of invocations) {
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
-        "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
+      "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
         "client.alerts.list": { ...base, items: [], next: 10 },
         "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
+        "client.service.version": { ...base, version: "0.0.1", commit: "abc123", dataFolder: root.work, checkout: root.work, comparison: "unchecked", updateCommands: [] },
+        "client.service.restart": { ...base, restarting: true },
         "client.harness.choices": { ...base, harnessId: "fake", accountId: "account", models: { source: "negotiated", options: [{ id: "small", label: "Small" }] }, efforts: { source: "negotiated", options: [{ id: "low" }] } },
         "client.agent.configuration": { ...base, agentId: "member", configuration: { desired: { model: "small", effort: "low" }, applied: { model: "small", effort: "low" }, status: "applied" },
           models: { source: "negotiated", options: [{ id: "small", label: "Small" }] }, efforts: { source: "configured", options: [{ id: "low" }] } },
@@ -170,9 +173,9 @@ for (const { command, words, form } of invocations) {
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
         "client.workflows.list": { ...base, items: [] },
-        "client.workflows.read": { ...base, workflow: { scope: "default", id: "build-loop", name: "Build loop", readOnly: true, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
-        "client.workflows.clone": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
-        "client.workflows.save": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.read": { ...base, workflow: { scope: "default", id: "build-loop", name: "Build loop", readOnly: true, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.clone": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.save": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
         "client.workflows.validate": { ...base, valid: false, error: "Use the workflow format." },
         "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },

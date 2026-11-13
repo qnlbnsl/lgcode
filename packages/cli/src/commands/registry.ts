@@ -10,6 +10,8 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.service.version": "Read the running version and optionally compare origin HEAD over HTTPS without downloading code.",
+  "client.service.restart": "Confirm sign-out of every page and stop running agents, then restart the service with its original arguments and environment.",
   "project.context.search": "Search readable project tasks and files in a registered local project workspace; returns typed references and truncation state.",
   "project.repository.discover": "Discover bounded local repositories inside the workspace folder.",
   "project.branches": "List actual branches of a registered local repository.",

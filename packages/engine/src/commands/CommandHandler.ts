@@ -1,3 +1,4 @@
+import { serviceRestartPending } from "../client/serviceControl.ts"
 import { acceptCache, type CacheTarget } from "./cache.ts";
 import { randomUUID } from "node:crypto";
 import {
@@ -294,6 +295,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     type Step = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
     const executeMutation = (credential: Credential, name: string, rawPayload: unknown) => Effect.suspend(() => {
       const prepare = (step: Step) => Effect.gen(function* () {
+        if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         let external: { readonly plan?: Plan; readonly finalize?: Planner; readonly failure?: CommandRefused | LogWriteFailed; readonly finished?: Event } | undefined;
         if (Object.hasOwn(gitPlanners, name) || Object.hasOwn(registrationPlanners, name)
@@ -360,6 +362,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           return yield* prepareProjectLifecycle({ runtime, actor, snapshot: yield* views.snapshot }, name, payload, bodyHash);
         }));
         return yield* step(log.transact((append) => Effect.gen(function* () {
+          if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
           // Invalid credentials never write an event or retrieve a receipt.
           const actor = yield* resolveCredential(credential, name);
           const rpc = lists.commands.requests.get(name);
@@ -433,6 +436,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               failure.reason === "no usable account" || projectLifecycleCommand(name) && !initialMainRefusal ? false : undefined);
             return { failure, afterCommit: undefined };
           }
+          if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
           const plan = planned.success;
           yield* append(actor, requestId, bodyHash, (pieceNamespace(name) === undefined || projectLifecycleCommand(name)) ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
             plan.reply === undefined ? replyFor(snapshot, name, requestId, batch, settings).reply : plan.reply(batch));
