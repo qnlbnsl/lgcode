@@ -11976,3 +11976,11 @@ The final waiter now removes the key before closing the scope.
 A regression holds the old job's cleanup open and proves that a new request starts independently.
 The initial regression also held its cleanup gate across a failed assertion.
 Its release now runs in an immediate finalizer so a failing assertion cannot park the test.
+
+## s4-models-17. The model-recovery fixture depended on configured discovery.
+
+The full check found one remaining test that expected configured model names to become a fake peer report.
+The model-recovery conversation offered `valid-model` only through that coupling.
+It now scripts its peer's discovery report independently of the configured list.
+The model and effort recovery tests retain their real handler, lost reply, resume, and draft assertions.
+This is a test-fixture correction after separating discovery in review item 7.
