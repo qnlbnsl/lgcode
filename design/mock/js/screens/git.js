@@ -1,5 +1,7 @@
+import * as liveGit from '../live/git.js';
+import { live, refuse } from '../lib.js';
 // The project's Git tab: worktrees, changes, diffs, commits, history, conflicts and integration.
-// Everything here works on local state. Nothing runs a real git command.
+// Standalone mode uses sample data. Live actions run through the authenticated engine.
 import {
   html, useState, useEffect, useMemo, Icon, cx, update, ago, useNow, persist, remember, useMedia, plural, MIN, HOUR, DAY,
 } from '../lib.js';
@@ -379,7 +381,7 @@ const STATUS = { M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed' };
 const baseName = (p) => p.split('/').pop();
 const dirName = (p) => p.split('/').slice(0, -1).join('/');
 function findWt(s, id) { return byId(s.worktrees, id); }
-function who(s, id) { return id === 'owner' ? 'You' : agentOf(s, id)?.name || 'Agent'; }
+function who(s, id) { return id === 'owner' ? 'You' : agentOf(s, id)?.name || (live.on ? id || '' : 'Agent'); }
 function Author({ s, id }) {
   const a = id !== 'owner' && agentOf(s, id);
   return html`<span class="git-author">${a ? html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} />` : html`<${OwnerAvatar} s=${s} size="sm" />`}<span class="truncate">${who(s, id)}</span></span>`;
@@ -392,19 +394,20 @@ function ownerText(s, w) {
 }
 function AheadBehind({ w }) {
   if (w.kind === 'base') return null;
-  return html`<span class="git-ab" title=${`${plural(w.ahead, 'commit')} ahead of ${w.parent}, ${w.behind} behind`}>
+  return html`<span class="git-ab" title=${`${plural(w.ahead, 'commit')} ahead of ${w.parent}${w.behind == null ? '' : ', ' + w.behind + ' behind'}`}>
     <span class=${cx(!w.ahead && 'faint')}><${Icon} name="arrow-up" size=${11} />${w.ahead}</span>
-    <span class=${cx(w.behind ? 'warn-text' : 'faint')}><${Icon} name="arrow-down" size=${11} />${w.behind}</span></span>`;
+    <span class=${cx(w.behind ? 'warn-text' : 'faint')}><${Icon} name="arrow-down" size=${11} />${w.behind ?? '—'}</span></span>`;
 }
 function StatusLetter({ status }) { return html`<span class=${cx('git-st', status)} title=${STATUS[status]}>${status}</span>`; }
 function Counts({ f }) {
+  if (f.add == null || f.del == null) return html`<span class="git-counts faint">—</span>`;
   if (f.kind === 'binary') return html`<span class="git-counts faint">binary</span>`;
   return html`<span class="git-counts"><span class="success-text">+${f.add.toLocaleString('en-GB')}</span><span class="error-text">−${f.del.toLocaleString('en-GB')}</span></span>`;
 }
 
 // ---- actions ----------------------------------------------------------------------
-function stage(wid, ids, staged) { update((s) => { for (const f of findWt(s, wid).files) if (ids.includes(f.id)) f.staged = staged; }); }
-function discard(s, w, files) {
+function stage(wid, ids, staged, all = false) { if (live.on) return liveGit.stage(wid, ids, staged, all); update((s) => { for (const f of findWt(s, wid).files) if (ids.includes(f.id)) f.staged = staged; }); }
+function discard(s, w, files) { if (live.on) return liveGit.discard(w, files);
   act.confirm({
     title: files.length === 1 ? `Discard changes to ${baseName(files[0].path)}?` : `Discard ${files.length} changed files?`,
     body: `The files in ${w.branch} go back to the last commit. This cannot be undone.`,
@@ -412,7 +415,7 @@ function discard(s, w, files) {
     onConfirm: () => { update((st) => { const x = findWt(st, w.id); x.files = x.files.filter((f) => !files.some((g) => g.id === f.id)); }); act.toast(files.length === 1 ? 'Changes discarded' : `${files.length} files discarded`); },
   });
 }
-function doCommit(wid, message) {
+function doCommit(wid, message) { if (live.on) return liveGit.commit(wid, message);
   let n = 0;
   update((s) => {
     const w = findWt(s, wid); const staged = w.files.filter((f) => f.staged); n = staged.length;
@@ -422,7 +425,7 @@ function doCommit(wid, message) {
   });
   act.toast(`Committed ${plural(n, 'file')} to the worktree`);
 }
-function updateFromBase(wid) {
+function updateFromBase(wid) { if (live.on) return refuse();
   update((s) => {
     const w = findWt(s, wid); const n = w.behind;
     for (const k of w.commits) k.refs = k.refs.filter((r) => r !== w.branch);
@@ -431,7 +434,7 @@ function updateFromBase(wid) {
   });
   act.toast('Updated from the base. No conflicts.');
 }
-function integrate(wid) {
+function integrate(wid) { if (live.on) return liveGit.integrate(wid);
   let msg = '';
   update((s) => {
     const w = findWt(s, wid); const parent = s.worktrees.find((x) => x.repo === w.repo && x.branch === w.parent);
@@ -446,7 +449,7 @@ function integrate(wid) {
   });
   act.toast(msg);
 }
-function openReview(s, w, project) {
+function openReview(s, w, project) { if (live.on) return liveGit.openReview(w, project);
   let r = s.requests.find((x) => x.kind === 'merge' && x.project === project.id && x.source === w.branch && x.status === 'open');
   if (!r) {
     const dirty = s.worktrees.filter((x) => x.project === project.id && x.kind !== 'project' && (x.ahead || x.files.length || x.merge)).length;
@@ -461,11 +464,11 @@ function openReview(s, w, project) {
   }
   act.openDialog({ type: 'merge-review', requestId: r.id });
 }
-function choose(wid, fid, kid, choice) {
+function choose(wid, fid, kid, choice) { if (live.on) return liveGit.choose(wid, fid, kid, choice);
   update((s) => { const f = findWt(s, wid).merge.files.find((x) => x.id === fid); f.parts.find((p) => p.id === kid).choice = choice; if (!choice) f.resolved = false; });
 }
-function markResolved(wid, fid, value = true) { update((s) => { findWt(s, wid).merge.files.find((x) => x.id === fid).resolved = value; }); }
-function continueMerge(wid) {
+function markResolved(wid, fid, value = true) { if (live.on) return liveGit.resolve(wid, fid, value); update((s) => { findWt(s, wid).merge.files.find((x) => x.id === fid).resolved = value; }); }
+function continueMerge(wid) { if (live.on) return liveGit.continueMerge(wid);
   update((s) => {
     const w = findWt(s, wid); const m = w.merge;
     for (const k of w.commits) k.refs = k.refs.filter((r) => r !== w.branch);
@@ -475,7 +478,7 @@ function continueMerge(wid) {
   });
   act.toast('Merge finished');
 }
-function abortMerge(s, w) {
+function abortMerge(s, w) { if (live.on) return refuse();
   act.confirm({
     title: 'Abort this merge?', body: `${w.branch} goes back to how it was before ${w.merge.from} was merged in. Your conflict choices are lost.`, action: 'Abort merge',
     onConfirm: () => { update((st) => { findWt(st, w.id).merge = null; }); act.toast('Merge aborted'); },
@@ -498,9 +501,11 @@ function Diff({ f, mode }) {
   const [showLarge, setShowLarge] = useState(false);
   const large = useMemo(() => (f.kind === 'large' && showLarge ? parseDiff(synth(f.path, 160, 120, 5)) : null), [f.id, showLarge]);
   useEffect(() => setShowLarge(false), [f.id]);
+  if (live.on && !f.loaded) return html`<div class="diff-note" role="status">Loading diff…</div>`;
+  if (live.on && f.diffError) return html`<div class="diff-note" role="status">${f.diffError}</div>`;
   if (f.kind === 'binary') {
     return html`<div class="diff-note"><${Icon} name="image" size=${18} /><strong>Binary file</strong>
-      <span>${f.status === 'A' ? 'A new' : 'A changed'} file of ${f.size}. There is no text to compare.</span></div>`;
+      <span>${f.status === 'A' ? 'A new' : 'A changed'} file${f.size ? ' of ' + f.size : ''}. There is no text to compare.</span></div>`;
   }
   if (f.kind === 'large' && !showLarge) {
     return html`<div class="diff-note"><${Icon} name="file-diff" size=${18} /><strong>Large diff hidden</strong>
@@ -553,20 +558,20 @@ function Changes({ s, w, mode, phone }) {
   const staged = w.files.filter((f) => f.staged); const unstaged = w.files.filter((f) => !f.staged);
   const sel = byId(w.files, ui.file) || (phone ? null : unstaged[0] || staged[0]);
   const msg = ui.message || ''; const readOnly = w.kind === 'base';
-  const can = staged.length > 0 && msg.trim().length > 0 && !w.merge;
-  const commitNow = () => { if (!can) return; doCommit(w.id, msg.trim()); setUi({ message: '', file: null }); };
+  const can = staged.length > 0 && msg.trim().length > 0 && (live.on ? !w.files.some((f) => f.conflict) && w.ready : !w.merge);
+  const commitNow = () => { if (!can) return; if (live.on) { doCommit(w.id, msg.trim()); return; } doCommit(w.id, msg.trim()); setUi({ message: '', file: null }); };
   const [writing, setWriting] = useState(false);
-  const generate = () => { if (!staged.length || writing) return; setWriting(true); setTimeout(() => { setWriting(false); setUi({ message: act.commitMessage(staged.map((f) => f.path)) }); }, 900); };
-  const why = w.merge ? 'Finish or abort the merge first' : !staged.length ? 'Stage a file first' : !msg.trim() ? 'Write a message first' : '';
+  const generate = () => { if (live.on) return refuse(); if (!staged.length || writing) return; setWriting(true); setTimeout(() => { setWriting(false); setUi({ message: act.commitMessage(staged.map((f) => f.path)) }); }, 900); };
+  const why = w.merge && !live.on ? 'Finish or abort the merge first' : w.files.some((f) => f.conflict) ? 'Resolve the conflicted files first' : !staged.length ? 'Stage a file first' : !msg.trim() ? 'Write a message first' : '';
   if (!w.files.length) {
     return html`<div class="git-clean"><${Empty} title="Nothing to commit" icon="circle-check">
       ${readOnly ? `${w.branch} is the base branch. Agents never edit it directly, so it has no changes of its own.` : `The worktree for ${w.branch} matches its last commit${w.commits[0] ? `, ${w.commits[0].hash}` : ''}.`}
-      <a class="link" href="#" onClick=${(e) => { e.preventDefault(); setUi({ tab: 'history' }); }}>Open the history</a><//></div>`;
+      <a class="link" href="#" onClick=${(e) => { e.preventDefault(); if (live.on) return liveGit.selectGit(w.id, 'history'); setUi({ tab: 'history' }); }}>Open the history</a><//></div>`;
   }
   const group = (title, files, isStaged) => files.length > 0 && html`<section class="git-group">
     <div class="section-head"><h3>${title}</h3><span class="count">${files.length}</span><span class="grow"></span>
       ${!isStaged && html`<button type="button" class="icon-btn sm" aria-label="Discard all changes" data-tip="Discard all" onClick=${() => discard(s, w, files)}><${Icon} name="undo-2" size=${14} /></button>`}
-      <button type="button" class="icon-btn sm" aria-label=${isStaged ? 'Unstage all' : 'Stage all'} data-tip=${isStaged ? 'Unstage all' : 'Stage all'} onClick=${() => stage(w.id, files.map((f) => f.id), !isStaged)}><${Icon} name=${isStaged ? 'minus' : 'plus'} size=${14} /></button></div>
+      <button type="button" class="icon-btn sm" aria-label=${isStaged ? 'Unstage all' : 'Stage all'} data-tip=${isStaged ? 'Unstage all' : 'Stage all'} onClick=${() => stage(w.id, files.map((f) => f.id), !isStaged, true)}><${Icon} name=${isStaged ? 'minus' : 'plus'} size=${14} /></button></div>
     <ul>${files.map((f) => html`<${FileRow} key=${f.id} f=${f} selected=${sel?.id === f.id} onSelect=${() => setUi({ file: f.id })}
       actions=${html`${!isStaged && html`<button type="button" class="icon-btn sm" aria-label=${`Discard changes to ${baseName(f.path)}`} data-tip="Discard" onClick=${() => discard(s, w, [f])}><${Icon} name="undo-2" size=${13} /></button>`}
         <button type="button" class="icon-btn sm" aria-label=${`${isStaged ? 'Unstage' : 'Stage'} ${baseName(f.path)}`} data-tip=${isStaged ? 'Unstage' : 'Stage'} onClick=${() => stage(w.id, [f.id], !isStaged)}><${Icon} name=${isStaged ? 'minus' : 'plus'} size=${13} /></button>`} />`)}</ul>
@@ -600,7 +605,7 @@ function History({ s, w, mode, phone }) {
   if (!w.commits.length) return html`<div class="git-clean"><${Empty} title="No commits yet" icon="history">Commits appear here once an agent or you commit to ${w.branch}.<//></div>`;
   return html`<div class=${cx('git-split history', phone && sel && 'detail')}>
     <div class="git-list"><ol class="git-log">${w.commits.map((k, i) => html`<li key=${k.hash}>
-      <button type="button" class=${cx('git-commit-row', sel?.hash === k.hash && 'sel', i >= w.ahead && w.kind !== 'base' && 'shared')} aria-current=${sel?.hash === k.hash ? 'true' : null} onClick=${() => setUi({ commit: k.hash })}>
+      <button type="button" class=${cx('git-commit-row', sel?.hash === k.hash && 'sel', i >= w.ahead && w.kind !== 'base' && 'shared')} aria-current=${sel?.hash === k.hash ? 'true' : null} onClick=${() => live.on ? liveGit.selectGit(w.id, 'history', k.hash) : setUi({ commit: k.hash })}>
         <span class=${cx('node', k.merge && 'merge')}></span>
         <span class="subject"><span class="truncate">${k.subject}</span></span>
         <span class="meta"><${Author} s=${s} id=${k.author} /><span class="mono faint">${k.hash}</span><span class="faint when">${ago(k.ts, now)}</span></span>
@@ -614,7 +619,7 @@ function History({ s, w, mode, phone }) {
           <div class="col grow" style="min-width:0;gap:4px"><h2>${sel.subject}</h2>
             <div class="row commit-meta"><${Author} s=${s} id=${sel.author} /><span class="muted">committed ${ago(sel.ts, now) === 'now' ? 'just now' : ago(sel.ts, now) + ' ago'}</span>
               <button type="button" class="tag copy" title="Copy the commit hash" onClick=${() => { navigator.clipboard?.writeText(sel.hash).catch(() => {}); act.toast('Commit hash copied'); }}>${sel.hash}<${Icon} name="copy" size=${10} /></button>
-              <span class="muted">${plural(sel.files.length, 'file')}</span></div>
+              <span class="muted">${sel.loaded ? plural(sel.files.length, 'file') : live.on ? 'Loading files…' : plural(sel.files.length, 'file')}</span></div>
             ${sel.body && html`<p class="muted" style="white-space:pre-wrap">${sel.body}</p>`}</div>
         </header>
         <div class="commit-files">${sel.files.map((f) => html`<section class="commit-file" key=${sel.hash + f.id}>
@@ -641,7 +646,7 @@ function Conflicts({ s, w, phone }) {
   return html`<div class=${cx('git-split conflicts', phone && sel && 'detail')}>
     <div class="git-list">
       <div class="cf-summary"><div class="row" style="gap:6px"><${Icon} name="git-merge" size=${14} class="warn-text" /><b>Merge in progress</b></div>
-        <p>Merging <span class="mono">${m.from}</span> into <span class="mono">${w.branch}</span>. ${who(s, m.by)} started it ${ago(m.startedAt)} ago and stopped at ${plural(m.files.length, 'file')}.</p>
+        <p>Merging <span class="mono">${m.from}</span> into <span class="mono">${w.branch}</span>. ${live.on ? '' : who(s, m.by) + ' started it ' + ago(m.startedAt) + ' ago and stopped at ' + plural(m.files.length, 'file') + '.'}</p>
         <div class="row" style="gap:6px"><button type="button" class="btn primary sm" disabled=${!allDone} title=${allDone ? '' : 'Resolve every file first'} onClick=${() => continueMerge(w.id)}>Continue merge</button>
           <button type="button" class="btn sm ghost" onClick=${() => abortMerge(s, w)}>Abort</button></div></div>
       <section class="git-group"><div class="section-head"><h3>Conflicted files</h3><span class="count">${m.files.filter((f) => !f.resolved).length}</span></div>
@@ -656,7 +661,7 @@ function Conflicts({ s, w, phone }) {
           <div class="diff-path"><b class="truncate">${baseName(sel.path)}</b><span class="mono truncate-start">${dirName(sel.path)}</span></div>
           <span class="muted not-phone">${sel.resolved ? 'Resolved' : left(sel) ? `${plural(left(sel), 'conflict')} left` : 'Every conflict has a choice'}</span>
           ${sel.resolved ? html`<button type="button" class="btn sm" onClick=${() => markResolved(w.id, sel.id, false)}>Reopen</button>`
-            : html`<button type="button" class="btn sm primary" disabled=${left(sel) > 0} onClick=${() => { markResolved(w.id, sel.id); act.toast(`${baseName(sel.path)} marked resolved`); }}>Mark resolved</button>`}
+            : html`<button type="button" class="btn sm primary" disabled=${left(sel) > 0 || (live.on && !sel.loaded)} onClick=${() => { if (live.on) return markResolved(w.id, sel.id); markResolved(w.id, sel.id); act.toast(`${baseName(sel.path)} marked resolved`); }}>Mark resolved</button>`}
         </header>
         <div class="cf-body">${(() => { let n = 0; return sel.parts.map((p) => {
           if (!p.id) return html`<div class="cf-ctx">${p.ctx.map((line, i) => html`<div><span class="ln">${p.start + i}</span>${line || ' '}</div>`)}</div>`;
@@ -683,7 +688,7 @@ function Integrate({ s, w, project }) {
   const parent = html`<span class="mono">${w.parent}</span>`;
   const dirty = w.files.length > 0;
   if (w.kind === 'project') {
-    const req = s.requests.find((x) => x.kind === 'merge' && x.project === project.id && x.source === w.branch);
+    const req = live.on ? w.review : s.requests.find((x) => x.kind === 'merge' && x.project === project.id && x.source === w.branch);
     if (project.merged || w.merged) {
       return html`<div class="git-integrate ok"><${Icon} name="git-merge" size=${14} class="success-text" /><span><b>Merged</b> into ${parent}${w.merged ? ` ${ago(w.merged, now)} ago` : req?.answeredAt ? ` ${ago(req.answeredAt, now) === 'now' ? 'just now' : ago(req.answeredAt, now) + ' ago'}` : ''}. The branch can be deleted.</span></div>`;
     }
@@ -706,6 +711,7 @@ const KIND_WORD = { base: 'Base', project: 'Project', team: 'Team', agent: 'Agen
 // Files is its own project tab beside Git. It is a placeholder until the file view is chosen.
 
 export function GitTab({ s, project }) {
+  useEffect(() => liveGit.openScreen('git', project.id), [project.id]);
   const phone = useMedia('(max-width: 860px)'); const narrow = useMedia('(max-width: 1100px)');
   const [modePref, setModePref] = useState(() => persist('gitDiffMode', 'unified'));
   const setMode = (m) => { setModePref(m); remember('gitDiffMode', m); };
@@ -721,11 +727,11 @@ export function GitTab({ s, project }) {
   const list = [...all].sort((a, b) => order[a.kind] - order[b.kind]);
   const w = list.find((x) => x.branch === s.inspecting[project.id]) || list.find((x) => x.branch === project.branch) || list[0];
   const ui = s.gitUi[w.id] || {}; const tab = ui.tab || (w.merge ? 'conflicts' : 'changes');
-  const setTab = (t) => update((st) => { st.gitUi[w.id] = { ...(st.gitUi[w.id] || {}), tab: t }; });
-  const pick = (x) => update((st) => { st.inspecting[project.id] = x.branch; });
+  const setTab = (t) => live.on ? liveGit.selectGit(w.id, t) : update((st) => { st.gitUi[w.id] = { ...(st.gitUi[w.id] || {}), tab: t }; });
+  const pick = (x) => live.on ? liveGit.selectGit(x.id) : update((st) => { st.inspecting[project.id] = x.branch; });
   const conflictCount = w.merge ? w.merge.files.filter((f) => !f.resolved).length : 0;
   const owner = agentOf(s, w.owner);
-  return html`<div class="git">
+  return html`<fieldset class="git" disabled=${live.on && (liveGit.busy('git') || liveGit.busy('git-plan'))} aria-busy=${live.on && liveGit.busy('git')} style="border:0;padding:0;margin:0;min-width:0">
     <div class="git-bar">
       <${Menu} class="git-pick" width=${400} label="Choose a worktree"
         header=${html`<div class="menu-label">Worktrees of ${project.name}</div>`}
@@ -737,6 +743,8 @@ export function GitTab({ s, project }) {
       <span class="git-owner not-phone">${owner ? html`<${Avatar} agent=${owner} s=${s} size="sm" />` : html`<${Icon} name="lock" size=${13} class="faint" />`}<span class="truncate">${ownerText(s, w)}</span>
         <span class="faint truncate">on ${machineOf(s, w.machine)?.name}</span></span>
       <${AheadBehind} w=${w} />
+      ${live.on && html`<button type="button" class="btn sm" onClick=${() => liveGit.refreshGit(project.id)}>Refresh Git</button>${['fetch', 'pull', 'push'].map((op) => html`<button type="button" class="btn sm" onClick=${() => liveGit.syncGit(w.id, op)}>${op[0].toUpperCase() + op.slice(1)}</button>`)}${liveGit.busy('git') && html`<span role="status">Working…</span>`}`}
+      ${live.on && w.truncated && html`<span role="alert">The change list is incomplete.</span>`}
       <span class="grow"></span>
       <div class="seg" role="tablist" aria-label="Git views">
         <button type="button" aria-pressed=${tab === 'changes'} onClick=${() => setTab('changes')}>Changes${w.files.length > 0 && html`<span class="count">${w.files.length}</span>`}</button>
@@ -754,5 +762,5 @@ export function GitTab({ s, project }) {
     ${tab === 'changes' ? html`<${Changes} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
       : tab === 'history' ? html`<${History} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
       : html`<${Conflicts} key=${w.id} s=${s} w=${w} phone=${phone} />`}
-  </div>`;
+  </fieldset>`;
 }

@@ -284,7 +284,7 @@ function SubRow({ s, x, now }) {
         <div class="col"><span class="row" style="gap:6px"><b>${x.name}</b>${x.useForNew && x.signedIn && html`<span class="badge outline" data-tip=${`New ${h.name} agents on ${m.name} use it`}>Default</span>`}</span>
           <span class="muted truncate" style="font-size:var(--text-sm)">${live.on ? '' : (x.account || 'No account') + ' · ' + m.name}</span></div></div>
       <div class="c-state"><span class="row" style="gap:6px"><i class=${cx('dot', st.dot)}></i><span class=${cx(st.tone === 'warn' && 'warn-text', st.tone === 'error' && 'error-text')} style=${st.tone ? 'font-weight:var(--weight-medium)' : ''}>${st.word}</span></span></div>
-      <div class="c-use" data-label="5 hours">${x.window ? html`<${Meter} pct=${x.window.pct} wide /><small class=${cx(x.window.pct >= 100 ? 'error-text' : 'muted')}>Resets in ${until(x.window.resetsAt, now)}</small>` : html`<span class="faint">—</span>`}</div>
+      <div class="c-use" data-label="5 hours">${live.on && s.accountLimits?.[x.id] ? html`<small class="muted">Resets in ${until(s.accountLimits[x.id], now)}</small>` : x.window ? html`<${Meter} pct=${x.window.pct} wide /><small class=${cx(x.window.pct >= 100 ? 'error-text' : 'muted')}>Resets in ${until(x.window.resetsAt, now)}</small>` : html`<span class="faint">—</span>`}</div>
       <div class="c-use" data-label="This week">${x.usage ? html`<${Meter} pct=${x.usage.pct} wide /><small class="muted">Resets ${x.usage.resetsAt - now < DAY ? 'in ' + until(x.usage.resetsAt, now) : new Date(x.usage.resetsAt).toLocaleDateString('en-GB', { weekday: 'long' })}</small>` : html`<span class="faint">—</span>`}</div>
       <div class="c-agents" data-label="Agents">${ags.length ? html`<button type="button" class="link" onClick=${() => act.toggleExpanded(k, true)}>${ags.length}</button><span class="muted"> · ${active} running</span>` : html`<span class="faint">None</span>`}</div>
       <div class="c-model" data-label="Model for new agents"><select class="select" aria-label=${'Model for new agents on ' + x.name} value=${x.model} disabled=${!x.signedIn} onChange=${(e) => { const v = e.target.value; if (live.on) return liveGit.accountModel(x.harness, v); update(() => { x.model = v; }); markSaved(); }}>
@@ -318,8 +318,9 @@ export function Subscriptions({ s }) {
     <div class="page-head"><h1 class="page-title">Subscriptions</h1>
       <span class="sub">${s.subscriptions.length - out} of ${s.subscriptions.length} signed in${capped ? html` · <span class="error-text">${capped} at its limit</span>` : ''}</span><${Saved} s=${s} /><span class="grow"></span>
       <button type="button" class="btn primary" disabled=${live.on && liveGit.busy('read-service')} onClick=${() => act.openDialog({ type: 'add-subscription' })}><${Icon} name="plus" size=${14} />Add subscription</button></div>
+    ${live.on && liveGit.busy('subscriptions') && html`<span role="status">Saving…</span>`}
     <fieldset disabled=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0" aria-busy=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('read-service'))}><div data-main>
-    ${Object.entries(HARNESSES).map(([hid, h]) => { const list = s.subscriptions.filter((x) => x.harness === hid);
+    ${(live.on && !s.ui.serviceReady ? [] : Object.entries(HARNESSES)).map(([hid, h]) => { const list = s.subscriptions.filter((x) => x.harness === hid);
       return html`<section key=${hid} class="svc-harness">
         <div class="section-head"><h2>${h.name}</h2><span class="count">${list.length}</span><span class="faint truncate not-phone" style="font-size:var(--text-sm)">${h.runMode} mode · ${h.models.join(', ')}</span></div>
         <div class="svc-subs">
@@ -407,7 +408,7 @@ export function Notifications({ s }) {
   return html`<div class="view-body"><div class="page">
     <div class="page-head"><h1 class="page-title">Phone notifications</h1>
       <span class="sub row" style="gap:6px"><i class=${cx('dot', on ? (failed ? 'failed' : 'working') : 'idle')}></i>${on ? html`Sending to <span class="mono">${set.ntfyTopic}</span>` : 'Not set up'}</span><${Saved} s=${s} /></div>
-    <div class="svc-split">
+    <fieldset class="svc-split" disabled=${live.on && liveGit.busy('notifications')} aria-busy=${live.on && liveGit.busy('notifications')} style="border:0;padding:0;margin:0;min-width:0">
       <div class="svc-side">
         <${Section} title="Where alerts go" sub="ntfy">
           ${!on && s.phoneOffer === 'open' && html`<div class="callout info" style="align-items:center;margin-bottom:var(--space-3)"><${Icon} name="smartphone" size=${15} />
@@ -439,7 +440,7 @@ export function Notifications({ s }) {
               <i class="pip" aria-label=${n.read ? null : live.on ? 'Open' : 'Unread'}></i>
               <span class=${cx('kind', n.kind === 'failed' ? 'failed' : r && r.status === 'open' ? n.kind : 'closed')}>${NOTE_KIND[n.kind] || n.kind}</span>
               ${clickable ? html`<a class="title truncate" href=${href(r ? routeForRequest(s, r) : n.to)} onClick=${(e) => { e.preventDefault(); open(n); }}>${n.title}</a>` : html`<span class="title truncate">${n.title}</span>`}
-              <span class="from muted truncate">${a ? a.name : 'LGTM Studio'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : ''}</span>
+              <span class="from muted truncate">${a ? a.name : 'LGTM Studio'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : n.answer ? ' · ' + n.answer : ''}</span>
               <span class=${cx('del', dc)} title=${n.error || (del === 'off' ? 'Phone notifications were not set up' : null)}>${del === 'failed' ? html`<${Icon} name="circle-alert" size=${13} />` : del === 'sent' ? html`<${Icon} name="check" size=${13} />` : null}${dw}
                 ${del === 'failed' && html`<button type="button" class="link" onClick=${() => retry(n)}>Retry</button>`}</span>
               <time class="muted">${now - n.ts < DAY ? clock(n.ts) : ago(n.ts, now) + ' ago'}</time>
@@ -447,7 +448,7 @@ export function Notifications({ s }) {
           ${list.length > 12 && html`<button type="button" class="btn sm ghost" style="margin-top:6px" onClick=${() => setShowAll(!showAll)}>${showAll ? 'Show fewer' : `Show all ${list.length}`}</button>`}
         <//>
       </div>
-    </div>
+    </fieldset>
   </div></div>`;
 }
 
@@ -531,16 +532,16 @@ function StallWatch({ s }) {
     <div class=${cx('svc-group', off && 'svc-off')}>
       <h3>When an agent may be stuck</h3>
       <${Row} label="Assigned, not started" id="sd-a"><${Num} id="sd-a" value=${set.stallAssigned} min=${1} max=${120} unit="minutes" onChange=${(v) => setS({ stallAssigned: v })} /><//>
-      <${Row} label="Worker, no output" id="sd-w"><${Num} id="sd-w" value=${set.stallWorker} min=${1} max=${120} unit="minutes" onChange=${(v) => setS({ stallWorker: v })} /><//>
+      <${Row} label="Worker, no output" hint=${live.on ? 'The service stall time. Role files can override it.' : null} id="sd-w"><${Num} id="sd-w" value=${set.stallWorker} min=${live.on ? 5 : 1} max=${live.on ? 240 : 120} unit="minutes" onChange=${(v) => setS({ stallWorker: v })} /><//>
       <${Row} label="Lead, no output" id="sd-l"><${Num} id="sd-l" value=${set.stallLead} min=${1} max=${240} unit="minutes" onChange=${(v) => setS({ stallLead: v })} /><//>
       <${Row} label="Wake it once first" hint="A stuck agent gets one wake. Ten minutes later its lead is told. A stuck lead goes to the project lead, and a stuck project lead comes to you.">
         <${Switch} on=${set.autoNudge} label="Wake it once first" onChange=${(v) => setS({ autoNudge: v })} /><//>
       <${Row} label="Replace the worker" id="sd-r" hint="After this many stalls in a row on the same work."><${Num} id="sd-r" value=${set.replaceAfter} min=${1} max=${9} unit="stalls" onChange=${(v) => setS({ replaceAfter: v })} /><//>
       <h3>When a subscription or an agent fails</h3>
-      <${Row} label="Wait after a usage limit" id="sd-c"><${Num} id="sd-c" value=${set.capacityBackoff} min=${1} max=${120} unit="minutes" onChange=${(v) => setS({ capacityBackoff: v })} /><//>
-      <${Row} label="Try again" id="sd-cr" hint="Then the agent stops and the failure comes to you."><${Num} id="sd-cr" value=${set.capacityRetries} min=${0} max=${99} unit="times" onChange=${(v) => setS({ capacityRetries: v })} /><//>
-      <${Row} label="Restart after a crash" id="sd-x"><${Num} id="sd-x" value=${set.crashRetries} min=${0} max=${9} unit="times" onChange=${(v) => setS({ crashRetries: v })} /><//>
-      <${Row} label="Close an idle team" id="sd-i" hint="A team with no work for this long is stopped. Its branch stays."><${Num} id="sd-i" value=${set.teamIdle} min=${5} max=${1440} unit="minutes" onChange=${(v) => setS({ teamIdle: v })} /><//>
+      <${Row} label="Wait after a usage limit" id="sd-c"><${Num} id="sd-c" value=${set.capacityBackoff} min=${1} max=${live.on ? 60 : 120} unit="minutes" onChange=${(v) => setS({ capacityBackoff: v })} /><//>
+      <${Row} label="Try again" id="sd-cr" hint="Then the agent stops and the failure comes to you."><${Num} id="sd-cr" value=${set.capacityRetries} min=${0} max=${live.on ? 12 : 99} unit="times" onChange=${(v) => setS({ capacityRetries: v })} /><//>
+      <${Row} label="Restart after a crash" id="sd-x"><${Num} id="sd-x" value=${set.crashRetries} min=${0} max=${live.on ? 1 : 9} unit="times" onChange=${(v) => setS({ crashRetries: v })} /><//>
+      <${Row} label="Close an idle team" id="sd-i" hint="A team with no work for this long is stopped. Its branch stays."><${Num} id="sd-i" value=${set.teamIdle} min=${live.on ? 15 : 5} max=${1440} unit="minutes" onChange=${(v) => setS({ teamIdle: v })} /><//>
       <h3>Approvals</h3>
       <${Row} label="Standing permission rules" hint=${'"Always allow" stores a rule. Later requests that match it are allowed without asking.'}>
         <${Switch} on=${set.standingRules} label="Standing permission rules" onChange=${(v) => setS({ standingRules: v })} /><//>
@@ -555,7 +556,7 @@ function WorkflowSettings({ s }) {
     <${Row} label="Your overrides" id="wf-path" hint="Files here replace the default workflow for every repository." top>
       <span class="row"><input id="wf-path" class="input mono grow" value=${set.workflowPath} onInput=${(e) => setS({ workflowPath: e.target.value })} spellcheck="false" />
         <button type="button" class="btn" onClick=${() => { if (live.on) return refuse(); setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
-      ${live.on ? html`<span class="svc-hint">${set.roleFile?.name || ''} ${Object.keys(set.roleFile?.roles || {}).join(', ')}</span>` : html`<ul class="svc-lines" style="margin-top:8px">
+      ${live.on ? html`<pre class="code">${set.roleFile ? JSON.stringify(set.roleFile, null, 2) : ''}</pre>` : html`<ul class="svc-lines" style="margin-top:8px">
         <li><${Icon} name="circle" size=${14} class="faint" /><span class="mono">${set.workflowPath}/workflow.md</span><span class="muted">Not found. The default is used.</span></li>
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span class="mono">${set.workflowPath}/roles/reviewer.md</span><span class="muted">Replaces the Reviewer's instructions.</span></li>
       </ul>${checked && checked !== 'loading' && html`<span class="svc-hint">Checked at ${clock(checked)}. Nothing changed.</span>`}`}<//>
@@ -589,7 +590,7 @@ function About({ s }) {
     <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? (live.on ? 'Running' : `Running on ${master.name}`) : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
     <${Row} label="Data folder"><span class="mono">${set.dataFolder}</span><//>
     <${Row} label="Machines"><a class="link" href=${href('/machines')}>${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</a><//>
-    <${Row} label="Licence"><span>Apache License 2.0</span><//>
+    <${Row} label="Licence"><span>${live.on ? '' : 'Apache License 2.0'}</span><//>
     <${Row} label="Restart the service" hint="Agents keep their place. Web connections close and reconnect.">
       <button type="button" class="btn" onClick=${() => live.on ? refuse() : act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
         onConfirm: () => { act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
@@ -615,7 +616,7 @@ export function ServiceSettings({ s, route }) {
       <a class="nav-item" href=${href('/notifications')}><${Icon} name="smartphone" size=${15} /><span>Phone notifications</span><${Icon} name="arrow-up-right" size=${12} class="faint" /></a></nav>
     <div class="svc-pane" data-main>
       <div class="page-head"><h1 class="page-title">${cur[1]}</h1><span class="sub">${cur[4]}</span><${Saved} s=${s} /></div>
-      <fieldset disabled=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} aria-busy=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0">${live.on && liveGit.busy('settings') && html`<span role="status">Saving…</span>`}<${Body} key=${cur[0] + (live.on ? String(s.settings.port ?? '') : '')} s=${s} /></fieldset>
+      <fieldset disabled=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} aria-busy=${live.on && (liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0">${live.on && liveGit.busy('settings') && html`<span role="status">Saving…</span>`}${(!live.on || s.ui.serviceReady || cur[0] === 'appearance') && html`<${Body} key=${cur[0] + (live.on ? String(s.settings.port ?? '') : '')} s=${s} />`}</fieldset>
     </div>
   </div></div>`;
 }

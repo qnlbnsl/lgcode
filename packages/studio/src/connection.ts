@@ -12,6 +12,7 @@ import { connect, type Client, type ClientEnvelope } from "@lgtm/client/browser"
 import type { ClientSnapshot, EventSequence, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
+import { mapAlerts } from "./git.ts"
 import * as Redacted from "effect/Redacted"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
@@ -20,6 +21,8 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly session?: { readonly status: SessionStatus; readonly firstRun: boolean }
   readonly conn?: StoreConn
   readonly owner?: StoreOwner
+  readonly notifications?: ReturnType<typeof mapAlerts>
+  readonly accountLimits?: Readonly<Record<string, number | null>>
 }
 export type Write = (patch: StorePatch) => void
 
@@ -85,10 +88,14 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   const timing: Timing = {}
 
   let write: Write = () => {}
+  // Retain a retry receipt after transport loss. Recovering the same carrier
+  // exchange must not create a second delivery with a new request identifier.
+  const retryIds = new Map<string, RequestId>()
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
   let activeClient: Client | undefined
+  let accountLimits: Record<string, number | null> = {}
 
   const setConn = (status: ConnectionStatus) => {
     clearTimeout(offlineTimer)
@@ -98,7 +105,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined) })
+  const forget = () => { retryIds.clear(); accountLimits = {}; write({ ...emptyRecords, notifications: [], accountLimits, owner: mapOwner(undefined) }) }
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -123,7 +130,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     const publish = (snapshot: ClientSnapshot) => {
       current = snapshot
       after = snapshot.sequence
-      if (!signal.aborted) write(mapSnapshot(snapshot, now()))
+      if (!signal.aborted) { const mapped = mapSnapshot(snapshot, now()); write({ ...mapped, notifications: mapAlerts(snapshot.alerts ?? [], mapped.agents) }) }
     }
     const program = Effect.gen(function* () {
       while (!ended && !signal.aborted) {
@@ -167,7 +174,6 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
           })))
         })).pipe(Effect.catch((error) => Effect.gen(function* () {
           if (signal.aborted) return
-          console.debug('follow failed', error)
           activeClient = undefined
           setConn("reconnecting")
           // A browser hides an HTTP refusal of a WebSocket. Ask the session route instead.
@@ -182,6 +188,10 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     // A pushed event either changes one agent's state in place or asks for a fresh snapshot.
     const apply = (item: ClientEnvelope, refresh: (minimum?: number) => Effect.Effect<void, unknown>) => Effect.gen(function* () {
       const event = item.event
+      if (event._tag === "AccountOutOfUsage" || event._tag === "AccountAvailable") {
+        accountLimits = { ...accountLimits, [event.accountId]: event._tag === "AccountOutOfUsage" ? event.resetAt ?? null : null }
+        write({ accountLimits })
+      }
       if (event._tag === "StateChanged" && current !== undefined) {
         publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => agent.agentId === event.agentId ? { ...agent, state: event.state } : agent) })
       } else if (needsRefresh(event._tag)) yield* refresh(item.sequence)
@@ -212,12 +222,16 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       // Credential ingress is decoded by the existing client, which requires Redacted.
       const secret = tag === "client.alerts.carrier.set-token" && "value" in payload
         ? Redacted.make(String(payload.value), { label: "secret value" }) : undefined
+      const retryKey = tag === "client.alerts.retry" ? JSON.stringify(payload) : undefined
+      const id = retryKey === undefined ? requestId() : retryIds.get(retryKey) ?? requestId()
+      if (retryKey !== undefined) retryIds.set(retryKey, id)
       try {
-        const result = await Effect.runPromise(invoke({ ...payload, ...(secret ? { value: secret } : {}), requestId: requestId() }).pipe(Effect.result), { signal: controller!.signal })
+        const result = await Effect.runPromise(invoke({ ...payload, ...(secret ? { value: secret } : {}), requestId: id }).pipe(Effect.result), { signal: controller!.signal })
         if (result._tag === "Failure") {
           const error = result.failure as { reason?: unknown; message?: unknown }
           throw new Error(typeof error.reason === "string" ? error.reason : typeof error.message === "string" ? error.message : "The service refused the request.")
         }
+        if (retryKey !== undefined) retryIds.delete(retryKey)
         return result.success
       } finally { if (secret) Redacted.wipeUnsafe(secret) }
     },

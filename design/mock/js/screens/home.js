@@ -1,6 +1,7 @@
 // Home is one triage table: everything that needs the owner, across every project.
 // Project navigation lives in the sidebar and on the All projects page, not here.
-import { html, useState, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
+import { html, useState, useEffect, Icon, cx, href, go, ago, clock, useNow, HOUR } from '../lib.js';
+import * as liveGit from '../live/git.js';
 import {
   openRequests, projectOf, repoOf, agentOf, teamOf, machineOf, KIND_LABEL, projectStatus, leadOf, agentStatus,
   agentsOfProject, byId, routeForRequest, STAGES,
@@ -28,6 +29,7 @@ const COLS = [
 ];
 
 function PhoneOffer({ s }) {
+  useEffect(() => liveGit.openScreen('phone-offer'), []);
   if (s.phoneOffer !== 'open' || s.settings.ntfyServer) return null;
   return html`<div class="phone-offer" role="note">
     <${Icon} name="smartphone" size=${14} /><span>Phone notifications are off</span>

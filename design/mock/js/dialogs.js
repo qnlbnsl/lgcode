@@ -1,3 +1,5 @@
+import * as liveGit from './live/git.js';
+import { live, refuse } from './lib.js';
 // Dialogs that belong to no single screen: the quick switcher, New project,
 // the merge review, and provider sign-in.
 import { html, useState, useEffect, useRef, Icon, cx, go, update, useKey } from './lib.js';
@@ -138,36 +140,36 @@ registerDialog('new-project', NewProject);
 
 // ---- merge review -----------------------------------------------------------------
 function MergeReview({ s, d }) {
-  const r = byId(s.requests, d.requestId); if (!r) return null;
+  const r = live.on && d.worktreeId ? s.worktrees.find((w) => w.id === d.worktreeId)?.review : byId(s.requests, d.requestId); if (!r) return null;
   const ev = r.evidence; const ok = ev.tests.ok && ev.review.ok;
   const docs = [['docs/reference/index.md', 212, 0], ['docs/reference/invoices.md', 148, 0], ['docs/reference/customers.md', 131, 0], ['scripts/build-reference.ts', 96, 12], ['docs/api/invoices.md', 0, 304], ['docs/api/customers.md', 0, 271], ['redirects.json', 37, 0]];
   const wt = (s.worktrees || []).find((w) => w.project === r.project && w.branch === r.source);
   const seen = new Map();
   for (const c of wt?.commits || []) for (const f of c.files || []) { const k = f.path || f[0]; const o = seen.get(k) || [k, 0, 0]; o[1] += f.add ?? f[2]?.add ?? 0; o[2] += f.del ?? f[2]?.del ?? 0; seen.set(k, o); }
-  const files = r.project === 'apiref' || !seen.size ? (r.project === 'apiref' ? docs : []) : [...seen.values()].slice(0, 8);
+  const files = live.on ? (r.files || []).map((f) => [f.path, '', '']) : r.project === 'apiref' || !seen.size ? (r.project === 'apiref' ? docs : []) : [...seen.values()].slice(0, 8);
   const subjects = (wt?.commits || []).slice(0, Math.max(1, ev.commits)).map((k) => k.subject);
-  const first = act.pullRequestText(subjects.length ? subjects : [r.title], ev);
+  const first = live.on ? { title: '', body: '' } : act.pullRequestText(subjects.length ? subjects : [r.title], ev);
   const [title, setTitle] = useState(first.title); const [body, setBody] = useState(first.body); const [writing, setWriting] = useState(false);
-  const regen = () => { setWriting(true); setTimeout(() => { const t = act.pullRequestText(subjects.length ? subjects : [r.title], ev); setTitle(t.title); setBody(t.body); setWriting(false); }, 900); };
+  const regen = () => { if (live.on) return refuse(); setWriting(true); setTimeout(() => { const t = act.pullRequestText(subjects.length ? subjects : [r.title], ev); setTitle(t.title); setBody(t.body); setWriting(false); }, 900); };
   const over = title.length > act.PR_TITLE_LIMIT;
-  const merge = () => { if (over || !title.trim()) return; act.closeDialog(); act.answerRequest(r.id, 'merge'); };
+  const merge = () => { if (live.on) return liveGit.answerReview(r.id, 'merge'); if (over || !title.trim()) return; act.closeDialog(); act.answerRequest(r.id, 'merge'); };
   return html`<${Dialog} title=${r.title} size="wide" onClose=${act.closeDialog}
     foot=${html`<span class="why">Only you can merge into ${r.target}.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
-      <button type="button" class=${cx('btn', ok && 'primary')} disabled=${over || !title.trim()} onClick=${merge}>${ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
+      <button type="button" class=${cx('btn', ok && 'primary')} disabled=${live.on ? liveGit.busy('git') || r.status !== 'open' : over || !title.trim()} onClick=${merge}>${live.on && liveGit.busy('git') ? 'Merging…' : ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
     <p class="mg-brief">${r.brief || r.body}</p>
     ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
     <div class="pr-text">
       <div class="field"><div class="row"><label for="pr-title" class="grow">Pull request title</label>
           <span class=${cx('num pr-count', over && 'error-text')} aria-live="polite">${title.length} / ${act.PR_TITLE_LIMIT}</span>
-          <button type="button" class="btn sm ghost" disabled=${writing} data-tip=${`Writes the title and description with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${regen}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button></div>
-        <input id="pr-title" class=${cx('input', over && 'invalid')} value=${title} disabled=${writing} onInput=${(e) => setTitle(e.target.value)} />
+          <button type="button" class="btn sm ghost" disabled=${writing} data-tip=${live.on ? null : `Writes the title and description with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${regen}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button></div>
+        <input id="pr-title" class=${cx('input', over && 'invalid')} value=${title} disabled=${writing} onInput=${(e) => live.on ? refuse() : setTitle(e.target.value)} />
         ${over && html`<span class="error" role="alert">Keep the title to ${act.PR_TITLE_LIMIT} characters.</span>`}</div>
       <div class="field"><label for="pr-body">Description</label>
-        <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => setBody(e.target.value)}></textarea></div>
+        <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => live.on ? refuse() : setBody(e.target.value)}></textarea></div>
     </div>
-    <${MergeFacts} s=${s} r=${r} />
+    <${MergeFacts} s=${s} r=${r} />${live.on && r.truncated && html`<p role="alert">The comparison is truncated.</p>`}
     <div><div class="section-head"><h3>${ev.files} files changed</h3><span class="grow"></span><a class="link" href="#/p/${r.project}/git" onClick=${act.closeDialog}>Open every diff in Git</a></div>
-      <table class="table"><tbody>${files.map(([f, add, del]) => html`<tr><td class="mono truncate">${f}</td><td class="num success-text">+${add}</td><td class="num error-text">−${del}</td></tr>`)}
+      <table class="table"><tbody>${files.map(([f, add, del]) => html`<tr><td class="mono truncate">${f}</td><td class="num success-text">${add === '' ? '' : '+' + add}</td><td class="num error-text">${del === '' ? '' : '−' + del}</td></tr>`)}
         ${ev.files > files.length && html`<tr><td class="muted">${files.length ? 'and ' : ''}${ev.files - files.length}${files.length ? ' more' : ' files'}</td><td></td><td></td></tr>`}</tbody></table></div>
   <//>`;
 }

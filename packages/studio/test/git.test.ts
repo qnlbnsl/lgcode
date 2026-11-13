@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { mapAccounts, mapAlertSettings, mapAlerts, mapHarnesses, mapServiceSettings } from "../src/git.ts"
+import { mapAccounts, mapAlertSettings, mapAlerts, mapHarnesses, mapPhoneOffer, mapServiceSettings, workspaceIdentity } from "../src/git.ts"
 import type { Account, Alert, AlertSettings, HarnessSettings, ProjectSettings } from "@lgtm/contracts"
+import * as Effect from 'effect/Effect'
+import * as Redacted from 'effect/Redacted'
+import * as Stream from 'effect/Stream'
+import { engineConnection } from '../src/connection.ts'
+import { engineSnapshot } from './fixtures.ts'
 const harness = { id: 'codex', runMode: 'acp', models: ['model'], efforts: ['high'], defaultModel: 'model', defaultPermission: 'ask' } as unknown as HarnessSettings
 const account = { id: 'account', harness: 'codex', displayName: 'Build account', enabled: true } as unknown as Account
 const project = { workspaceFolder: '/tmp', shell: '/bin/sh', lead: { harness: 'codex', account: { _tag: 'named', accountId: 'account' }, permission: 'edit' } } as unknown as ProjectSettings
@@ -27,11 +32,67 @@ describe('service mapping', () => {
     const alert = { alertId: 'alert', kind: 'question', title: 'Question', agentId: 'worker', subject: { _tag: 'question', id: 'question' }, raisedAt: 123, status: 'open', delivery: { status: 'failed', reason: 'token missing', generation: 7, attempt: 2, final: true } } as unknown as Alert
     expect(mapAlerts([alert], [{ id: 'worker', project: 'project' }])[0]).toMatchObject({ id: 'alert', read: false, request: 'question', to: '/p/project/chat/worker', generation: 7, attempt: 2, error: 'token missing' })
   })
+  it('uses service dismissal and carrier state for the phone offer', () => {
+    const settings = { carrier: { _tag: 'none' }, pushPromptDismissed: false } as AlertSettings
+    expect(mapPhoneOffer(settings)).toBe('open')
+    expect(mapPhoneOffer({ ...settings, pushPromptDismissed: true })).toBe('declined')
+    expect(mapPhoneOffer({ ...settings, carrier: { _tag: 'ntfy', server: 'http://127.0.0.1:1', topic: 'test' } })).toBe('declined')
+  })
+  it('joins answered requests even when the alert has no agent identity', () => {
+    const alert = { alertId: 'alert', kind: 'question', title: 'Question', subject: { _tag: 'question', id: 'question' }, raisedAt: 1, status: 'cleared' } as unknown as Alert
+    const request = { id: 'question', agentId: 'worker', status: 'answered', answer: 'Proceed' } as import('@lgtm/contracts').ClientRequest
+    expect(mapAlerts([alert], [{ id: 'worker', project: 'project' }], [request])[0]).toMatchObject({ read: true, answer: 'Proceed', to: '/p/project/chat/worker' })
+  })
+})
+
+describe('authenticated screen requests', () => {
+  it('keeps an uncertain notification retry receipt and wraps token ingress', async () => {
+    const ids: string[] = [], secrets: Redacted.Redacted<string>[] = []
+    let ready = false
+    const client = {
+      'client.snapshot': () => Effect.succeed(engineSnapshot),
+      'project.settings': () => Effect.sync(() => { ready = true; return {} }),
+      'client.subscribe': () => Stream.never,
+      'client.alerts.retry': (p: { requestId: string }) => Effect.suspend(() => {
+        ids.push(p.requestId)
+        return ids.length === 1 ? Effect.fail({ reason: 'transport lost' }) : Effect.succeed({ accepted: false, reason: 'carrier delivery failed' })
+      }),
+      'client.alerts.carrier.set-token': (p: { value: Redacted.Redacted<string> }) => Effect.sync(() => {
+        expect(Redacted.value(p.value)).toBe('synthetic-token')
+        secrets.push(p.value)
+        return {}
+      })
+    }
+    const connection = engineConnection({ location: { protocol: 'http:', host: '127.0.0.1' }, fetch: async () => new Response(null, { status: 204 }),
+      connect: (() => Effect.succeed(client)) as unknown as NonNullable<import('../src/connection.ts').ConnectionOptions['connect']>, debug() {} })
+    connection.open(() => {})
+    try {
+      await expect.poll(() => ready).toBe(true)
+      const retry = { alertId: 'alert', generation: 1, attempt: 1 }
+      await expect(connection.request('client.alerts.retry', retry)).rejects.toThrow('transport lost')
+      await expect(connection.request('client.alerts.retry', retry)).resolves.toMatchObject({ accepted: false })
+      expect(ids[0]).toBe(ids[1])
+      await connection.request('client.alerts.retry', retry)
+      expect(ids[2]).not.toBe(ids[1])
+      await connection.request('client.alerts.carrier.set-token', { origin: 'http://127.0.0.1:1', nonce: 'test', value: 'synthetic-token' })
+      expect(() => Redacted.value(secrets[0]!)).toThrow()
+      await expect(connection.request('unknown', {})).rejects.toThrow('Unknown service request.')
+    } finally { connection.close() }
+  })
 })
 
 import { mapCommitFiles, mapConflict, mapGitChanges, mapGitCommit, mapGitDiff, mapGitState, mapMainReview } from '../src/git.ts'
 import type { GitChange, GitCommit, GitConflict, GitMainReview, GitState } from '@lgtm/contracts'
 describe('Git mapping', () => {
+  it('joins registered project and team worktrees to their real parent branches', () => {
+    const base = { worktreeId: 'base', repoId: 'repo', branch: 'main', checkout: 'main' } as import('@lgtm/contracts').Workspace
+    const source = { worktreeId: 'source', repoId: 'repo', branch: 'project', checkout: 'worktree' } as import('@lgtm/contracts').Workspace
+    const team = { worktreeId: 'team', repoId: 'repo', branch: 'build', checkout: 'worktree', parentId: 'source' } as import('@lgtm/contracts').Workspace
+    const project = { projectId: 'project', worktreeId: 'source', leadAgentId: 'lead' } as import('@lgtm/contracts').Project
+    const teams = [{ teamId: 'build', projectId: 'project', worktreeId: 'team' }] as import('@lgtm/contracts').Team[]
+    expect(workspaceIdentity(source, [base, source, team], [project], teams)).toEqual({ kind: 'project', project: 'project', team: null, owner: 'lead', parent: 'main' })
+    expect(workspaceIdentity(team, [base, source, team], [project], teams)).toEqual({ kind: 'team', project: 'project', team: 'build', owner: null, parent: 'project' })
+  })
   it('keeps both indexed and working sides of a partially staged file', () => {
     const rows = mapGitChanges([{ path: 'file.txt', originalPath: 'old.txt', staged: true, unstaged: true, conflict: false, untracked: false, index: 'R', worktree: 'M' }])
     expect(rows.map((r) => [r.status, r.staged, r.path, r.oldPath])).toEqual([['R', true, 'file.txt', 'old.txt'], ['M', false, 'file.txt', 'old.txt']])

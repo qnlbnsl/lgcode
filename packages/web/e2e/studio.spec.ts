@@ -1,3 +1,4 @@
+import { exerciseStudioGit } from './support/studioGit.ts'
 import { exerciseStudioService } from './support/studioService.ts'
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
@@ -16,7 +17,7 @@ import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
-import { call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
+import { appendSetup, call, eventOf, harnessSettings, makeFakeSecrets, makeRig, ownerCredential, removeRig, success } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
@@ -57,6 +58,8 @@ test("live website: signs in through the engine, shows its real records, and kee
       yield* Effect.scoped(Effect.gen(function* () {
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
+        success(yield* call(ownerCredential, 'harnesses', { operation: 'set', harness: harnessSettings('first', { models: ['test-model', 'other-model'], efforts: ['high'], defaultModel: 'test-model', defaultEffort: 'high' }) }))
+        success(yield* call(ownerCredential, 'project.settings.set', { settings: { workspaceFolder: rig.work, shell: 'zsh', lead: { harness: 'first', account: { _tag: 'any' }, permission: 'ask', model: 'test-model', effort: 'high' } } }))
         yield* completedSetup(project.projectId)
         yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
@@ -92,6 +95,8 @@ test("live website: signs in through the engine, shows its real records, and kee
         // A change in the engine reaches the open page through the stream.
         yield* call(project.leadCredential, "project.sprint.create", { projectId: project.projectId, label: "SP-2",
           name: "Pushed sprint", goal: "Arrive on the stream", phase: "Plan", owner: project.leadId, needs: [] })
+        yield* appendSetup([eventOf({ _tag: 'QuestionAsked', agentId: project.workerId, questionId: 'service-question', holder: { _tag: 'owner' }, deliveryId: 'service-question-delivery', text: 'Which branch?' }),
+          eventOf({ _tag: 'OwnerNeeded', agentId: project.workerId, reason: 'request needs the owner', subject: { _tag: 'question', id: 'service-question' } })])
         yield* Effect.promise(async () => {
           const origin = `http://127.0.0.1:${port}`
           const sidebar = page.locator(".sidebar")
@@ -168,3 +173,5 @@ test("design mock: still opens on its sample data with no console error", async 
     expect(errors).toEqual([])
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 })
+
+test('live website: Git changes, history, remotes, integration and owner approval', async ({ page }) => { test.setTimeout(360_000); await exerciseStudioGit(page) })

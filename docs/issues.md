@@ -11031,12 +11031,14 @@ The gap table is `.plans/plans/connect-mock/gap-table.md`.
 ## 623. The live website shows the page's default settings, not the engine's
 
 Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
-State: open.
+State: fixed for Service settings and Phone notifications in step 2.
 
-The live website at `/studio/` fills its Service settings and Notifications pages from the page's own defaults.
-The engine does not send these settings in `client.snapshot`, so the values shown may differ from the engine's real ones.
-Changing a setting is refused with a short notice, so nothing wrong is saved.
-Step 2 of the plan connects the settings to the engine's commands.
+These pages now read their settings from the engine when opened.
+The Home notification offer reads the same carrier and dismissal settings.
+Unsupported settings are empty.
+Unset role overrides stay empty because the engine does not return effective role defaults.
+Appearance keeps browser preferences, as intended.
+Supplied actions call the authenticated client API.
 
 ## 624. The live website's Machines page has no figures for the engine's machine
 
@@ -11098,3 +11100,14 @@ The website shows an empty number for an unset limit.
 An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
+
+## s2-git-4. Notification retries need the original receipt after a lost reply.
+
+Found: 2026-11-13, while connecting notification delivery actions.
+State: fixed in this change.
+
+A carrier exchange can finish before its reply reaches the browser.
+A repeated click must recover the original request instead of creating another delivery.
+The connection keeps the request identifier until a reply confirms the result.
+The notification page keeps the original alert generation and attempt while recovery is pending.
+A unit test checks that recovery reuses the identifier.

@@ -16,7 +16,7 @@ export async function run(key, work) {
   catch (e) { if (state === S() && S().session.status === 'in') act.toast(e.message || 'The service did not complete the request.', 'error'); return false; }
   finally { if (state === S()) pending(key, false); }
 }
-const request = (tag, payload = {}) => { console.debug('live request', tag); return engine.request(tag, payload); };
+const request = (tag, payload = {}) => engine.request(tag, payload);
 const settingsPatch = (patch) => engineWrite({ settings: { ...S().settings, ...patch } });
 let service;
 let accounts;
@@ -25,15 +25,16 @@ let subscriptionsLoaded = false;
 let screen;
 let revision = 0;
 let refreshTimer;
+let retryPending;
 // A connection snapshot can replace the skeletons. Keep already-read detail while refreshing.
 export function observe(patch) {
   if (patch.session && patch.session.status !== 'in') {
-    service = accounts = statuses = undefined; subscriptionsLoaded = false; revision++; clearTimeout(refreshTimer);
+    service = accounts = statuses = retryPending = undefined; subscriptionsLoaded = false; S().ui.serviceReady = false; revision++; clearTimeout(refreshTimer);
     Object.assign(patch, { notifications: [], settings: { ntfyServer: '', ntfyTopic: '', ntfyToken: '', notifyOn: {}, quiet: {} } });
   }
   if (patch.worktrees) patch.worktrees = patch.worktrees.map((w) => ({ ...w, ...(S().worktrees?.find((x) => x.id === w.id && x.folder === w.folder && x.branch === w.branch) || {}), ...Object.fromEntries(Object.entries(w).filter(([k]) => !['files', 'commits', 'ahead', 'behind', 'merge'].includes(k))) }));
   if (patch.subscriptions && subscriptionsLoaded) patch.subscriptions = S().subscriptions;
-  if (screen && patch.conn?.status === 'live' || screen && patch.projects) {
+  if (screen && (patch.conn?.status === 'live' || patch.projects)) {
     clearTimeout(refreshTimer); refreshTimer = setTimeout(() => refreshScreen(), 100);
   }
 }
@@ -48,15 +49,27 @@ export function openScreen(name, project) {
 async function refreshScreen() {
   if (!mapping || !screen || S().session.status !== 'in') return;
   if (screen.name === 'git') return refreshGit(screen.project);
+  if (busy('read-service')) { clearTimeout(refreshTimer); refreshTimer = setTimeout(refreshScreen, 200); return; }
   return run('read-service', () => loadService(screen?.name));
 }
 async function loadService(name) {
   const version = revision;
-  if (name === 'notifications') {
-    const [settings, list] = await Promise.all([request('client.alerts.settings'), request('client.alerts.list', { after: 0, limit: 200 })]);
+  if (name === 'notifications' || name === 'phone-offer') {
+    const settings = await request('client.alerts.settings');
+    if (name === 'phone-offer') {
+      if (version === revision && S().session.status === 'in') {
+        settingsPatch(mapping.mapAlertSettings(settings));
+        engineWrite({ phoneOffer: mapping.mapPhoneOffer(settings) });
+      }
+      return;
+    }
+    const items = []; let after = 0;
+    for (;;) { const page = await request('client.alerts.list', { after, limit: 200 }); items.push(...page.items); if (page.next === undefined || page.next <= after) break; after = page.next; }
+    const requests = []; after = 0;
+    for (;;) { const page = await request('client.requests', { after, limit: 200 }); requests.push(...page.items); if (page.next === undefined || page.next <= after) break; after = page.next; }
     if (version !== revision || S().session.status !== 'in') return;
     settingsPatch(mapping.mapAlertSettings(settings));
-    engineWrite({ notifications: mapping.mapAlerts(list.items, S().agents), phoneOffer: settings.pushPromptDismissed ? 'declined' : 'open' });
+    engineWrite({ notifications: mapping.mapAlerts(items, S().agents, requests), phoneOffer: mapping.mapPhoneOffer(settings) });
     return;
   }
   const [accountReply, harnessReply, project, roles, web, roleFile, snapshot] = await Promise.all([
@@ -70,7 +83,7 @@ async function loadService(name) {
   Object.assign(HARNESSES, mapping.mapHarnesses(service.harnesses));
   settingsPatch(mapping.mapServiceSettings(service.project, service.harnesses, service.roles, service.web, service.roleFile));
   engineWrite({ subscriptions: mapping.mapAccounts(accounts, statuses, service.harnesses, service.project) });
-  subscriptionsLoaded = true;
+  subscriptionsLoaded = true; S().ui.serviceReady = true; notify();
 }
 export const accountAction = (id, operation, patch = {}) => run('subscriptions', async () => {
   const account = accounts?.find((a) => a.id === id);
@@ -79,15 +92,15 @@ export const accountAction = (id, operation, patch = {}) => run('subscriptions',
   await loadService('subscriptions');
 });
 export const addAccount = (harness, name) => run('subscriptions', async () => {
-  console.debug('adding account');
   await request('accounts', { operation: 'add', account: { id: 'account-' + crypto.randomUUID(), harness, displayName: name, enabled: true } });
   await loadService('subscriptions'); act.closeDialog();
 });
 export const makeDefault = (id) => run('subscriptions', async () => {
   const account = accounts?.find((a) => a.id === id), h = service?.harnesses.find((h) => h.id === account?.harness);
   if (!service?.project || !h) throw new Error('Configure project lead defaults first.');
-  await request('project.settings.set', { settings: { ...service.project, lead: { harness: h.id, account: { _tag: 'named', accountId: id }, permission: h.defaultPermission,
-    ...(h.defaultModel ? { model: h.defaultModel } : {}), ...(h.defaultEffort ? { effort: h.defaultEffort } : {}) } } });
+  const lead = service.project.lead?.harness === h.id ? service.project.lead : { harness: h.id, permission: h.defaultPermission,
+    ...(h.defaultModel ? { model: h.defaultModel } : {}), ...(h.defaultEffort ? { effort: h.defaultEffort } : {}) };
+  await request('project.settings.set', { settings: { ...service.project, lead: { ...lead, account: { _tag: 'named', accountId: id } } } });
   await loadService('subscriptions');
 });
 export const accountModel = (harness, model) => run('subscriptions', async () => {
@@ -135,7 +148,14 @@ export const notifyKind = (kind, push) => run('notifications', async () => {
   await request('client.alerts.settings.set', { kind: kind === 'failed' ? 'failure' : kind, push }); await loadService('notifications');
 });
 export const sendTest = () => run('notifications', async () => { const r = await request('client.alerts.test'); if (!r.accepted) throw new Error(r.reason); act.toast('Test accepted by the notification service.'); });
-export const retryAlert = (n) => run('notifications', async () => { const r = await request('client.alerts.retry', { alertId: n.id, generation: n.generation, attempt: n.attempt }); if (!r.accepted) throw new Error(r.reason); await loadService('notifications'); });
+export const retryAlert = (n) => run('notifications', async () => {
+  if (retryPending && retryPending.alertId !== n.id) throw new Error('Recover the pending notification retry first.');
+  retryPending ||= { alertId: n.id, generation: n.generation, attempt: n.attempt };
+  const r = await request('client.alerts.retry', retryPending);
+  retryPending = undefined;
+  await loadService('notifications');
+  if (!r.accepted) throw new Error(r.reason);
+});
 export const dismissAlerts = () => run('notifications', async () => { for (const n of S().notifications.filter((n) => !n.read)) await request('client.alerts.dismiss', { alertId: n.id }); await loadService('notifications'); });
 export const dismissOffer = () => run('notifications', async () => { await request('client.alerts.prompt.dismiss'); await loadService('notifications'); });
 // Git reads and actions follow below.
@@ -155,12 +175,17 @@ async function loadGit(project) {
     const changes = read(await request('project.changes', scope(w)));
     if (version !== revision || S().session.status !== 'in') return;
     const files = mapping.mapGitChanges(changes.items);
-    const merge = state.mergeHead || changes.items.some((x) => x.conflict) ? { from: state.mergeHead || '', by: null, startedAt: null, files: changes.items.filter((x) => x.conflict).map((x) => ({ id: x.path, path: x.path, parts: [], resolved: false, loaded: false })) } : null;
+    const merge = state.mergeHead || changes.items.some((x) => x.conflict) ? { from: state.mergeHead || '', by: null, startedAt: null, files: changes.items.filter((x) => x.conflict).map((x) => ({ ...(w.merge?.files.find((f) => f.path === x.path) || {}), id: x.path, path: x.path, parts: w.merge?.files.find((f) => f.path === x.path)?.parts || [], resolved: false, loaded: false })) } : null;
     writeWt(w.id, { ...mapping.mapGitState(state, w.parent), files, merge, ready: !changes.truncated, truncated: changes.truncated });
     if (w.kind === 'project') {
       const status = read(await request('project.review.status', { ...scope(w), projectId: project }));
       if (version !== revision) return;
-      if (status.review) writeWt(w.id, { review: mapping.mapMainReview(status.review, undefined, S().projects.find((p) => p.id === project)?.lead || ''), merged: status.review.outcome === 'merged' ? status.review.decidedAt : null });
+      if (status.review) {
+        const fresh = mapping.mapMainReview(status.review, undefined, S().projects.find((p) => p.id === project)?.lead || '');
+        const old = wt(w.id).review;
+        const review = old?.id === fresh.id && old.head === fresh.head && old.baseHead === fresh.baseHead ? { ...old, ...fresh, files: old.files, evidence: { ...old.evidence, tests: fresh.evidence.tests, review: fresh.evidence.review } } : fresh;
+        writeWt(w.id, { review, merged: status.review.outcome === 'merged' && status.review.head === state.head ? status.review.decidedAt : null });
+      }
     }
   }
   const selected = list.find((w) => w.branch === S().inspecting[project]) || list.find((w) => w.kind === 'project') || list[0];
@@ -246,9 +271,9 @@ export function answerReview(id, option) {
     const review = read(await request('project.review.approve', { ...scope(w), projectId: r.project, reviewId: r.id, expectedHead: r.head, expectedBaseHead: r.baseHead, confirmed: true,
       decision: r.evidence.tests.ok && r.evidence.review.ok ? 'approve' : 'approve_without_evidence' }));
     writeWt(w.id, { review: mapping.mapMainReview(review, undefined, r.agent) });
+    if (review.outcome === 'merged') act.closeDialog();
     await loadGit(r.project);
     if (review.outcome !== 'merged') throw new Error(review.reason || 'The merge was refused.');
-    act.closeDialog();
   });
 }
 export function choose(id, fid, kid, choice) { return run('git', async () => {

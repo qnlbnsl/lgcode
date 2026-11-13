@@ -1,5 +1,5 @@
 // Pure mapping for the Git tab and the service pages. Missing engine fields stay empty.
-import type { Account, ClientSnapshot, HarnessSettings, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
+import type { Account, ClientRequest, ClientSnapshot, HarnessSettings, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
 import { mapPermission } from "./mapping.ts"
 
 export function mapHarnesses(rows: ReadonlyArray<HarnessSettings>) {
@@ -32,13 +32,18 @@ export function mapAlertSettings(settings: AlertSettings) {
     quiet: { on: null, from: "", to: "", failed: null } }
 }
 
-export function mapAlerts(alerts: ReadonlyArray<Alert>, agents: ReadonlyArray<{ id: string; project: string }>) {
+export function mapPhoneOffer(settings: AlertSettings) {
+  return settings.pushPromptDismissed || settings.carrier._tag !== 'none' ? 'declined' : 'open'
+}
+
+export function mapAlerts(alerts: ReadonlyArray<Alert>, agents: ReadonlyArray<{ id: string; project: string }>, requests: ReadonlyArray<ClientRequest> = []) {
   return alerts.map((a) => {
-    const agent = agents.find((x) => x.id === (a.agentId ?? (a.subject?._tag === "agent" ? a.subject.id : "")))
     const request = a.subject?._tag === "permission" || a.subject?._tag === "question" ? a.subject.id : null
+    const row = requests.find((r) => r.id === request)
+    const agent = agents.find((x) => x.id === (a.agentId ?? row?.agentId ?? (a.subject?._tag === "agent" ? a.subject.id : "")))
     const to = agent ? `/p/${encodeURIComponent(agent.project)}/chat/${encodeURIComponent(agent.id)}` : a.subject?._tag === "account" ? "/subscriptions" : null
     return { id: a.alertId, ts: a.raisedAt, kind: a.kind === "failure" ? "failed" : a.kind, title: a.title, agent: agent?.id ?? null, project: agent?.project ?? null,
-      request, to, read: a.status === "cleared", delivery: a.delivery?.status === "delivered" ? "sent" : a.delivery?.status ?? "off",
+      request, to, answer: row?.status === 'answered' ? row.answer ?? '' : '', read: a.status === "cleared", delivery: a.delivery?.status === "delivered" ? "sent" : a.delivery?.status ?? "off",
       error: a.delivery?.status === "failed" ? a.delivery.reason : null, generation: a.delivery?.generation, attempt: a.delivery?.attempt }
   }).sort((a, b) => b.ts - a.ts)
 }
