@@ -52,6 +52,7 @@ export const gitReads = {
   "project.commit.files": workspaceRead((git, path, raw, agentRead) => git.commitFiles(path, raw.commit as string, agentRead)),
   "project.git.state": workspaceRead((git, path, raw) => git.state(path, raw.target as string | undefined)),
   "project.review": workspaceRead((git, path, raw, agentRead) => git.review(path, raw.base as string, agentRead)),
+  "project.conflict.resolved": workspaceRead((git, path) => git.resolvedConflicts(path)),
   "project.conflict": workspaceRead((git, path, raw, agentRead) => git.conflict(path, raw.path as string, agentRead)),
   "project.conflict.choose": workspaceRead((git, path, raw) => git.choose(path, selection(raw), raw.hunk as number, raw.choice as import("./git/types.ts").ConflictChoice)),
   "project.discard.plan": workspaceRead((git, path, raw) => git.planDiscard(path, raw.paths as string[] | undefined)),
@@ -72,17 +73,39 @@ export const gitPlanners = {
   "project.pull": mutate((git, path) => git.pull(path)),
   "project.push": mutate((git, path) => git.push(path)),
   "project.integrate": mutate((git, path, raw, input) => Effect.gen(function* () {
-    const destination = yield* workspacePath(input, { ...raw, worktreeId: raw.destinationId }, git)
+    const destination = yield* workspacePath(input, { worktreeId: raw.destinationId }, git)
     const source = own(projectView(input.snapshot).workspaces, raw.worktreeId as string)!
     // Integrations use the recorded team-to-project relationship, never a
     // caller-selected branch target or an unrelated checkout in the repository.
     const view = projectView(input.snapshot)
     const team = Object.values(view.teams).find((row) => row.worktreeId === source.worktreeId)
+    const parentTeam = Object.values(view.teams).find((row) => row.worktreeId === destination.worktreeId)
     const project = team === undefined ? undefined : own(view.projects, team.projectId)
-    if (project?.worktreeId !== destination.worktreeId || source.parentId !== destination.worktreeId || source.repoId !== destination.repoId) {
+    const builder = parentTeam !== undefined && !Object.values(view.projects).some((row) => row.worktreeId === source.worktreeId)
+      && team === undefined && source.checkout === "worktree"
+    if (source.parentId !== destination.worktreeId || source.repoId !== destination.repoId
+      || !(project?.worktreeId === destination.worktreeId || builder)) {
       return yield* refused("integration requires a registered team source and its project workspace")
     }
     return { head: yield* gitCall(git.mergeTeam(path, destination.path, raw.expectedHead as string)) }
   })),
+  "project.update": mutate((git, path, raw, input) => Effect.gen(function* () {
+    const child = own(projectView(input.snapshot).workspaces, raw.worktreeId as string)!
+    const parent = yield* workspacePath(input, { worktreeId: raw.destinationId }, git)
+    const view = projectView(input.snapshot)
+    const project = Object.values(view.projects).find((row) => row.worktreeId === child.worktreeId)
+    const team = Object.values(view.teams).find((row) => row.worktreeId === child.worktreeId)
+    const builderTeam = Object.values(view.teams).find((row) => row.worktreeId === child.parentId)
+    const projectParent = project !== undefined && parent.checkout === "main"
+      && parent.path === own(view.repositories, child.repoId)?.path
+    const teamParent = team !== undefined && own(view.projects, team.projectId)?.worktreeId === parent.worktreeId
+    const builderParent = builderTeam !== undefined && child.checkout === "worktree"
+    if (child.repoId !== parent.repoId || child.worktreeId === parent.worktreeId
+      || child.parentId !== undefined && child.parentId !== parent.worktreeId
+      || !(projectParent || teamParent || builderParent && child.parentId === parent.worktreeId)) return yield* refused("update requires the registered parent workspace")
+    return { head: yield* gitCall(git.mergeTeam(parent.path, path, raw.expectedHead as string)) }
+  })),
+  "project.merge.abort": mutate((git, path, raw) => git.abortMerge(path, raw.expectedHead as string, raw.expectedMergeHead as string, raw.confirmed as boolean)),
+  "project.conflict.reopen": mutate((git, path, raw) => git.reopen(path, raw.path as string, raw.expectedHead as string, raw.expectedMergeHead as string)),
   "project.conflict.resolve": mutate((git, path, raw) => git.resolve(path, selection(raw))),
 } satisfies Record<string, PiecePlanner>

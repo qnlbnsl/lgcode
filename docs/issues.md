@@ -12194,3 +12194,99 @@ The model and effort recovery tests retain their real handler, lost reply, resum
 The matching first-run browser fixture had the same dependency.
 It now scripts the peer report separately as well.
 These are test-fixture corrections after separating discovery in review item 7.
+
+
+## s4-git2-1. Merge abort and conflict reopening were not connected.
+
+The live Git page refused both controls.
+The engine now exposes owner-only requests for the expected active merge.
+Abort uses Git's merge abort command after checking both heads and explicit confirmation.
+Reopening uses Git's resolve-undo index extension and restores the canonical three-way conflict.
+The resolved file list survives a page reload and service reconstruction.
+An inactive merge, a stale head, and an unsafe file path are refused.
+Unsupported conflict kinds retain the terminal workflow.
+
+## s4-git2-2. Parent updates and builder integrations were missing.
+
+The Git page did not report how many commits a workspace was behind its parent.
+The state reply now carries that count separately from the remote count.
+A parent update uses the registered workspace relationship and the existing bounded integration operation.
+A registered worktree whose parent is a registered team can integrate into that team.
+The page maps that checkout as an agent worktree.
+Optional project, team, and owner text does not establish the integration relationship.
+Dirty source or destination workspaces still refuse the merge.
+A conflict remains available in the ordinary conflict view.
+
+## s4-git2-3. Sending a main review back lost the owner's reason.
+
+The review had no sent-back state or connected action.
+The owner can now decline the exact open review with a nonblank reason.
+The decision and the addressed board post are stored in one writer transaction.
+The board planner retains its own namespace and access checks.
+An identical retry returns the original receipt without another post.
+The built merge dialog reuses the existing send-back control and reason form styles.
+The design reference is unchanged.
+
+## s4-git2-4. Git message generation has no configured execution boundary.
+
+ProjectSettings has no Git text-model or account selection.
+The live service mapping's gitModel value is an empty placeholder.
+The runner has a temporary discovery operation, but it sends no prompt and returns only choices.
+Ordinary prompts require a registered agent, an incarnation, a delivery, and durable thread routing.
+There is no bounded short task that returns generated Git text with an owner-selected account and model.
+Commit and pull request generation therefore retain their existing refusal.
+This assignment adds no implicit account selection and sends no repository content to a model.
+
+## s4-git2-5. Hosted pull request editing has no stored provider record.
+
+GitMainReview is a local approval record for a reviewed pair of heads.
+It has no hosted pull request number, provider identity, title, or body.
+The Git service can read local review evidence and merge it with owner approval.
+It does not create a hosted pull request.
+No authenticated provider update operation exists in the engine.
+The title and body controls therefore retain their refusal.
+A hosted record and a bounded authenticated provider action are prerequisites for connecting them.
+
+
+## s4-git2-6. The required local live check passed sixteen of twenty-three steps.
+
+The run used private service state under `/tmp/lgtm-live-b15F6M`.
+It did not use the owner's service on port 8787.
+The removed-variables, state-read, always-allow, permission-kinds, reload, and token-scan checks failed.
+The recording step was skipped because earlier checks failed.
+The final comparison of rebuilt views and secret scanning of events, replies, and output passed.
+The token-scan check separately reported an agent token in a harness session file or process arguments.
+These harness findings are outside this Git assignment.
+The complete bounded output is retained in the worker's result logs.
+The assignment's earlier reference count was nineteen of twenty-three.
+
+
+## s4-git2-7. Competing review decisions need one workspace operation lane.
+
+The first send-back implementation used the writer transaction alone.
+A regression held an owner merge open and showed that a decline could record sent-back before that merge finished.
+The decline now acquires the same workspace operation lane as prepare and approve.
+It rechecks the stored review after the earlier operation ends.
+A completed approval makes the queued decline refuse without posting a reason.
+
+
+## s4-git2-8. The Git journey clicked approval during a background refresh.
+
+Opening a main review finishes the comparison and evidence reads before recording an open review.
+The engine has no later transition that makes that review ready.
+The resulting project snapshot schedules the page's Git refresh after one hundred milliseconds.
+That refresh reads the project's workspaces and the selected file details through the same pending key as mutations.
+The merge dialog disables approval while that key is pending.
+The dialog can therefore be visible while its approval button remains disabled for the duration of those reads.
+A loaded computer can exhaust the journey's ten-second click budget in that state.
+A gated page regression reproduces an open review with a pending background read.
+The Git journey now waits for the existing aria-busy state to become false after opening each merge review.
+It uses the existing assertion budget and does not raise a timeout.
+No separate engine readiness delay was found.
+
+## s4-git2-9. The builder mapping initially lost legacy team display metadata.
+
+The broader regression run found that callers without the optional team list displayed a team workspace as a project workspace.
+The mapping now retains the existing workspace team identifier as a display fallback.
+A registered builder parent still takes precedence in the page mapping.
+The engine continues to require the registered parent relationship for integration authority.

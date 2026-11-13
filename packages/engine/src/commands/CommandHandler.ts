@@ -415,6 +415,13 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
             if (external?.failure !== undefined) return yield* external.failure;
             const plan = external?.plan ?? (yield* (external?.finalize ?? finalizeLifecycle ?? lists.planners[name]!)({ runtime, actor, snapshot }, payload));
+            if (name === "project.review.decline") {
+              // This engine-owned composition keeps both piece boundaries:
+              // only the board planner may construct the addressed owner post.
+              const board = yield* checkPieceBatch("board", snapshot, { events: plan.events.filter((event) => event._tag.startsWith("board.")), deliveries: plan.deliveries }, actor, lists);
+              const project = yield* checkPieceBatch("project", snapshot, { events: plan.events.filter((event) => event._tag.startsWith("project.")) }, actor, lists);
+              return { ...plan, events: [...board, ...project] };
+            }
             const namespace = pieceNamespace(name);
             if (namespace !== undefined && !projectLifecycleCommand(name)) {
               if (plan.afterCommit !== undefined) return yield* refused();
@@ -482,7 +489,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         const lifecycle = withLane(log, "project-lifecycle")(settled);
         return projectLifecycleCommand(name) ? engineOwned(lifecycle) : lifecycle;
       }
-      return Object.hasOwn(gitPlanners, name)
+      return Object.hasOwn(gitPlanners, name) || name === "project.review.decline"
         ? withLane(log, `git-operation:${typeof rawPayload === "object" && rawPayload !== null ? String((rawPayload as { worktreeId?: unknown }).worktreeId) : "invalid"}`)(settled)
         : settled;
     });

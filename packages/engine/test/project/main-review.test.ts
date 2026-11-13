@@ -704,3 +704,81 @@ it.live("issue 595: partial main checkout permission failure leaves the review o
   expect(mergeCalls()).toBe(1)
   expect(projectView(yield* snapshot).gitReviews[f.worktreeId]?.outcome).toBe("open")
 })).pipe(Effect.orDie))
+
+
+it.live("s4-git2: sends a main review back atomically with its reason on the lead board and refuses old or agent decisions", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  expect(typeof (f.api as any)["project.review.decline"]).toBe("function");
+  const payload = { requestId: freshRequest(), projectId: f.projectId, worktreeId: f.worktreeId, reviewId: review.reviewId, expectedHead: review.head, expectedBaseHead: review.baseHead, reason: "Please add coverage <script>literal</script>." };
+  const member = yield* client(f.socket, f.member.token);
+  expect(yield* refusal(run(member, "project.review.decline", payload))).toBeDefined();
+  expect(yield* refusal(run(f.api, "project.review.decline", { ...payload, requestId: freshRequest(), reason: "   " }))).toBeDefined();
+  const reply = yield* run(f.api, "project.review.decline", payload);
+  expect(reply.result).toMatchObject({ outcome: "sent_back", reason: payload.reason, decision: null, mergeHead: null });
+  expect(yield* run(f.api, "project.review.decline", payload)).toEqual(reply);
+  expect((yield* run(f.api, "project.review.status", f)).result.review.outcome).toBe("sent_back");
+  const posts = (yield* readLog).filter((row) => row.event._tag === "board.PostWritten" && row.event.text.includes(payload.reason));
+  expect(posts).toHaveLength(1);
+  expect(posts[0]!.event).toMatchObject({ to: [{ _tag: "agent", agentId: projectView(yield* snapshot).projects[f.projectId]!.leadAgentId }] });
+  expect(yield* refusal(approve(f, review))).toBe("main review is unavailable; prepare a new review");
+  expect(yield* refusal(run(f.api, "project.review.decline", { ...payload, requestId: freshRequest() }))).toBeDefined();
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(f.baseHead);
+})).pipe(Effect.orDie));
+
+it.live("s4-git2: updates only from the registered parent and integrates a registered builder into its team", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup();
+  expect(typeof (f.api as any)["project.update"]).toBe("function");
+  save(rig.work, "parent.txt", "parent change\n"); const parentHead = commit(rig.work, "Parent update");
+  const update = { requestId: freshRequest(), projectId: f.projectId, worktreeId: f.worktreeId, destinationId: f.destinationId, expectedHead: parentHead };
+  yield* run(f.api, "project.update", update);
+  expect(git(f.source, "merge-base", "--is-ancestor", parentHead, "HEAD")).toBe("");
+  const teamPath = join(rig.root, "team"), builderPath = join(rig.root, "builder");
+  git(f.source, "worktree", "add", "-b", "team-build", teamPath);
+  const teamId = (yield* run(f.api, "project.workspace.register", { repoId: f.repoId, machineId: "local", path: teamPath, branch: "team-build", checkout: "worktree", parentId: f.worktreeId })).worktreeId;
+  const team = yield* run(f.api, "project.team.create", { projectId: f.projectId, name: "Build", worktreeId: teamId });
+  git(teamPath, "worktree", "add", "-b", "builder-work", builderPath);
+  const builderId = (yield* run(f.api, "project.workspace.register", { repoId: f.repoId, machineId: "local", path: builderPath, branch: "builder-work", checkout: "worktree", parentId: teamId })).worktreeId;
+  save(builderPath, "builder.txt", "builder contribution\n"); const head = commit(builderPath, "Builder contribution");
+  yield* run(f.api, "project.integrate", { worktreeId: builderId, destinationId: teamId, expectedHead: head });
+  expect(readFileSync(join(teamPath, "builder.txt"), "utf8")).toBe("builder contribution\n");
+  expect(existsSync(join(f.source, "builder.txt"))).toBe(false);
+  expect(yield* refusal(run(f.api, "project.integrate", { worktreeId: builderId, destinationId: f.worktreeId, expectedHead: head }))).toBeDefined();
+  expect(yield* refusal(run(f.api, "project.update", { ...update, requestId: freshRequest(), destinationId: teamId }))).toBeDefined();
+  save(rig.work, "file.txt", "parent conflict\n"); const nextParent = commit(rig.work, "Parent conflict");
+  save(f.source, "file.txt", "project conflict\n"); commit(f.source, "Project conflict");
+  expect(yield* refusal(run(f.api, "project.update", { ...update, requestId: freshRequest(), expectedHead: nextParent }))).toBe("Git: conflicts");
+  const state = (yield* run(f.api, "project.git.state", { worktreeId: f.worktreeId })).result;
+  expect(state.mergeHead).toBe(nextParent);
+  const conflict = (yield* run(f.api, "project.conflict", { worktreeId: f.worktreeId, path: "file.txt" })).result;
+  const chosen = (yield* run(f.api, "project.conflict.choose", { worktreeId: f.worktreeId, selection: conflict, hunk: 0, choice: "ours" })).result;
+  yield* run(f.api, "project.conflict.resolve", { worktreeId: f.worktreeId, selection: chosen });
+  expect((yield* run(f.api, "project.conflict.resolved", { worktreeId: f.worktreeId })).result.items).toContain("file.txt");
+  yield* run(f.api, "project.conflict.reopen", { worktreeId: f.worktreeId, path: "file.txt", expectedHead: state.head, expectedMergeHead: state.mergeHead });
+  expect((yield* run(f.api, "project.conflict", { worktreeId: f.worktreeId, path: "file.txt" })).result.choices).toEqual([null]);
+  yield* run(f.api, "project.merge.abort", { worktreeId: f.worktreeId, expectedHead: state.head, expectedMergeHead: state.mergeHead, confirmed: true });
+  expect((yield* run(f.api, "project.git.state", { worktreeId: f.worktreeId })).result.mergeHead).toBeNull();
+})).pipe(Effect.orDie));
+
+
+it.live("s4-git2: a send-back decision waits for the same workspace's in-flight owner approval", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  const original = GitProcesses.gitProcess;
+  let release!: () => void, entered!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const spy = vi.spyOn(GitProcesses, "gitProcess").mockImplementation(async (...args) => {
+    if (args[0] === rig.work && args[1].includes("merge") && !args[1].includes("--is-ancestor")) { entered(); await held; }
+    return original(...args);
+  });
+  yield* Effect.gen(function* () {
+    const merging = yield* approve(f, review).pipe(Effect.forkChild);
+    yield* Effect.promise(() => started);
+    const declining = yield* run(f.api, "project.review.decline", { worktreeId: f.worktreeId, projectId: f.projectId,
+      reviewId: review.reviewId, expectedHead: review.head, expectedBaseHead: review.baseHead, reason: "Please check the tests." }).pipe(Effect.result, Effect.forkChild);
+    yield* Effect.sleep(100);
+    expect(projectView(yield* snapshot).gitReviews[f.worktreeId]!.outcome).toBe("open");
+    release();
+    expect((yield* Fiber.join(merging)).result.outcome).toBe("merged");
+    expect((yield* Fiber.join(declining))._tag).toBe("Failure");
+  }).pipe(Effect.ensuring(Effect.sync(() => { release(); spy.mockRestore(); })));
+})).pipe(Effect.orDie));

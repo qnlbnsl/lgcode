@@ -321,6 +321,32 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     if (reply.code !== 0) throw processFailure(reply);
     return reply.stdout.trim();
   };
+  // Git retains the original unmerged stages in its resolve-undo index extension.
+  // Only the current merge can use them; never reconstruct from client content.
+  const resolvedConflicts = async (folder: string, signal: AbortSignal) => {
+    if (await mergeHead(folder, signal) === null) return list<string>([]);
+    const records = (await git(folder, ["ls-files", "--resolve-undo", "-z"], signal)).split("\0").filter(Boolean);
+    const paths = new Map<string, Set<string>>();
+    for (const record of records) {
+      const match = /^(100644|100755) ([0-9a-f]+) ([123])\t(.+)$/.exec(record);
+      if (match === null) continue;
+      const stages = paths.get(match[4]!) ?? new Set<string>();
+      stages.add(match[3]!); paths.set(match[4]!, stages);
+    }
+    const unresolved = new Set((await completeChanges(folder, signal)).filter((row) => row.conflict).map((row) => row.path));
+    const result: string[] = [];
+    for (const [path, stages] of paths) {
+      if (stages.size !== 3 || unresolved.has(path)) continue;
+      await filePath(folder, path);
+      result.push(path);
+    }
+    return list(result);
+  };
+  const expectedMerge = async (folder: string, expectedHead: string, expectedMergeHead: string, signal: AbortSignal) => {
+    const merging = await mergeHead(folder, signal);
+    if (merging === null) return fail("no_merge");
+    if (merging !== expectedMergeHead || await head(folder, signal) !== expectedHead) return fail("stale_state");
+  };
   const mainComparison = async (source: string, destination: string, signal: AbortSignal) => {
     const from = await repository(source, signal), to = await repository(destination, signal);
     if (from.commonDirectory !== to.commonDirectory || from.path === to.path) return fail("invalid_path");
@@ -455,20 +481,22 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const currentHead = await head(path, signal), currentBranch = await branch(path, signal);
       const upstreamReply = await run(path, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], signal);
       const upstreamName = upstreamReply.code === 0 ? upstreamReply.stdout.trim() : null;
-      let ahead = 0, behind = 0, pending = 0, pendingSince: string | null = null;
+      let ahead = 0, behind = 0, behindParent = 0, pending = 0, pendingSince: string | null = null;
       if (currentHead !== null && upstreamName !== null) {
         const counts = (await git(path, ["rev-list", "--left-right", "--count", `${await ref(path, upstreamName, signal)}...${currentHead}`, "--"], signal)).trim().split(/\s+/);
         behind = Number(counts[0]); ahead = Number(counts[1]);
       }
       if (currentHead !== null && target !== undefined) {
-        const range = `${await ref(path, target, signal)}..${currentHead}`;
+        const targetHead = await ref(path, target, signal);
+        behindParent = Number((await git(path, ["rev-list", "--count", `${currentHead}..${targetHead}`, "--"], signal)).trim());
+        const range = `${targetHead}..${currentHead}`;
         pending = Number((await git(path, ["rev-list", "--count", range, "--"], signal)).trim());
         if (pending > 0) {
           const dates = (await git(path, ["log", "--format=%cI", range, "--"], signal)).trim().split("\n");
           pendingSince = dates.reduce((oldest, date) => Date.parse(date) < Date.parse(oldest) ? date : oldest);
         }
       }
-      return { head: currentHead, branch: currentBranch, upstream: upstreamName, mergeHead: await mergeHead(path, signal), ahead, behind, pending, pendingSince };
+      return { head: currentHead, branch: currentBranch, upstream: upstreamName, mergeHead: await mergeHead(path, signal), ahead, behind, behindParent, pending, pendingSince };
     }),
     stage: (folder, requested) => withRepo(folder, async (path, signal) => {
       const change = (await completeChanges(path, signal)).find((change) => change.path === requested);
@@ -589,6 +617,22 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       if (ancestry.code === 1) return fail("git_failed");
       if (ancestry.code !== 0) throw processFailure(ancestry);
       return merged;
+    }),
+    abortMerge: (folder, expectedHead, expectedMergeHead, confirmed) => withRepo(folder, async (path, signal) => {
+      if (confirmed !== true) return fail("confirmation_required");
+      await expectedMerge(path, expectedHead, expectedMergeHead, signal);
+      await mutateGit(path, ["merge", "--abort"], signal);
+      if (await mergeHead(path, signal) !== null || await head(path, signal) !== expectedHead) return fail("stale_state");
+    }),
+    resolvedConflicts: (folder) => withRepo(folder, resolvedConflicts),
+    reopen: (folder, requested, expectedHead, expectedMergeHead) => withRepo(folder, async (path, signal) => {
+      await filePath(path, requested);
+      await expectedMerge(path, expectedHead, expectedMergeHead, signal);
+      const resolved = await resolvedConflicts(path, signal);
+      if (resolved.truncated) return fail("output_limit");
+      if (!resolved.items.includes(requested)) return fail("unsupported_conflict");
+      await mutateGit(path, ["checkout", "--conflict=diff3", "-m", "--", requested], signal);
+      await conflict(path, requested, signal);
     }),
     conflict: (folder, path, agentRead = false) => withRepo(folder, (base, signal) => {
       if (agentRead && isRepositoryCredentialPath(path)) return fail("invalid_path");
