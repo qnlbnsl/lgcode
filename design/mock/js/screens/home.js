@@ -7,6 +7,7 @@ import {
   agentsOfProject, byId, routeForRequest, STAGES,
 } from '../data.js';
 import * as act from '../actions.js';
+import * as board from '../live/board.js';
 import { RequestBlock, Avatar, Menu, Empty, StateWord } from '../ui.js';
 
 const KINDS = ['question', 'approval', 'merge', 'failed'];
@@ -148,7 +149,7 @@ export function ProjectTable({ s, projects, showRepo = true }) {
         <td class="num muted">${p.archived ? '—' : `${working} of ${ags.length}`}</td>
         <td class="muted">${machineOf(s, p.machine).name}</td>
         <td class="mono muted">${p.branch}</td>
-        <td style="text-align:right">${p.archived && html`<button type="button" class="btn sm" onClick=${(e) => { e.stopPropagation(); act.archiveProject(p.id, false); }}>Restore</button>`}</td>
+        <td style="text-align:right">${p.archived && html`<button type="button" class="btn sm" aria-busy=${board.busy('project:' + p.id)} disabled=${board.busy('project:' + p.id)} onClick=${(e) => { e.stopPropagation(); act.archiveProject(p.id, false); }}>Restore</button>`}</td>
       </tr>`;
     })}
     ${projects.length === 0 && html`<tr><td colspan="9" class="muted" data-empty>No project matches.</td></tr>`}</tbody></table>`;

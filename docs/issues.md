@@ -11068,7 +11068,179 @@ The service prints "socket path exceeds 100 bytes", but `serve --detach` discard
 The launcher reports only "lgtm: service failed to start".
 Running `node packages/engine/src/service.ts` directly shows the reason.
 
-## s2-chat-1. Live request cards used the mock's fixed permission options.
+## 627. The live board inferred sprint status from its phase.
+
+The first connection put a sprint into a column from its phase and completion time.
+The engine derives status from its completion text and task states.
+This change maps those four engine states and leaves Backlog empty.
+It also removes the mock's default priority, roadmap dates, and eight-phase progress from live board rendering.
+
+## 628. Project settings rendered values the engine does not store.
+
+The first connection supplied enabled test and review switches and a derived task prefix.
+The settings page also proposed a work assignment from the mock's model lists.
+This change leaves these live fields empty and keeps their actions on the explicit refusal.
+The lead's model and effort choices now come from the configuration read.
+
+## 629. A failed Git read hid independent task history.
+
+The new task detail read initially treated history and changed files as one successful operation.
+A refused Git read therefore hid history that the engine had returned.
+This change applies each successful read and shows the reason for each failed read.
+The browser fixture now registers a real temporary Git repository and its workspace settings.
+
+## 630. The sidebar did not refresh the owner's saved name.
+
+The connection originally read the owner's name only when it connected.
+Saving a display name during first run left the sidebar showing its old value.
+The connection now reads the settings again when their change arrives on the stream.
+
+## 631. The mock hides message post actions in a narrow panel.
+
+The existing message styles hide the post action buttons when the panel is narrower than 720 pixels.
+This also happens on a desktop when the sidebar and channel list reduce the panel width.
+The browser test uses a wide viewport to exercise those existing controls.
+Changing this layout remains outside this connection change.
+
+## 632. Generic dialogs closed before a live request finished.
+
+The mock's rename and confirmation dialogs close before their callbacks run.
+A live rename or archive therefore had no pending control and lost its draft on refusal.
+These dialogs now support waiting for a reply when the caller requests it.
+The connected project actions use this option.
+The standalone mock retains its immediate callbacks.
+
+## 633. Repository placeholders asserted that unknown data was absent.
+
+The repository page rendered a missing remote address as "None".
+Project settings rendered the same missing address as "No remote".
+The engine does not hold a remote address, so these statements were not supported by its records.
+The live fields now remain empty.
+The live repository description also omits the mock's promise that a lead will write it.
+
+## 634. The full browser check failed in three unchanged website cases.
+
+The full check at `04eb7aa` passed all TypeScript checks and all 528 test files.
+Its browser run passed the three Studio cases and failed three existing website cases.
+The Git staging case could not find the expected disabled "Commit 2 files" button after staging.
+The Git synchronization case retained "1 incoming" after Pull.
+The registered component preview case did not observe the expected document response.
+The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
+The result file records the baseline checks for these failures.
+
+## 635. A failed logout claimed that the engine had ended the session.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The connection treated every logout response as a confirmed session revocation.
+It now removes the records immediately and shows a persistent warning unless the engine confirms the logout.
+An older session probe could also restore the records after logout.
+Session attempts now invalidate older replies.
+
+## 636. Truncated snapshots left references to missing records.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The mapping retained requests whose agents were absent from the mapped roster.
+Other bounded lists could leave missing repositories, projects, teams, sprints, tasks, or request holders.
+The mapping now recovers agent membership from unambiguous retained evidence.
+It omits children with missing required parents and clears optional links to omitted records.
+It does not turn a missing request holder into an owner-held request.
+
+## 637. Account and configuration events left the website stale.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Four account and configuration event types advanced the subscription cursor without refreshing mapped records.
+Those events now request a fresh snapshot before advancing the cursor.
+Oversized event markers use the same refresh rule.
+
+## 638. Lifecycle updates kept the previous activity text.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+An agent could resume working while its activity still said that it was signed out.
+The connection now recomputes the display state with the contracts helper.
+
+## 639. Failed retries postponed the offline deadline.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Every failed attempt restarted the offline timer and claimed a new contact time.
+Retries now share one outage deadline.
+Only a successful connection or a received stream item updates the last contact time.
+
+## 640. Refused settings changes still displayed Saved.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The Saved indicator bypassed the store's refusal guard.
+Its write now passes through the guarded update function.
+
+## 641. Unconnected controls simulated successful service actions.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Reconnect now claimed success before the connection answered.
+Update checks, workflow checks, restarts, and harness scans also simulated successful work.
+The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
+Unconnected actions now show the required refusal notice before their simulation starts.
+Reconnect now leaves its status to the real connection.
+The standalone mock retains its simulation.
+
+## 642. The logout test supplied its own record cleanup.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The previous rendering test supplied an ended session and empty records itself.
+Its name now describes that limited assertion.
+New tests invoke the actual logout control through the real connection.
+They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## 643. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: open.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
+
+## 644. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.
+
+## 645. Live request cards used the mock's fixed permission options.
 
 The mock's compact approval card always offered its own Allow and Deny identifiers.
 A harness can send different identifiers and persistent options.
@@ -11076,13 +11248,13 @@ The live card now renders the engine's complete option list.
 The standalone mock keeps its original choices.
 The browser test answers a permission with a harness-specific identifier.
 
-## s2-chat-2. Reading an absent thread could write into the live store.
+## 646. Reading an absent thread could write into the live store.
 
 The mock's thread reader created an empty thread when none existed.
 Live threads are engine records, so that read now returns an empty list without writing.
 The live connection clears thread records when the owner session ends.
 
-## s2-chat-3. A snapshot refresh could skip queued conversation events.
+## 647. A snapshot refresh could skip queued conversation events.
 
 The live connection advanced its stream cursor when it published a refreshed snapshot.
 A lifecycle event could trigger a snapshot that already included later prompt and reply events.
@@ -11091,27 +11263,27 @@ The connection now advances the stream cursor only after processing each stream 
 The first snapshot still anchors the initial subscription.
 The browser test verifies that a sent prompt appears before any reload.
 
-## s2-chat-4. A fast session check could leave the page on its loading screen.
+## 648. A fast session check could leave the page on its loading screen.
 
 The store subscribed its rendering listener in a delayed effect.
 A fast session check and snapshot could publish before that listener existed.
 The store now subscribes in a layout effect, before browser responses can arrive.
 The browser journey checks a signed-in reload after live actions.
 
-## s2-chat-5. Context selection needs the registered worktree identity.
+## 649. Context selection needs the registered worktree identity.
 
 A team's worktree can also be the project's registered checkout.
 The live context picker now uses the engine's worktree identifiers from the project and team records.
 It maps the search reply's result before displaying tasks and files.
 The browser test attaches a task identity to a real prompt in a temporary Git repository.
 
-## s2-chat-6. Reads could start before the live connection was ready.
+## 650. Reads could start before the live connection was ready.
 
 Home could try its request and phone-offer reads before the transport became available.
 Home now starts those reads when the connection reports that it is live.
 A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.
 
-## s2-chat-7. Some supplied labels were still shown as identifiers.
+## 651. Some supplied labels were still shown as identifiers.
 
 The live composer showed an account identifier instead of its display name.
 Prompt context showed a task identifier instead of its available label.
@@ -11119,7 +11291,7 @@ The roster did not distinguish an agent whose task was under review.
 The open screens now read account names and map task labels and the Reviewing state.
 The account reader retains only the identifier, harness, and display name.
 
-## s2-chat-8. The live idle lane could claim that no work was assigned.
+## 652. The live idle lane could claim that no work was assigned.
 
 An idle agent can still own an active task.
 The mock's fallback reason said "Nothing assigned" for that agent.
@@ -11127,7 +11299,7 @@ The live lane now leaves the reason empty when the engine supplies no reason.
 The linked task remains visible.
 The standalone mock keeps its original wording.
 
-## s2-chat-9. The existing project-creation logout journey can time out.
+## 653. The existing project-creation logout journey can time out.
 
 Found: 2026-11-13, during the full remote check of `8577d48`.
 State: open.
@@ -11141,3 +11313,35 @@ A bounded five-run comparison at that baseline then produced four identical time
 The production web source, engine source, and affected test file are unchanged from that baseline.
 The cause remains unproved.
 The task result records the complete checks and baseline comparisons.
+
+## 654. The Nudge regression test still expected an unconnected control after the merge.
+
+Found: 2026-11-13, while merging the area branch into the chat worker branch.
+State: fixed in this merge.
+
+The area regression test expected Nudge to refuse before sending any request.
+The chat implementation connects Nudge to the engine's direct board post request.
+The merged test now checks that the request reaches the connection.
+It also checks that an engine refusal appears and leaves the local posts empty.
+The other unconnected controls keep their original refusal checks.
+
+## 655. The merged Messages module imported the live binding twice.
+
+Found: 2026-11-13, during the remote browser check of this merge.
+State: fixed in this merge.
+
+Both branches added the live binding to the Messages module's imports.
+Git kept both declarations when it merged the import lists.
+The browser rejected the module and left both the live page and the standalone mock blank.
+The test transformer accepted the declarations, so the Studio tests did not expose the error.
+Removing the redundant import lets the browser parse the module.
+
+## 656. The board mapping replaced worker names with role labels.
+
+Found: 2026-11-13, during the merged chat browser journey.
+State: fixed in this merge.
+
+The area board mapping replaced each worker's engine name with its role label.
+The chat roster needs the engine name to identify a worker and its controls.
+The merged mapping keeps worker names and retains the area's project lead and team lead labels.
+The browser journey checks the same worker in the blocked lane and the table.

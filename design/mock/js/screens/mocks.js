@@ -262,7 +262,7 @@ function ScreenView({ s, p, m, id }) {
       <section><p class="note">${sc.note}</p>
         <div class="row" style="flex-wrap:wrap">
           ${sc.status !== 'approved' && html`<button type="button" class="btn primary" onClick=${() => { update(() => { sc.status = 'approved'; for (const c of m.changes) if (c.screen === sc.id) c.seen = true; }); act.toast(`${sc.name} approved`); }}><${Icon} name="check" size=${14} />Approve</button>`}
-          <button type="button" class="btn ghost" onClick=${() => act.toast(`Opening ${sc.name} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${14} />Edit design</button></div></section>
+          <button type="button" class="btn ghost" onClick=${() => { if (act.refused()) return; act.toast(`Opening ${sc.name} in OpenPencil`); }}><${Icon} name="pencil-ruler" size=${14} />Edit design</button></div></section>
       <section class="mk-comments"><h3>Comments</h3>
         ${sc.comments.length === 0 && !sc.replying && html`<p class="muted" data-empty>No comments</p>`}
         <ol>${sc.comments.map((c, n) => { const a = c.from === 'owner' ? null : agentOf(s, c.from);

@@ -59,7 +59,8 @@ export function update(fn) {
 // preferences, the open dialog and the drafts, stays writable.
 export const ENGINE_OWNED = new Set([
   'session', 'conn', 'owner', 'machines', 'subscriptions', 'repos', 'projects', 'teams', 'agents', 'epics', 'sprints', 'tasks',
-  'phoneOffer', 'threads', 'pending', 'requests', 'channels', 'posts', 'worktrees', 'workflow', 'mocks', 'design', 'notifications', 'settings',
+  'phoneOffer', 'threads', 'pending',
+  'boardUnread', 'boardRevision', 'boardDetails', 'taskDetails', 'setupData', 'boardAgents', 'requests', 'channels', 'posts', 'worktrees', 'workflow', 'mocks', 'design', 'notifications', 'settings',
 ]);
 export const live = { on: false, refusedTurn: false, onRefuse: null };
 let engineWriting = false;

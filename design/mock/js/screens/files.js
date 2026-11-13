@@ -118,7 +118,7 @@ function CommitFile({ s, d }) {
   const w = byId(s.worktrees, d.wid); const name = d.path.split('/').pop();
   const [msg, setMsg] = useState(''); const [writing, setWriting] = useState(false);
   const ok = msg.trim().length > 0 && !writing;
-  const generate = () => { setWriting(true); setTimeout(() => { setWriting(false); setMsg(act.commitMessage([d.path])); }, 900); };
+  const generate = () => { if (act.refused()) return; setWriting(true); setTimeout(() => { setWriting(false); setMsg(act.commitMessage([d.path])); }, 900); };
   const submit = () => { if (!ok) return; act.closeDialog(); commitFile(d.wid, d.path, msg.trim()); };
   return html`<${Dialog} title=${'Commit ' + name} size="narrow" onClose=${act.closeDialog} onSubmit=${submit}
     foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!ok}><${Icon} name="check" size=${14} />Commit</button>`}>
@@ -211,7 +211,7 @@ export function FilesTab({ s, project, route }) {
     ${textFile && !readOnly && c && !isDirty && html`<button type="button" class="btn sm primary" aria-label="Commit" onClick=${() => act.openDialog({ type: 'commit-file', wid, path: sel })}><${Icon} name="git-commit-horizontal" size=${13} /><span class="fx-lbl">Commit</span></button>`}
     <${Menu} class="icon-btn" align="end" label="More" trigger=${html`<${Icon} name="ellipsis" size=${16} />`} width=${220}
       items=${[...(lines > 0 ? [{ label: 'Wrap long lines', checked: wrap, onSelect: () => setWrap(!wrap) }, { sep: true }] : []), { label: 'Copy path', icon: 'copy', onSelect: () => { navigator.clipboard?.writeText(sel).catch(() => {}); act.toast('Path copied'); } },
-        { label: 'Download', disabled: offline, onSelect: () => act.toast(`Downloading ${crumbs[crumbs.length - 1]} from ${m.name}`) }]} />
+        { label: 'Download', disabled: offline, onSelect: () => { if (act.refused()) return; act.toast(`Downloading ${crumbs[crumbs.length - 1]} from ${m.name}`); } }]} />
   </div>`;
 
   let body;
@@ -223,7 +223,7 @@ export function FilesTab({ s, project, route }) {
   else if (file.binary || file.size > TEXT_LIMIT) body = html`<div class="fx-state"><${Icon} name=${file.binary ? 'archive' : 'file-text'} size=${20} class="faint" />
       <strong>${file.binary ? 'Binary file' : 'Too large to show'} · ${fileSize(file.size)}</strong>
       <span>${file.binary ? 'It can be downloaded, not read here.' : `Files over ${fileSize(TEXT_LIMIT)} are downloaded, not shown.`}</span>
-      <button type="button" class="btn" onClick=${() => act.toast(`Downloading ${crumbs[crumbs.length - 1]} from ${m.name}`)}>Download</button></div>`;
+      <button type="button" class="btn" onClick=${() => { if (act.refused()) return; act.toast(`Downloading ${crumbs[crumbs.length - 1]} from ${m.name}`); }}>Download</button></div>`;
   else body = html`${busy && html`<p class="fx-busy"><${Icon} name="info" size=${13} />${worker.name} is working in this worktree. When you save, it is told which file you changed.</p>`}
     <${CodeEditor} key=${wid + ':' + file.path} doc=${shown} path=${file.path} wrap=${wrap} readOnly=${readOnly} onChange=${edit} onSave=${save} />`;
 

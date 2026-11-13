@@ -4,6 +4,7 @@ import * as chat from './live/chat.js';
 // engine is also reported to engine.js, under the RPC tag the real client API uses.
 import { store, update, notify, uid, remember, go, MIN, live, refuse, engineWrite } from './lib.js';
 import * as engine from './engine.js';
+import * as board from './live/board.js';
 import {
   agentOf, projectOf, teamOf, threadOf, openRequests, agentLabel, byId, tasksOfSprint, teamName, HARNESSES,
 } from './data.js';
@@ -20,13 +21,14 @@ export function toast(text, tone = 'ok') {
 // The notice is written directly, because every other change in a refused turn is dropped.
 export const NOT_CONNECTED = 'This is not connected to the service yet. Nothing was changed.';
 live.onRefuse = () => {
+  if (S().ui.saved) S().ui.saved = null;
   const id = uid('toast');
   S().toasts.push({ id, text: NOT_CONNECTED, tone: 'error' }); notify();
   setTimeout(() => { S().toasts = S().toasts.filter((t) => t.id !== id); notify(); }, 3600);
 };
 // True, after the notice, when the website is live and this action is not connected yet.
-function refused() { if (!live.on) return false; refuse(); return true; }
-export function openDialog(dialog) { update((s) => { s.dialog = dialog; }); }
+export function refused() { if (!live.on) return false; refuse(); return true; }
+export function openDialog(dialog) { if (['pair-machine', 'signin'].includes(dialog.type) && refused()) return; update((s) => { s.dialog = dialog; }); }
 export function closeDialog() { update((s) => { s.dialog = null; }); }
 // Asks before a destructive change. `onConfirm` runs only after the owner agrees.
 export function confirm({ title, body, lost = [], action, danger = true, onConfirm }) {
@@ -221,7 +223,7 @@ export function nameFromGoal(goal) {
   return name ? name[0].toUpperCase() + name.slice(1) : 'New project';
 }
 export function createProject({ repo, goal, machine, subscription, newRepo }) {
-  if (refused()) return;
+  if (live.on) return board.createProject({ repo, goal, machine, subscription, newRepo });
   const s = S();
   let repoId = repo;
   if (newRepo) {
@@ -255,7 +257,7 @@ export function createProject({ repo, goal, machine, subscription, newRepo }) {
   return id;
 }
 export function archiveProject(pid, archived = true) {
-  if (refused()) return;
+  if (live.on) return board.archiveProject(pid, archived);
   engine.call(archived ? 'archive' : 'restore', { projectId: pid });
   update((s) => {
     const p = projectOf(s, pid); p.archived = archived;

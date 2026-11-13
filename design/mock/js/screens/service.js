@@ -1,11 +1,12 @@
 // The service pages: Machines, Subscriptions, Phone notifications and Service settings,
 // plus one project's Settings tab and the Add repository dialog.
-import { html, useState, useEffect, Icon, cx, update, store, go, href, ago, clock, dayLabel, useNow, uid, plural, MIN, HOUR, DAY } from '../lib.js';
+import { html, useState, useEffect, Icon, cx, update, store, go, href, ago, clock, dayLabel, useNow, uid, plural, MIN, HOUR, DAY, live, refuse } from '../lib.js';
 import {
   HARNESSES, PERMISSION_MODES, KIND_LABEL, byId, projectOf, repoOf, agentOf, teamsOf, teamName, agentsOfTeam, agentsOfProject,
   machineOf, subOf, subLabel, agentStatus, routeForAgent, routeForRequest, openRequests, hasEffort, harnessOfModel, WORK_KINDS, proposeAssignment,
 } from '../data.js';
 import * as act from '../actions.js';
+import * as board from '../live/board.js';
 import { Avatar, Menu, Dialog, registerDialog, Empty, StateWord } from '../ui.js';
 
 // ---- seed ----------------------------------------------------------------------
@@ -54,7 +55,7 @@ const subAgents = (s, sid) => s.agents.filter((a) => a.subscription === sid && !
 
 let savedTimer = null;
 function markSaved() {
-  store.state.ui.saved = Date.now();
+  update((s) => { s.ui.saved = Date.now(); });
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => update((s) => { s.ui.saved = null; }), 1800);
 }
@@ -167,9 +168,9 @@ export function Machines({ s }) {
             <td class="svc-acts" onClick=${(e) => e.stopPropagation()}><${Menu} class="icon-btn sm" label=${'Actions for ' + m.name} align="end" width=${230} trigger=${html`<${Icon} name="ellipsis" size=${15} />`}
               items=${[
                 { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: `Rename ${m.name}`, value: m.name, taken: s.machines.map((x) => x.name), onRename: (v) => { update(() => { m.name = v; }); act.toast('Machine renamed'); } }) },
-                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.toast(`Scanned ${m.name}. Nothing changed.`) },
+                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => { if (act.refused()) return; act.toast(`Scanned ${m.name}. Nothing changed.`); } },
                 { label: 'Add repository', icon: 'folder-git-2', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.openDialog({ type: 'add-repository', machine: m.id }) },
-                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
+                off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { if (act.refused()) return; act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
                 { sep: true },
                 { label: 'Remove machine', icon: 'trash-2', danger: true, disabled: m.role === 'master', why: m.role === 'master' ? 'The master runs the service and cannot be removed.' : null, onSelect: () => remove(m) },
               ].filter(Boolean)} /></td>
@@ -214,22 +215,23 @@ registerDialog('pair-machine', PairMachine);
 // ---- add repository ------------------------------------------------------------
 function AddRepository({ s, d }) {
   const known = d.repo ? byId(s.repos, d.repo) : null;
-  const [machine, setMachine] = useState(d.machine || 'studio'); const m = machineOf(s, machine);
-  const [path, setPath] = useState(() => `${machineOf(s, d.machine || 'studio').workspace}/${known ? known.name : ''}`);
+  const [machine, setMachine] = useState(live.on ? 'local' : d.machine || 'studio'); const m = machineOf(s, machine);
+  const [path, setPath] = useState(() => `${machineOf(s, live.on ? 'local' : d.machine || 'studio').workspace}/${known ? known.name : ''}`);
   const [found, setFound] = useState(null);
   useEffect(() => { if (!known) return; setPath(`${m.workspace}/${known.name}`); }, [machine]);
   const name = path.replace(/\/+$/, '').split('/').pop() || '';
   const valid = /^(~|\/)/.test(path.trim()) && name && name !== '~' && path.trim() !== m.workspace;
   useEffect(() => {
-    setFound(null); if (!valid) return;
+    setFound(null); if (live.on || !valid) return;
     const t = setTimeout(() => setFound(known ? { main: known.main, remote: known.remote } : { main: 'main', remote: `github.com/acme/${name}` }), 700);
     return () => clearTimeout(t);
   }, [path, machine]);
   const id = act.slug(name); const dup = !known && s.repos.some((r) => r.id === id);
   const here = known ? known.folders[machine] : dup && byId(s.repos, id).folders[machine];
-  const why = m.status !== 'online' ? `${m.name} is offline.` : !valid ? 'Give the folder of a git repository.' : here ? `${name} is already on ${m.name}.` : !found ? 'Looking at the folder…' : null;
+  const why = m.status !== 'online' ? `${m.name} is offline.` : !valid ? 'Give the folder of a git repository.' : here ? `${name} is already on ${m.name}.` : !live.on && !found ? 'Looking at the folder…' : null;
   const add = () => {
     if (why) return;
+    if (live.on) return board.addRepository({ path, name, repo: known?.id, back: d.back });
     update((st) => { const r = known || (dup && byId(st.repos, id));
       if (r) r.folders[machine] = path.trim();
       else st.repos.push({ id, name, main: found.main, remote: found.remote, folders: { [machine]: path.trim() } });
@@ -239,16 +241,16 @@ function AddRepository({ s, d }) {
   };
   const close = () => (d.back ? act.openDialog(d.back) : act.closeDialog());
   return html`<${Dialog} title=${known ? `Add ${known.name} to a machine` : 'Add repository'} onClose=${close} onSubmit=${add}
-    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${close}>${d.back ? 'Back' : 'Cancel'}</button><button type="submit" class="btn primary" disabled=${!!why}>Add repository</button>`}>
+    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${close}>${d.back ? 'Back' : 'Cancel'}</button><button type="submit" class="btn primary" disabled=${!!why || (live.on && board.busy('add-repository'))} aria-busy=${live.on && board.busy('add-repository')}>${live.on && board.busy('add-repository') ? 'Adding…' : 'Add repository'}</button>`}>
     <div class="field"><label for="ar-machine">Machine</label>
       <select id="ar-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
-        ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
+        ${s.machines.filter((x) => !live.on || x.id === 'local').map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
     <div class="field"><label for="ar-path">Folder on ${m.name}</label>
       <input id="ar-path" class="input mono" value=${path} onInput=${(e) => setPath(e.target.value)} placeholder=${m.workspace + '/my-repository'} autofocus spellcheck="false" />
       <span class="hint">The folder must already be a git repository. LGTM Studio adds its worktrees under <code>.worktrees</code> inside it.</span></div>
     <dl class="dl svc-detected">
-      <dt>Base branch</dt><dd class="mono">${found ? found.main : html`<span class="faint">${valid ? 'Detecting…' : '—'}</span>`}</dd>
-      <dt>Remote</dt><dd class="mono" style="overflow-wrap:anywhere">${found ? (found.remote || 'No remote') : html`<span class="faint">${valid ? 'Detecting…' : '—'}</span>`}</dd>
+      <dt>Base branch</dt><dd class="mono">${found ? found.main : html`<span class="faint">${live.on ? '' : valid ? 'Detecting…' : '—'}</span>`}</dd>
+      <dt>Remote</dt><dd class="mono" style="overflow-wrap:anywhere">${found ? (found.remote || 'No remote') : html`<span class="faint">${live.on ? '' : valid ? 'Detecting…' : '—'}</span>`}</dd>
       <dt>Status</dt><dd>${found ? html`<span class="row success-text"><${Icon} name="circle-check" size=${14} />A git repository with a clean working tree</span>` : html`<span class="faint">—</span>`}</dd>
     </dl>
   <//>`;
@@ -341,7 +343,7 @@ function AddSubscription({ s }) {
     <div class="field"><label>Harness</label><${Seg} label="Harness" value=${harness} onChange=${setHarness} options=${Object.entries(HARNESSES).map(([id, x]) => ({ id, label: x.name }))} /></div>
     <div class="field"><label for="as-name">Name</label><input id="as-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Max" autofocus />${why && name.trim() ? html`<span class="error">${why}</span>` : html`<span class="hint">Shown as "${h.name} · ${name.trim() || 'Max'}".</span>`}</div>
     <div class="field"><label for="as-machine">Machine</label><select id="as-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
-      ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : ''}</option>`)}</select></div>
+      ${s.machines.filter((x) => !live.on || x.id === 'local').map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : ''}</option>`)}</select></div>
   <//>`;
 }
 registerDialog('add-subscription', AddSubscription);
@@ -392,7 +394,7 @@ export function Notifications({ s }) {
   const list = s.notifications; const unread = list.filter((n) => !n.read).length; const failed = list.filter((n) => n.delivery === 'failed').length;
   const [showAll, setShowAll] = useState(false); const shown = showAll ? list : list.slice(0, 12);
   const open = (n) => { update(() => { n.read = true; }); const r = n.request && byId(s.requests, n.request); if (r) go(routeForRequest(s, r)); else if (n.to) go(n.to); };
-  const retry = (n) => { act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
+  const retry = (n) => { if (act.refused()) return; act.toast('Sending again…'); setTimeout(() => { const ok = /\./.test(set.ntfyServer) && !/localhost/.test(set.ntfyServer); update(() => { n.delivery = ok ? 'sent' : 'failed'; }); act.toast(ok ? 'Sent to phone' : n.error, ok ? 'ok' : 'error'); }, 700); };
   const setOn = (k, v) => setS({ notifyOn: { ...set.notifyOn, [k]: v } });
   const setQuiet = (patch) => setS({ quiet: { ...set.quiet, ...patch } });
   let lastDay = null;
@@ -546,7 +548,7 @@ function WorkflowSettings({ s }) {
       <span class="row"><b style="font-weight:var(--weight-medium)">Build loop</b><span class="badge outline">Default</span></span><//>
     <${Row} label="Your overrides" id="wf-path" hint="Files here replace the default workflow for every repository." top>
       <span class="row"><input id="wf-path" class="input mono grow" value=${set.workflowPath} onInput=${(e) => setS({ workflowPath: e.target.value })} spellcheck="false" />
-        <button type="button" class="btn" onClick=${() => { setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
+        <button type="button" class="btn" onClick=${() => { if (act.refused()) return; setChecked('loading'); setTimeout(() => setChecked(Date.now()), 600); }}>${checked === 'loading' ? 'Checking…' : 'Check again'}</button></span>
       <ul class="svc-lines" style="margin-top:8px">
         <li><${Icon} name="circle" size=${14} class="faint" /><span class="mono">${set.workflowPath}/workflow.md</span><span class="muted">Not found. The default is used.</span></li>
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span class="mono">${set.workflowPath}/roles/reviewer.md</span><span class="muted">Replaces the Reviewer's instructions.</span></li>
@@ -576,7 +578,7 @@ function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
     <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGTM Studio ${set.version}</b><span class="tag">${set.commit}</span>
-      <button type="button" class="btn sm" onClick=${() => { setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
+      <button type="button" class="btn sm" onClick=${() => { if (act.refused()) return; setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
       ${chk === 'done' && html`<span class="row success-text" style="gap:4px;font-size:var(--text-sm)"><${Icon} name="check" size=${13} />Up to date</span>`}</span><//>
     <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? `Running on ${master.name}` : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
     <${Row} label="Data folder"><span class="mono">${set.dataFolder}</span><//>
@@ -584,7 +586,7 @@ function About({ s }) {
     <${Row} label="Licence"><span>Apache License 2.0</span><//>
     <${Row} label="Restart the service" hint="Agents keep their place. Web connections close and reconnect.">
       <button type="button" class="btn" onClick=${() => act.confirm({ title: 'Restart the service?', body: 'Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', action: 'Restart', danger: false,
-        onConfirm: () => { act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
+        onConfirm: () => { if (act.refused()) return; act.setConnection('reconnecting'); setTimeout(() => { act.setConnection('live'); act.toast('The service restarted'); }, 2400); } })}><${Icon} name="rotate-ccw" size=${13} />Restart</button><//>
   </div>`;
 }
 const SECTIONS = [
@@ -615,19 +617,23 @@ export function ServiceSettings({ s, route }) {
 export function ProjectSettings({ s, project: p }) {
   const r = repoOf(s, p); const m = machineOf(s, p.machine); const lead = agentOf(s, p.lead); const ags = agentsOfProject(s, p.id); const teams = teamsOf(s, p.id);
   const [goal, setGoal] = useState(p.goal);
+  useEffect(() => { if (live.on) void board.loadAgents([p.lead]); }, [p.id, p.lead]);
+  const choices = s.boardAgents?.[p.lead];
+  const projectBusy = live.on && board.busy('project:' + p.id);
+  const configBusy = live.on && board.busy('configure:' + p.lead);
   useEffect(() => setGoal(p.goal), [p.id]);
   const perms = [...new Set(ags.map((a) => a.permission))]; const perm = perms.length === 1 ? perms[0] : null;
-  const set = (patch) => { update(() => { Object.assign(p, patch); }); markSaved(); };
-  const branches = [...new Set([r.main, 'develop', 'release/next'])];
+  const set = (patch) => { if (live.on) { refuse(); return; } update(() => { Object.assign(p, patch); }); markSaved(); };
+  const branches = live.on ? [] : [...new Set([r.main, 'develop', 'release/next'])];
   const subs = s.subscriptions.filter((x) => x.machine === p.machine || x.id === lead.subscription);
   const running_ = ags.filter(running).length;
-  const rename = () => act.openDialog({ type: 'rename', title: 'Rename project', value: p.name, taken: s.projects.filter((x) => x.repo === p.repo).map((x) => x.name), note: 'The branch and the folder keep their names.', onRename: (v) => { update(() => { p.name = v; }); act.toast('Project renamed'); } });
-  const archive = () => act.confirm({ title: `Archive ${p.name}?`, body: 'The project leaves the sidebar and its agents stop. Its branch, worktrees and threads are kept, and you can restore it.', action: 'Archive project', danger: false,
+  const rename = () => act.openDialog({ type: 'rename', title: 'Rename project', waitForReply: live.on, value: p.name, taken: s.projects.filter((x) => x.repo === p.repo).map((x) => x.name), note: 'The branch and the folder keep their names.', onRename: (v) => { if (live.on) return board.renameProject(p.id, v); update(() => { p.name = v; }); act.toast('Project renamed'); } });
+  const archive = () => act.confirm({ title: `Archive ${p.name}?`, waitForReply: live.on, pendingLabel: 'Archiving…', body: 'The project leaves the sidebar and its agents stop. Its branch, worktrees and threads are kept, and you can restore it.', action: 'Archive project', danger: false,
     lost: [running_ ? `${plural(running_, 'running agent')} will stop` : null, openRequests(s, { project: p.id }).length ? `${plural(openRequests(s, { project: p.id }).length, 'open request')} will be hidden` : null].filter(Boolean),
-    onConfirm: () => { act.archiveProject(p.id); go('/r/' + r.id); } });
+    onConfirm: async () => { const reply = await act.archiveProject(p.id); if (!live.on || reply) go('/r/' + r.id); return reply; } });
   const del = () => act.confirm({ title: `Delete ${p.name}?`, body: 'This cannot be undone.', action: 'Delete project',
     lost: [`${plural(ags.length, 'agent')} and ${ags.length === 1 ? 'its thread' : 'their threads'}`, `${plural(1 + teams.length, 'worktree')} under ${p.folder}`, p.merged ? null : `The branch ${p.branch} and its unmerged commits`, `${plural(s.sprints.filter((x) => x.project === p.id).length, 'sprint')} and ${plural(s.tasks.filter((x) => x.project === p.id).length, 'task')}`].filter(Boolean),
-    onConfirm: () => { const id = p.id; go('/r/' + r.id);
+    onConfirm: () => { if (live.on) { refuse(); return; } const id = p.id; go('/r/' + r.id);
       update((st) => { const ch = new Set(st.channels.filter((c) => c.project === id).map((c) => c.id));
         for (const k of ['projects']) st[k] = st[k].filter((x) => x.id !== id);
         for (const k of ['agents', 'teams', 'sprints', 'tasks', 'requests', 'channels']) st[k] = st[k].filter((x) => x.project !== id);
@@ -635,47 +641,47 @@ export function ProjectSettings({ s, project: p }) {
       act.toast(`Deleted ${p.name}`); } });
   const signed = new Set(s.subscriptions.filter((x) => x.signedIn && x.enabled).map((x) => x.harness));
   const asg = p.assignment || { state: 'proposed', rows: proposeAssignment(s), changed: [] };
-  const saveAsg = (next) => { update(() => { p.assignment = next; }); markSaved(); };
+  const saveAsg = (next) => { if (live.on) { refuse(); return; } update(() => { p.assignment = next; }); markSaved(); };
   const setRow = (k, patch) => { const row = { ...asg.rows[k], ...patch };
     if (patch.harness) { row.model = HARNESSES[patch.harness].models[0]; }
     row.effort = hasEffort(row.harness, row.model) ? row.effort || 'Medium' : null;
     saveAsg({ ...asg, rows: { ...asg.rows, [k]: row }, changed: [...new Set([...(asg.changed || []), k])] }); };
-  const [allModel, setAllModel] = useState(() => asg.rows.Plan.model);
-  const applyAll = () => { const h = harnessOfModel(allModel); const rows = {}; for (const k of WORK_KINDS) rows[k] = { harness: h, model: allModel, effort: hasEffort(h, allModel) ? asg.rows[k].effort || 'Medium' : null };
+  const [allModel, setAllModel] = useState(() => live.on ? '' : asg.rows.Plan.model);
+  const applyAll = () => { if (live.on) { refuse(); return; } const h = harnessOfModel(allModel); const rows = {}; for (const k of WORK_KINDS) rows[k] = { harness: h, model: allModel, effort: hasEffort(h, allModel) ? asg.rows[k].effort || 'Medium' : null };
     saveAsg({ ...asg, rows, changed: [...WORK_KINDS] }); act.toast(`Every row uses ${allModel}`); };
   const approve = () => { saveAsg({ ...asg, state: 'approved' }); act.toast('Assignment approved. The project lead was told.'); };
-  const setPerm = (v) => { update((st) => { for (const a of st.agents) if (a.project === p.id) a.permission = v; }); markSaved(); };
-  const setTeam = (t, patch) => { update((st) => { for (const a of agentsOfTeam(st, t.id)) { if (patch.harness && patch.harness !== a.harness) { const hs = HARNESSES[patch.harness]; const sub = st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn && x.machine === p.machine) || st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn); a.harness = patch.harness; a.subscription = sub ? sub.id : a.subscription; a.model = hs.models[0]; a.effort = 'Medium'; } if (patch.model) a.model = patch.model; } if ('needToKnow' in patch) byId(st.teams, t.id).needToKnow = patch.needToKnow; }); markSaved(); };
-  return html`<div class="page svc-project">
+  const setPerm = (v) => { if (live.on) { refuse(); return; } update((st) => { for (const a of st.agents) if (a.project === p.id) a.permission = v; }); markSaved(); };
+  const setTeam = (t, patch) => { if (live.on) { refuse(); return; } update((st) => { for (const a of agentsOfTeam(st, t.id)) { if (patch.harness && patch.harness !== a.harness) { const hs = HARNESSES[patch.harness]; const sub = st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn && x.machine === p.machine) || st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn); a.harness = patch.harness; a.subscription = sub ? sub.id : a.subscription; a.model = hs.models[0]; a.effort = 'Medium'; } if (patch.model) a.model = patch.model; } if ('needToKnow' in patch) byId(st.teams, t.id).needToKnow = patch.needToKnow; }); markSaved(); };
+  return html`<div class="page svc-project" aria-busy=${projectBusy || configBusy}>
     <div class="page-head"><h1 class="page-title">Project settings</h1>${p.archived && html`<span class="badge">Archived</span>`}<${Saved} s=${s} /></div>
-    ${p.archived && html`<div class="callout" style="align-items:center;margin-bottom:var(--space-3);max-width:860px"><${Icon} name="archive" size=${15} /><span class="grow">This project is archived. Its agents are stopped.</span><button type="button" class="btn sm" onClick=${() => act.archiveProject(p.id, false)}><${Icon} name="archive-restore" size=${13} />Restore</button></div>`}
+    ${p.archived && html`<div class="callout" style="align-items:center;margin-bottom:var(--space-3);max-width:860px"><${Icon} name="archive" size=${15} /><span class="grow">This project is archived. Its agents are stopped.</span><button type="button" class="btn sm" aria-busy=${projectBusy} disabled=${projectBusy} onClick=${() => act.archiveProject(p.id, false)}><${Icon} name="archive-restore" size=${13} />Restore</button></div>`}
     <${Section} title="Project">
       <div class="svc-rows">
-        <${Row} label="Name"><span class="row"><b style="font-weight:var(--weight-medium)">${p.name}</b><span class="tag" data-tip="Task labels start with this">${p.prefix}</span><button type="button" class="btn sm" onClick=${rename}><${Icon} name="pencil" size=${12} />Rename</button></span><//>
+        <${Row} label="Name"><span class="row"><b style="font-weight:var(--weight-medium)">${p.name}</b><span class="tag" data-tip="Task labels start with this">${p.prefix}</span><button type="button" class="btn sm" disabled=${projectBusy} onClick=${rename}><${Icon} name="pencil" size=${12} />Rename</button></span><//>
         <${Row} label="Goal" id="ps-goal" hint="The project lead reads this at the start of every turn." top>
           <textarea id="ps-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)}></textarea>
-          ${goal.trim() !== p.goal && html`<span class="row" style="margin-top:6px"><button type="button" class="btn sm primary" disabled=${!goal.trim()} onClick=${() => { set({ goal: goal.trim() }); act.toast('Goal saved. The project lead was told.'); }}>Save goal</button><button type="button" class="btn sm ghost" onClick=${() => setGoal(p.goal)}>Discard</button></span>`}<//>
+          ${goal.trim() !== p.goal && html`<span class="row" style="margin-top:6px"><button type="button" class="btn sm primary" disabled=${!goal.trim() || projectBusy} aria-busy=${projectBusy} onClick=${() => { if (live.on) return board.saveGoal(p.id, goal.trim()); set({ goal: goal.trim() }); act.toast('Goal saved. The project lead was told.'); }}>Save goal</button><button type="button" class="btn sm ghost" onClick=${() => setGoal(p.goal)}>Discard</button></span>`}<//>
       </div>
     <//>
     <${Section} title="Repository and machine">
       <div class="svc-rows">
-        <${Row} label="Repository"><span class="row"><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a><span class="muted mono truncate">${r.remote || 'No remote'}</span></span><//>
+        <${Row} label="Repository"><span class="row"><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a><span class="muted mono truncate">${live.on ? r.remote : r.remote || 'No remote'}</span></span><//>
         <${Row} label="Base branch" id="ps-base" hint="Finished work merges into this branch, with your approval.">
           <select id="ps-base" class="select mono" style="width:300px" value=${p.base || r.main} onChange=${(e) => set({ base: e.target.value })}>${branches.map((b) => html`<option value=${b}>${b}${b === r.main ? ' (repository default)' : ''}</option>`)}</select><//>
         <${Row} label="Project branch"><span class="mono">${p.branch}</span><//>
         <${Row} label="Folder"><span class="mono" style="overflow-wrap:anywhere">${p.folder}</span><//>
         <${Row} label="Runs on" id="ps-machine" hint="New agents start here. Running agents stay where they are.">
           <select id="ps-machine" class="select" style="width:300px" value=${p.machine} onChange=${(e) => { const v = e.target.value; set({ machine: v, folder: `${r.folders[v]}/.worktrees/${p.branch.split('/').pop()}` }); }}>
-            ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online' || !r.folders[x.id]}>${x.name}${x.status !== 'online' ? ' (offline)' : !r.folders[x.id] ? ` (${r.name} is not on it)` : ''}</option>`)}</select>
+            ${s.machines.filter((x) => !live.on || x.id === 'local').map((x) => html`<option value=${x.id} disabled=${x.status !== 'online' || !r.folders[x.id]}>${x.name}${x.status !== 'online' ? ' (offline)' : !r.folders[x.id] ? ` (${r.name} is not on it)` : ''}</option>`)}</select>
           ${m.status !== 'online' && html`<span class="svc-err">${m.name} is offline.</span>`}<//>
         <${Row} label="Lead subscription" id="ps-sub" hint="The project lead runs on this subscription." top>
           <div class="svc-lead">
-            <select id="ps-sub" class="select" value=${lead.subscription} onChange=${(e) => { const x = subOf(s, e.target.value); update(() => { lead.subscription = x.id; if (lead.harness !== x.harness) { lead.harness = x.harness; lead.model = HARNESSES[x.harness].models[0]; lead.effort = hasEffort(x.harness, lead.model) ? 'High' : null; } }); markSaved(); }}>
+            <select id="ps-sub" class="select" value=${lead.subscription} onChange=${(e) => { if (live.on) { refuse(); return; } const x = subOf(s, e.target.value); update(() => { lead.subscription = x.id; if (lead.harness !== x.harness) { lead.harness = x.harness; lead.model = HARNESSES[x.harness].models[0]; lead.effort = hasEffort(x.harness, lead.model) ? 'High' : null; } }); markSaved(); }}>
               ${subs.map((x) => html`<option value=${x.id} disabled=${!x.signedIn}>${subLabel(s, x.id)}${!x.signedIn ? ' (signed out)' : x.usage ? ` · ${x.usage.pct}% used` : ''}</option>`)}</select>
-            <select class="select" aria-label="Lead model" value=${lead.model} onChange=${(e) => { const v = e.target.value; update(() => { lead.model = v; lead.effort = hasEffort(lead.harness, v) ? lead.effort || 'High' : null; }); markSaved(); }}>
-              ${HARNESSES[lead.harness].models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select>
-            ${hasEffort(lead.harness, lead.model)
-              ? html`<select class="select" aria-label="Lead effort" value=${lead.effort || 'High'} onChange=${(e) => { const v = e.target.value; update(() => { lead.effort = v; }); markSaved(); }}>${HARNESSES[lead.harness].efforts.map((x) => html`<option value=${x}>${x}</option>`)}</select>`
+            <select class="select" aria-label="Lead model" disabled=${configBusy} value=${lead.model} onChange=${(e) => { const v = e.target.value; if (live.on) return board.configureLead(p.lead, { model: v }); update(() => { lead.model = v; lead.effort = hasEffort(lead.harness, v) ? lead.effort || 'High' : null; }); markSaved(); }}>
+              ${(live.on ? choices?.models || [] : HARNESSES[lead.harness].models.map((id) => ({ id, label: id }))).map((mo) => html`<option value=${mo.id}>${mo.label}</option>`)}</select>
+            ${(live.on ? choices?.efforts.length > 0 : hasEffort(lead.harness, lead.model))
+              ? html`<select class="select" aria-label="Lead effort" disabled=${configBusy} value=${lead.effort || 'High'} onChange=${(e) => { const v = e.target.value; if (live.on) return board.configureLead(p.lead, { effort: v }); update(() => { lead.effort = v; }); markSaved(); }}>${(live.on ? choices?.efforts || [] : HARNESSES[lead.harness].efforts.map((id) => ({ id, label: id }))).map((x) => html`<option value=${x.id}>${x.label}</option>`)}</select>`
               : html`<span class="muted svc-noeffort">No effort setting</span>`}
           </div><//>
       </div>
@@ -686,13 +692,13 @@ export function ProjectSettings({ s, project: p }) {
           <${PermissionPicker} name="ps-perm" value=${perm} onChange=${setPerm} /><//>
         <${Row} label="Write tests first" hint="Tests are written before the code, and they must fail first."><${Switch} on=${p.tests === 'on'} label="Write tests first" onChange=${(v) => set({ tests: v ? 'on' : 'off' })} /><//>
         <${Row} label="Agent review" hint="Reviewers score each change in rounds before it reaches you."><${Switch} on=${p.agentReview === 'on'} label="Agent review" onChange=${(v) => set({ agentReview: v ? 'on' : 'off' })} /><//>
-        <${Row} label="Remove agent credits when merging" hint="Strips the co-author lines agents add to their commits."><${Switch} on=${p.removeCredits ?? s.settings.removeCredits} label="Remove agent credits when merging" onChange=${(v) => set({ removeCredits: v })} /><//>
+        <${Row} label="Remove agent credits when merging" hint="Strips the co-author lines agents add to their commits."><${Switch} on=${live.on ? false : p.removeCredits ?? s.settings.removeCredits} label="Remove agent credits when merging" onChange=${(v) => set({ removeCredits: v })} /><//>
       </div>
     <//>
-    <${Section} title="Assignment" sub=${asg.state === 'approved' ? 'Approved by you' : `Proposed by the project lead`}
+    <${Section} title="Assignment" sub=${live.on ? null : asg.state === 'approved' ? 'Approved by you' : `Proposed by the project lead`}
       action=${asg.state !== 'approved' && html`<button type="button" class="btn sm" onClick=${approve}><${Icon} name="check" size=${13} />Approve</button>`}>
       <div class="table-wrap svc-assign"><table class="table"><thead><tr><th>Work</th><th>Harness</th><th>Model</th><th>Effort</th></tr></thead>
-        <tbody>${WORK_KINDS.map((k) => { const row = asg.rows[k]; const h = HARNESSES[row.harness];
+        <tbody>${(live.on ? [] : WORK_KINDS).map((k) => { const row = asg.rows[k]; const h = HARNESSES[row.harness];
           return html`<tr key=${k} class=${cx(asg.changed?.includes(k) && 'changed')}>
             <td><b style="font-weight:var(--weight-medium)">${k}</b></td>
             <td><select class="select" aria-label=${k + ' harness'} value=${row.harness} onChange=${(e) => setRow(k, { harness: e.target.value })}>
@@ -704,7 +710,7 @@ export function ProjectSettings({ s, project: p }) {
       <div class="svc-assign-all row">
         <label for="ps-all" class="muted">Every row</label>
         <select id="ps-all" class="select" value=${allModel} onChange=${(e) => setAllModel(e.target.value)}>
-          ${Object.entries(HARNESSES).filter(([id]) => signed.has(id)).map(([id, x]) => html`<optgroup label=${x.name}>${x.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</optgroup>`)}</select>
+          ${Object.entries(HARNESSES).filter(([id]) => !live.on && signed.has(id)).map(([id, x]) => html`<optgroup label=${x.name}>${x.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</optgroup>`)}</select>
         <button type="button" class="btn sm" onClick=${applyAll}>Apply</button>
       </div>
     <//>
@@ -721,8 +727,8 @@ export function ProjectSettings({ s, project: p }) {
     <${Section} title="Archive or delete">
       <div class="svc-rows svc-danger">
         ${p.archived
-          ? html`<${Row} label="Restore this project" hint="It returns to the sidebar. Its agents stay stopped until you resume them."><button type="button" class="btn" onClick=${() => act.archiveProject(p.id, false)}><${Icon} name="archive-restore" size=${13} />Restore</button><//>`
-          : html`<${Row} label="Archive this project" hint="Stops its agents and hides it. Nothing is deleted."><button type="button" class="btn" onClick=${archive}><${Icon} name="archive" size=${13} />Archive</button><//>`}
+          ? html`<${Row} label="Restore this project" hint="It returns to the sidebar. Its agents stay stopped until you resume them."><button type="button" class="btn" aria-busy=${projectBusy} disabled=${projectBusy} onClick=${() => act.archiveProject(p.id, false)}><${Icon} name="archive-restore" size=${13} />Restore</button><//>`
+          : html`<${Row} label="Archive this project" hint="Stops its agents and hides it. Nothing is deleted."><button type="button" class="btn" disabled=${projectBusy} onClick=${archive}><${Icon} name="archive" size=${13} />Archive</button><//>`}
         <${Row} label="Delete this project" hint="Removes its agents, threads, worktrees and branch."><button type="button" class="btn danger" onClick=${del}><${Icon} name="trash-2" size=${13} />Delete</button><//>
       </div>
     <//>

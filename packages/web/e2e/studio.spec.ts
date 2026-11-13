@@ -16,14 +16,14 @@ import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { incarnationOf, makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
-import { agentCredential, appendSetup, eventOf, ownerCredential, success, call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
+import { seedAccount, harnessSettings, agentCredential, appendSetup, eventOf, ownerCredential, success, call, makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
 
 test.use({ actionTimeout: 10_000 })
 
-test("live website: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
+test("live chat: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
   test.setTimeout(90_000)
   const rig = makeRig()
   const previousHome = process.env.LGTM_HOME
@@ -293,6 +293,226 @@ test("live website: signs in through the engine, shows its real records, and kee
 })
 
 // design/mock still opens on its own, on its sample data, with its simulation and controls.
+test("live projects and board: signs in through the engine, shows its real records, and keeps the sample out", async ({ page }, info) => {
+  test.setTimeout(90_000)
+  page.setDefaultTimeout(5_000)
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  const rig = makeRig()
+  const previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
+  const password = randomBytes(32).toString("base64url")
+  const staticRoot = join(rig.root, "page")
+  mkdirSync(staticRoot)
+  writeFileSync(join(staticRoot, "index.html"), "<!doctype html><title>Current page</title><main>Current page</main>")
+  const errors: string[] = []
+  const violations: string[] = []
+  const timings: string[] = []
+  page.on("pageerror", (error) => errors.push(error.stack ?? error.message))
+  page.on("console", (message) => {
+    // The browser logs the engine's refusal of a signed-out session check and of a wrong
+    // password. Those refusals are expected here.
+    if (message.type() === "error" && !/status of 401/.test(message.text())) errors.push(message.text())
+    if (message.type() === "debug" && message.text().startsWith("LGTM Studio:")) timings.push(message.text())
+  })
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      (window as unknown as { violations?: string[] }).violations ??= []
+      ;(window as unknown as { violations: string[] }).violations.push(`${event.violatedDirective}: ${event.blockedURI}`)
+    })
+  })
+  try {
+    execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
+    execFileSync("git", ["-C", rig.work, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
+    const additionalRepo = join(rig.root, "additional-repository")
+    mkdirSync(additionalRepo)
+    execFileSync("git", ["-C", additionalRepo, "init", "-b", "main"], { stdio: "ignore" })
+    execFileSync("git", ["-C", additionalRepo, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
+    const studioRoot = await buildStudio(join(rig.root, "studio"))
+    const port = await unusedPort()
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const runner = yield* makeFakeRunner()
+      runner.script("choices", () => Effect.succeed({ models: { source: "negotiated", options: [{ id: "test-model", label: "Test model" }, { id: "model-next", label: "Next model" }] }, efforts: { source: "negotiated", options: [{ id: "high", label: "High" }, { id: "medium", label: "Medium" }] } }))
+      const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, {
+        redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text)
+      }))
+      yield* Effect.scoped(Effect.gen(function* () {
+        yield* registerRebuildCheck()
+        const project = yield* decisionSetup()
+        yield* appendSetup([eventOf({ _tag: "project.RepositoryAdded", repoId: project.repoId, name: "Repository", path: rig.work }),
+          eventOf({ _tag: "project.RepositoryLocated", repoId: project.repoId, machineId: "local", path: rig.work }),
+          eventOf({ _tag: "project.WorktreeCreated", repoId: project.repoId, worktreeId: project.worktreeId,
+          branch: "main", path: rig.work, machineId: "local", checkout: "main" })])
+        const taskId = success(yield* call(ownerCredential, "project.task.create", { ...project.task, title: "Engine task", label: "TK-1" })).taskId
+        success(yield* call(ownerCredential, "project.task.note", { projectId: project.projectId, taskId, title: "Recorded note", detail: "Actual engine history" }))
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
+        yield* seedAccount("studio-ready", "cursor")
+        success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
+        success(yield* call(ownerCredential, "accounts set-secret", { accountId: "studio-ready", name: "CURSOR_API_KEY", nonce: "studio-browser", value: Redacted.make("synthetic-studio-browser-key") }))
+        const channelId = success(yield* call(ownerCredential, "board.open", { name: "project-updates" })).channelId
+        success(yield* call(ownerCredential, "board.members", { channelId, add: [project.workerId], remove: [] }))
+        success(yield* call(project.workerCredential, "board.post", { channelId, text: "Engine board post", to: [{ _tag: "owner" }], reply: "none" }))
+        yield* completedSetup(project.projectId)
+        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
+          settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          // The current page keeps working at the root, and /studio is sent to /studio/.
+          await page.goto(origin)
+          await expect(page).toHaveTitle("Current page")
+          await page.goto(`${origin}/studio`)
+          await expect(page).toHaveURL(`${origin}/studio/`)
+
+          // A signed-out visitor sees the Login page, and a wrong password is refused.
+          await expect(page.locator("#login-password")).toBeVisible()
+          await page.locator("#login-password").fill("not the password")
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          await expect(page.getByText("That password is wrong. Nothing was signed in.")).toBeVisible()
+
+          await page.locator("#login-password").fill(password)
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          const sidebar = page.locator(".sidebar")
+          await expect(sidebar.locator(".tree-row.repo")).toContainText("Repository")
+          await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
+          await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
+          for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
+
+          // The project's lead and its team come from the engine.
+          await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/agents`)
+          await expect(page.locator(".main")).toContainText("Build")
+          await expect(page.locator(".main")).toContainText("Project lead")
+          await expect(page.locator(".topbar")).toContainText("Project")
+        })
+
+        // A change in the engine reaches the open page through the stream.
+        yield* call(project.leadCredential, "project.sprint.create", { projectId: project.projectId, label: "SP-2",
+          name: "Pushed sprint", goal: "Arrive on the stream", phase: "Plan", owner: project.leadId, needs: [] })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          const sidebar = page.locator(".sidebar")
+          await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/board`)
+          await expect(page.locator(".main")).toContainText("Pushed sprint")
+          await expect(page.locator('[aria-label="Backlog"] .sprint-card')).toHaveCount(0)
+          await expect(page.locator('[aria-label="Planned"]')).toContainText("Pushed sprint")
+          await expect(page.locator('[aria-label="In progress"]')).toContainText("Sprint")
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/sprint/${project.sprintId}`)
+          await expect(page.locator(".tk")).toContainText("Engine task")
+          await page.getByRole("button", { name: "Add task", exact: true }).click()
+          await page.getByRole("textbox", { name: "Task title" }).fill("Owner added task")
+          await page.getByRole("button", { name: "Add", exact: true }).click()
+          await expect(page.locator(".tk")).toContainText("Owner added task")
+          await page.getByRole("row").filter({ hasText: "Engine task" }).click()
+          await expect(page.locator(".page-title")).toHaveText("Engine task")
+          await expect(page.locator(".main")).toContainText(rig.work)
+          await expect(page.locator(".timeline")).toContainText("Recorded note")
+          await expect(page.locator(".main")).toContainText(rig.work)
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/team/${project.team.teamId}`)
+          await expect(page.getByRole("link", { name: "Team channel", exact: true })).toBeVisible()
+          await expect(page.locator(".main")).toContainText("Owner added task")
+          await page.goto(`${origin}/studio/#/r/${project.repoId}`)
+          await expect(page.locator(".repo-facts")).toContainText(rig.work)
+          await expect(page.locator(".repo-facts dt").filter({ hasText: "Remote" }).locator("+ dd")).toBeEmpty()
+          await expect(page.locator(".repo-desc p")).toHaveCount(0)
+          await expect(page.locator(".main .table")).toContainText("Project")
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/messages/waiting`)
+          await expect(page.locator(".ch-row").filter({ hasText: "project-updates" }).locator(".count.info")).toHaveText("1")
+          await page.locator(".ch-row").filter({ hasText: "project-updates" }).click()
+          await expect(page.locator(".mb-stream")).toContainText("Engine board post")
+          await expect(page.locator(".ch-row").filter({ hasText: "project-updates" }).locator(".count.info")).toHaveCount(0)
+          const composer = page.locator(".mb-stream .board-composer")
+          await composer.locator("textarea").fill("Owner board post")
+          await composer.getByRole("button", { name: "Post", exact: true }).click()
+          const posted = page.locator(".mb-stream .post").filter({ hasText: "Owner board post" })
+          await expect(posted).toBeVisible()
+          await expect(posted).toContainText("Needs reply")
+          await posted.hover()
+          await posted.getByRole("button", { name: "Mark as answered", exact: true }).click()
+          await expect(posted).toContainText("Withdrawn")
+          await posted.hover()
+          await posted.getByRole("button", { name: "Reopen", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          const original = page.locator(".mb-stream .post").filter({ hasText: "Engine board post" })
+          await original.hover()
+          await original.getByRole("button", { name: "Reply in thread", exact: true }).click()
+          const thread = page.getByRole("complementary", { name: "Thread", exact: true })
+          await thread.locator("textarea").fill("Owner thread reply")
+          await thread.getByRole("button", { name: "Post", exact: true }).click()
+          await expect(thread).toContainText("Owner thread reply")
+          await page.getByRole("button", { name: "Close thread", exact: true }).click()
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/settings`)
+          await page.locator("#ps-goal").fill("An edited engine goal")
+          await page.getByRole("button", { name: "Save goal", exact: true }).click()
+          await expect(page.getByRole("button", { name: "Save goal", exact: true })).toHaveCount(0)
+          await page.getByRole("button", { name: "Rename", exact: true }).click()
+          await page.locator("#rename-field").fill("Renamed project")
+          await page.getByRole("dialog").getByRole("button", { name: "Rename", exact: true }).click()
+          await expect(sidebar.locator(".tree-row.project").filter({ hasText: "Renamed project" })).toBeVisible()
+          await page.getByRole("combobox", { name: "Lead model", exact: true }).selectOption("model-next")
+          await expect(page.getByRole("combobox", { name: "Lead model", exact: true })).toHaveValue("model-next")
+          await page.getByRole("combobox", { name: "Lead effort", exact: true }).selectOption("medium")
+          await expect(page.getByRole("combobox", { name: "Lead effort", exact: true })).toHaveValue("medium")
+          await page.getByRole("button", { name: "Archive", exact: true }).click()
+          await page.getByRole("dialog").getByRole("button", { name: "Archive project", exact: true }).click()
+          await expect(page).toHaveURL(new RegExp("#/r/"))
+          await page.goto(`${origin}/studio/#/projects`)
+          await page.getByRole("button", { name: /^Archived/ }).click()
+          await expect(page.locator(".main .table")).toContainText("Renamed project")
+          await page.getByRole("button", { name: "Restore", exact: true }).click()
+          await expect(page.getByRole("button", { name: "Restore", exact: true })).toHaveCount(0)
+          await page.goto(`${origin}/studio/#/machines`)
+          await page.getByRole("button", { name: /^Show details for / }).click()
+          await page.getByRole("button", { name: "Add repository", exact: true }).click()
+          await expect(page.locator("#ar-machine option")).toHaveCount(1)
+          await page.locator("#ar-path").fill(additionalRepo)
+          await page.getByRole("dialog").getByRole("button", { name: "Add repository", exact: true }).click()
+          await expect(sidebar.locator(".tree-row.repo").filter({ hasText: "additional-repository" })).toBeVisible()
+          await page.goto(`${origin}/studio/#/projects`)
+          await page.locator(".main").getByRole("button", { name: "New project", exact: true }).click()
+          await expect(page.locator("#np-machine option")).toHaveCount(1)
+          await page.locator("#np-repo").selectOption({ label: "additional-repository" })
+          await page.locator("#np-goal").fill("Build owner creation")
+          await page.getByRole("button", { name: "Create project", exact: true }).click()
+          await expect(page.locator(".topbar")).toContainText("Owner creation")
+          await page.locator(".sidebar").getByRole("button", { name: "New project", exact: true }).click()
+          await page.locator("#np-repo").selectOption({ label: "additional-repository" })
+          await page.locator("#np-goal").fill("Build owner creation")
+          await page.getByRole("button", { name: "Create project", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("project name already exists in this repository")
+          await expect(page.locator("#np-goal")).toHaveValue("Build owner creation")
+          await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click()
+          await page.locator(".sidebar").getByRole("button", { name: "New project", exact: true }).click()
+          await page.locator("#np-repo").selectOption("__new")
+          await page.locator("#np-newrepo").fill("browser-new-repository")
+          await page.locator("#np-goal").fill("Build nested board")
+          await page.getByRole("button", { name: "Create project", exact: true }).click()
+          await expect(page.locator(".topbar")).toContainText("Nested board")
+          await expect(sidebar.locator(".tree-row.repo").filter({ hasText: "browser-new-repository" })).toBeVisible()
+          await expect.poll(() => timings.some((line) => line.includes("first pushed update") && line.includes("after the engine recorded it"))).toBe(true)
+          await page.goto(`${origin}/studio/#/home`)
+
+          // A reload keeps the session, which is the engine's cookie.
+          await page.reload()
+          await expect(sidebar.locator(".tree-row.project").filter({ hasText: "Renamed project" })).toBeVisible()
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(2)
+
+          // Logging out ends the session and leaves no records on the page.
+          await page.getByRole("button", { name: "Log out" }).click()
+          await expect(page.locator("#login-password")).toBeVisible()
+          await expect(page.locator(".tree-row")).toHaveCount(0)
+        })
+      })).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
+    })).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<void, unknown, never>)
+    expect(await page.evaluate(() => (window as unknown as { violations?: string[] }).violations ?? [])).toEqual([])
+    expect(errors).toEqual([])
+    info.annotations.push({ type: "timing", description: timings.join("; ") })
+    console.log(timings.join("\n"))
+  } finally {
+    if (errors.length) console.log("PAGE ERRORS", errors)
+    if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome
+    removeRig(rig)
+  }
+})
+
+// design/mock still opens on its own, on its sample data, with its simulation and controls.
 test("design mock: still opens on its sample data with no console error", async ({ page }) => {
   const { createServer } = await import("node:http")
   const { readFile } = await import("node:fs/promises")
@@ -319,7 +539,7 @@ test("design mock: still opens on its sample data with no console error", async 
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     await expect(page.locator(".sidebar")).toContainText("lgtm-studio")
     await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(1)
-    for (const route of ["/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
+    for (const route of ["/projects", "/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/sprint/sp1", "/p/console/task/t15", "/p/console/team/console-shell", "/p/console/messages", "/p/console/settings", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
       await page.goto(`${origin}/mock/#${route}`)
       await expect(page.locator(".main")).toBeVisible()
     }
@@ -333,4 +553,73 @@ test("design mock: still opens on its sample data with no console error", async 
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     expect(errors).toEqual([])
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
+})
+
+// An empty engine takes the owner through discovery and an existing repository, then
+// starts exactly one lead through the fake runner and persists positive completion.
+test("live first run: saves settings, registers the existing folder and creates the first project", async ({ page }) => {
+  test.setTimeout(90_000)
+  page.setDefaultTimeout(5_000)
+  const rig = makeRig(), previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
+  const password = randomBytes(32).toString("base64url"), errors: string[] = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  page.on("console", (message) => { if (message.type() === "error" && !/status of 401/.test(message.text())) errors.push(message.text()) })
+  try {
+    execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
+    execFileSync("git", ["-C", rig.work, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
+    const studioRoot = await buildStudio(join(rig.root, "studio")), staticRoot = join(rig.root, "old-page"), port = await unusedPort()
+    mkdirSync(staticRoot); writeFileSync(join(staticRoot, "index.html"), "<!doctype html><title>Old page</title>")
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const runner = yield* makeFakeRunner()
+      const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, {
+        redact: (event) => Effect.succeed(event), redactText: (text) => Effect.succeed(text)
+      }))
+      yield* Effect.scoped(Effect.gen(function* () {
+        yield* registerRebuildCheck()
+        yield* seedAccount("setup-ready", "cursor")
+        success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", {
+          adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }]
+        }) }))
+        success(yield* call(ownerCredential, "accounts set-secret", { accountId: "setup-ready", name: "CURSOR_API_KEY", nonce: "studio-setup", value: Redacted.make("synthetic-studio-setup-key") }))
+        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
+          settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* Effect.promise(async () => {
+          const origin = `http://127.0.0.1:${port}`
+          await page.goto(`${origin}/studio/`)
+          await page.locator("#login-password").fill(password)
+          await page.getByRole("button", { name: "Sign in", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Connect a subscription", exact: true })).toBeVisible()
+          await expect(page.locator(".auth-options")).toContainText("local-credential")
+          await expect(page.locator(".auth-options")).not.toContainText("WXKP-3QHD")
+          await page.getByRole("button", { name: "Skip setup", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await page.locator("#setup-workspace").fill(rig.root)
+          await page.locator("#setup-shell").fill("bash")
+          await page.locator("#setup-owner").fill("Setup Owner")
+          await page.getByRole("button", { name: "Continue", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Add a repository", exact: true })).toBeVisible()
+          await page.locator("#setup-path").fill(rig.work)
+          await page.getByRole("button", { name: "Continue", exact: true }).click()
+          await expect(page.getByRole("heading", { name: "Start the first project", exact: true })).toBeVisible()
+          await page.locator("#setup-goal").fill("Build a first board")
+          await page.getByRole("button", { name: "Create project", exact: true }).click()
+          await expect(page.locator(".topbar")).toContainText("First board")
+          await expect(page.locator(".sidebar")).toContainText("Setup Owner")
+          await page.reload()
+          await expect(page.locator(".topbar")).toContainText("First board")
+          await expect(page.locator(".auth.setup")).toHaveCount(0)
+        })
+        const setup = success(yield* call(ownerCredential, "project.setup", {})).setup
+        expect(setup.completedAt).toBeDefined()
+        expect(runner.calls.filter((row) => row.method === "start")).toHaveLength(1)
+        const settings = success(yield* call(ownerCredential, "project.settings", {})).settings
+        expect(settings).toMatchObject({ workspaceFolder: rig.root, shell: "bash", displayName: "Setup Owner" })
+      })).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
+    })).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<void, unknown, never>)
+    expect(errors).toEqual([])
+  } finally {
+    if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome
+    removeRig(rig)
+  }
 })
