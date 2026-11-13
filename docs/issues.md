@@ -11834,3 +11834,11 @@ The same case passed immediately when run by itself.
 No project push implementation was changed in this work.
 The final full check determines whether the failure repeats.
 The initial output is retained in the worker's result artifacts.
+
+## s5-workflows-5. Serializing a reply before redaction missed secrets with escaped characters.
+
+The first workflow reply sanitizer redacted the serialized JSON string.
+A registered secret containing a newline or quote was escaped before the sanitizer could match it.
+The new regression test failed on that assertion.
+The handler now redacts each string value before serialization.
+The regression test and authenticated workflow API tests pass.

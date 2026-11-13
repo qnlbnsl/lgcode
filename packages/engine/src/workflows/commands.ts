@@ -26,7 +26,12 @@ const handler = (operation: string): ReadHandler => (input: Input, payload: Reco
     }, catch: (error) => refused(error instanceof Error && !('code' in error) ? error.message : 'The workflow file is unavailable, unsafe, or already exists.'),
   })
   // Workflow text is owner-authored file data, and can contain a registered secret.
-  const clean = yield* input.runtime.log.redactText(JSON.stringify(result))
-  return { reply: { requestId: payload.requestId, ...JSON.parse(clean) } }
+  const clean = (value: unknown): Effect.Effect<unknown> => {
+    if (typeof value === 'string') return input.runtime.log.redactText(value)
+    if (Array.isArray(value)) return Effect.forEach(value, clean)
+    if (value !== null && typeof value === 'object') return Effect.forEach(Object.entries(value), ([key, item]) => clean(item).pipe(Effect.map((text) => [key, text] as const))).pipe(Effect.map(Object.fromEntries))
+    return Effect.succeed(value)
+  }
+  return { reply: { requestId: payload.requestId, ...((yield* clean(result)) as Record<string, unknown>) } }
 })
 export const workflowReads = Object.fromEntries(['list', 'read', 'clone', 'save', 'validate', 'delete'].map((action) => [`client.workflows.${action}`, handler(action)]))
