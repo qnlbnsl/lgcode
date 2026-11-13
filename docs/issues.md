@@ -12045,3 +12045,18 @@ The repository-wide guard found three new test files without their rebuild regis
 The files that open an event log now register a scoped rebuild comparison.
 The process-only and filesystem-only files register the no-log form.
 The follow-up includes the repository guard and the harness tests.
+
+## s5-harnesses-21. The service journey still looked for permission settings on Harnesses.
+
+The review restored the default permission picker to Service settings.
+The existing browser helper still looked for it on Harnesses.
+The helper now verifies model persistence on Harnesses before checking permission persistence in Service settings.
+The separate Harnesses journey also verifies the restored location.
+
+## s5-harnesses-22. The admin browser journey intermittently misses token clearing.
+
+The full browser run passed 50 journeys and failed two journeys.
+The admin journey failed while waiting for its token-cleared label.
+An immediate isolated rerun passed without a source change.
+This matter remains open because notifications are outside this builder's assignment.
+The other failure was the permission-picker test location recorded above.
