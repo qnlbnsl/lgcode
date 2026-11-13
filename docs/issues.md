@@ -11764,3 +11764,41 @@ The fix for issue 668 treated a harness's description as the command whenever th
 A request without its source event, such as a row on Home, then turned "Run Studio checks" into 'Run "Run" in the terminal'.
 The description now stands in for the command only when the engine marks the input as cut.
 A unit test covers the plain-word case.
+
+## 684. Service settings shows no models for any harness.
+
+The owner reported this on 2026-11-13.
+The owner changed the default harness to Claude on "Service settings" and saw no models.
+The same happened for the other two harnesses.
+The engine's harness list carries an empty model list for every harness.
+The engine learns a harness's models only from a running agent, through `client.agent.configuration`.
+The page therefore has nothing to offer before an agent of that harness runs.
+The page also does not say why the list is empty.
+A fix needs the engine to ask a harness for its models without a running agent.
+This is not fixed.
+
+## 685. The Messages tab shows no board on a project without teams.
+
+The owner reported this on 2026-11-13.
+The project "Connect website engine" has a lead and no team.
+The engine opens a channel for each team, so this project has no channel and no posts.
+The tab shows "No channels yet", which is what the engine holds.
+The owner expected to see a message board.
+Whether a project gets a channel from its first day is the owner's decision.
+This is not changed.
+
+## 686. The Mocks tab is absent on a project without mocks.
+
+The owner reported this on 2026-11-13.
+The live website shows the "Mocks" tab only when a project is in its design stage or has a recorded mock.
+The project "Connect website engine" has neither, so the tab is not shown.
+The mock behaves the same way with its sample data.
+Whether the tab should always show, with an empty state, is the owner's decision.
+This is not changed.
+
+## 687. The owner judged Subscriptions and Service settings unfinished.
+
+The owner reported this on 2026-11-13.
+The owner said that "Service settings" needs a lot of work and is acceptable for now.
+The owner said that "Subscriptions" needs work before a release.
+The owner did not yet say what is missing on either page.

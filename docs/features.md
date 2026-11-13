@@ -930,3 +930,35 @@ The owner asked on 2026-11-13 for an approval card to say what is being attempte
 The live website can name only the program, because a harness reports the command and not the reason.
 The engine could ask the requesting agent for one sentence of intent, or take it from the agent's last message before the tool call.
 The card would then show that sentence as its summary.
+
+## One Harnesses page in place of harness settings and Subscriptions
+
+The owner asked for this on 2026-11-13.
+One page lists every harness.
+Each harness shows its accounts and subscriptions.
+A button on a harness adds another account or subscription.
+Adding an account checks whether the harness is installed.
+A harness that is not installed shows its install script and is installed from the page.
+"Subscriptions" then leaves the left navigation.
+
+## A harness installer
+
+The owner asked for this on 2026-11-13.
+LGTM Studio installs a missing harness by itself.
+The page shows the install script before it runs.
+
+## Notifications with more than one kind of delivery
+
+The owner asked for this on 2026-11-13.
+"Phone notifications" is renamed "Notifications".
+Delivery kinds are added, starting with email and ntfy, and others may follow.
+Email is sent through the user's own mail account, with the user's own credentials or key.
+LGTM Studio's maker never sends the email.
+
+## A Workflows tab with a visual editor
+
+The owner asked for this on 2026-11-13.
+The build loop is shown in a "Workflows" tab.
+A user sees the default workflow as a picture.
+A user clones it and changes the copy in a visual editor.
+A user can also make a workflow from nothing.
