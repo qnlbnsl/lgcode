@@ -63,7 +63,8 @@ describe("stream state (findings 3 and 4)", () => {
     const snapshot = { ...engineSnapshot, agents: engineSnapshot.agents.map((a) => a.agentId === "ag-lead" ? { ...a, state: { _tag: "paused", reason: "signed-out", midTurn: false }, displayedState: "Signed out" } : a) } as ClientSnapshot
     const h = harness({ snapshot, items: [{ sequence: 43, occurredAt: 1, event: { _tag: "StateChanged", agentId: "ag-lead", state: { _tag: "working" } } }] })
     await vi.waitFor(() => expect(h.state.agents?.[0]?.state).toBe("working"))
-    expect(h.state.agents?.[0]?.activity).toBe("")
+    // The board mapping shows the recomputed label. The stale one must be gone.
+    expect(h.state.agents?.[0]?.activity).toBe("Working")
   })
 })
 

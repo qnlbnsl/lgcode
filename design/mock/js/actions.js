@@ -27,7 +27,7 @@ live.onRefuse = () => {
 };
 // True, after the notice, when the website is live and this action is not connected yet.
 export function refused() { if (!live.on) return false; refuse(); return true; }
-export function openDialog(dialog) { if (['pair-machine', 'add-repository', 'signin'].includes(dialog.type) && refused()) return; update((s) => { s.dialog = dialog; }); }
+export function openDialog(dialog) { if (['pair-machine', 'signin'].includes(dialog.type) && refused()) return; update((s) => { s.dialog = dialog; }); }
 export function closeDialog() { update((s) => { s.dialog = null; }); }
 // Asks before a destructive change. `onConfirm` runs only after the owner agrees.
 export function confirm({ title, body, lost = [], action, danger = true, onConfirm }) {

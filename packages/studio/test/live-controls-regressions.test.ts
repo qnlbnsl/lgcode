@@ -1,3 +1,4 @@
+import * as board from "../src/board.ts"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { Client, connect } from "@lgtm/client/browser"
 import * as Effect from "effect/Effect"
@@ -22,14 +23,14 @@ beforeAll(async () => { website = await import("../../../design/mock/js/app.js" 
 afterEach(() => { website.unmount(element); element.remove() })
 async function mount(route: string, connection?: LiveConnection, records = mapSnapshot(engineSnapshot, 1)) {
   const calls: string[] = []
-  connection ??= {
-    kind: "engine", label: "test engine", call(tag) { calls.push(tag) }, push() {},
+  const live: LiveConnection = connection ?? {
+    kind: "engine", label: "test engine", board, async request(tag) { calls.push(tag); throw new Error("Test refusal") }, call(tag) { calls.push(tag) }, push() {},
     open(write) { write({ ...records, session: { status: "in", firstRun: false }, conn: { status: "reconnecting", lastHeard: 0 } }) },
     async signIn() { return "in" }, async signOut() {}, reconnect() { calls.push("reconnect") }, close() {}
   }
   element = document.createElement("div"); document.body.append(element)
   location.hash = "#" + route
-  const { store } = website.mount(element, { mode: "live", connection })
+  const { store } = website.mount(element, { mode: "live", connection: live })
   await settle()
   return { store, calls }
 }
@@ -119,7 +120,15 @@ for (const [route, label] of [["/machines", "Add machine"], ["/r/rp-orchard", "A
     if (label === "Add repository") {
       const actions = await import("../../../design/mock/js/actions.js" as string) as { openDialog(d: unknown): void }
       actions.openDialog({ type: "add-repository", machine: "local" })
-    } else button(label).click()
+      // Adding a repository is connected to the engine, so its dialog opens. It must still
+      // wait for the owner, and never show the sample's invented remote.
+      await new Promise((done) => setTimeout(done, 900))
+      expect((store.state.dialog as { type?: string } | null)?.type).toBe("add-repository")
+      expect(document.body.textContent).not.toContain("github.com/acme")
+      expect(calls).toEqual([])
+      return
+    }
+    button(label).click()
     await settle()
     noticeOnly(store.state)
     expect(store.state.dialog).toBeNull()
