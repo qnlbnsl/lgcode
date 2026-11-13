@@ -168,7 +168,7 @@ it("a refused full run starts no delayed simulation (finding 7)", async () => {
 it("shows a fast initial session response before passive effects run", async () => {
   const client = { "client.snapshot": () => Effect.succeed(engineSnapshot), "project.settings": () => Effect.succeed({}), "client.subscribe": () => Stream.never } as unknown as Client
   const connection = engineConnection({ location: { protocol: "http:", host: "127.0.0.1:8787" }, debug() {},
-    connect: (() => Effect.succeed(client)) as typeof connect, fetch: (async () => ({ status: 204 })) as typeof fetch })
+    connect: (() => Effect.succeed(client)) as typeof connect, fetch: async () => new Response(null, { status: 204 }) })
   const { store } = await mount("/home", connection)
   expect(store.state.session.status).toBe("in")
   expect(element.querySelector(".tree-row.project")).not.toBeNull()
