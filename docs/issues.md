@@ -11983,4 +11983,6 @@ The full check found one remaining test that expected configured model names to 
 The model-recovery conversation offered `valid-model` only through that coupling.
 It now scripts its peer's discovery report independently of the configured list.
 The model and effort recovery tests retain their real handler, lost reply, resume, and draft assertions.
-This is a test-fixture correction after separating discovery in review item 7.
+The matching first-run browser fixture had the same dependency.
+It now scripts the peer report separately as well.
+These are test-fixture corrections after separating discovery in review item 7.
