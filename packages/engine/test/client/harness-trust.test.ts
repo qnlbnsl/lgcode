@@ -1,3 +1,4 @@
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { afterEach, expect, it } from "@effect/vitest"
 import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
@@ -11,6 +12,8 @@ import { Runner } from "../../src/runner/Runner.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { harnessSettings } from "../support/handlerRig.ts"
 import { linuxProcessReader } from "../../src/recovery/orphans.ts"
+registerRebuildCheck({ noLog: true })
+
 const roots: string[] = []
 const root = () => { const path = mkdtempSync(join(tmpdir(), "lgtm-trust-")); roots.push(path); return path }
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })

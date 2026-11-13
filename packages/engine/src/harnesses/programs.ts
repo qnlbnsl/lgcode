@@ -257,7 +257,7 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
         let result: ProcessResult = { ok: false, output: "", reason: "The install command could not run." }
         try {
           await rm(plan.prefix, { recursive: true, force: true }); await mkdir(plan.prefix, { mode: 0o700 })
-          for (const name of ["package.json", "package-lock.json"]) await copyFile(new URL(`locks/${id}/${name}`, import.meta.url), join(plan.prefix, name))
+          for (const name of ["package.json", "package-lock.json"]) await copyFile(new URL(`./locks/${id}/${name}`, import.meta.url), join(plan.prefix, name))
           // Ten minutes accommodates slow downloads; the entire operation has
           // one deadline. Failure removes the partial tree and its receipt.
           result = await runRecipe([plan], { home: options.home, timeoutMs: 600_000, signal: controller.signal, operation })

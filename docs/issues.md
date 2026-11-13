@@ -12030,3 +12030,18 @@ It passed 51 browser journeys.
 The Git journey timed out while clicking its existing integration control.
 The Harnesses journey passed in that run.
 This matter remains open because the Git journey is outside this builder's assignment.
+
+## s5-harnesses-19. The web transform requires an explicit relative lockfile URL.
+
+The full review check found that Vite treated the dynamic lockfile URL as an asset glob.
+A relative glob must begin with a dot and a slash.
+The engine now uses that explicit relative URL.
+Nine web test suites failed during import before this correction.
+The focused follow-up runs every affected suite.
+
+## s5-harnesses-20. New engine tests must register the rebuild hook.
+
+The repository-wide guard found three new test files without their rebuild registration.
+The files that open an event log now register a scoped rebuild comparison.
+The process-only and filesystem-only files register the no-log form.
+The follow-up includes the repository guard and the harness tests.

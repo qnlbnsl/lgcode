@@ -1,9 +1,12 @@
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { afterEach, expect, it } from "@effect/vitest"
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, realpathSync } from "node:fs"
 import { join, dirname, isAbsolute, delimiter } from "node:path"
 import { tmpdir } from "node:os"
 import { installPlan, installerEnvironment, resolveToolchain, runRecipe, makeHarnessPrograms, userHarnessBin } from "../../src/harnesses/programs.ts"
 import { installRecipes } from "../../src/harnesses/recipes.ts"
+
+registerRebuildCheck({ noLog: true })
 
 const roots: string[] = []
 const root = () => { const p = mkdtempSync(join(tmpdir(), "lgtm-toolchain-")); roots.push(p); return p }

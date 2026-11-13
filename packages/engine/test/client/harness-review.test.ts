@@ -1,3 +1,4 @@
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import * as Schema from "effect/Schema"
 import { HarnessSettings } from "@lgtm/contracts"
 import { afterEach, expect, it } from "@effect/vitest"
@@ -15,6 +16,7 @@ afterEach(() => { if (rig) removeRig(rig) })
 it.live("refuses all four harness requests to an authenticated agent with the exact reason", () => Effect.gen(function* () {
   rig = makeRig(); const runner = yield* makeFakeRunner()
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets() }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     const child = yield* seedAgent({ id: "worker", name: "Builder" })
     for (const [name, payload] of [["client.harness.status", {}], ["client.harness.recipe", { harnessId: "codex" }], ["client.harness.install", { harnessId: "codex" }], ["client.harness.account.check", { accountId: "owner" }]] as const) {
       expect(yield* call(agentCredential(child.token), name, payload)).toMatchObject({ _tag: "Failure", failure: { reason: "command refused" } })
@@ -65,6 +67,7 @@ it.live("interrupts the install, waits for cleanup, audits cancellation and rele
     return { ok: false, output: "", reason: cancelled ? "The install was cancelled." : "Fixture deadline." }
   } }
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     const fiber = yield* call(ownerCredential, "client.harness.install", { harnessId: "first" }).pipe(Effect.forkScoped)
     while (!started) yield* Effect.sleep(5)
     yield* Fiber.interrupt(fiber)
@@ -78,6 +81,7 @@ it.live("keeps saved settings and executable output out of the production recipe
   const programs = makeHarnessPrograms({ home: rig.home, path: "" })
   const before = programs.recipe("gemini")
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("first", { adapterPath: executable, adapterArguments: ["npm", "install", "attacker"] }) }))
     const status = success(yield* call(ownerCredential, "client.harness.status", { refresh: true }))
     expect(status.harnesses.find((h: any) => h.harnessId === "first").version).toContain("attacker")
@@ -99,6 +103,7 @@ it.live("validates automatically suggested settings with the harnesses planner",
   const base = fixtureHarnessPrograms({ home: rig.home, executable, script })
   const programs = { ...base, defaultSettings: () => Schema.decodeUnknownSync(HarnessSettings)(harnessSettings("first", { adapterPath: process.execPath })) }
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     expect(success(yield* call(ownerCredential, "client.harness.install", { harnessId: "first" }))).toMatchObject({ state: "installed" })
     expect((yield* readLog).filter((e) => e.event._tag === "HarnessChanged")).toHaveLength(1)
   }))
@@ -119,9 +124,13 @@ it.live("recovers a pending audit at startup and closes the installer when the e
   let recovered = 0, closed = 0
   const programs = { ...makeHarnessPrograms({ home: rig.home, path: "" }), recover: async () => { recovered++ }, close: async () => { closed++ } }
   const fakes = { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }
-  yield* provideRig(rig, fakes, appendSetup([eventOf({ _tag: "HarnessInstallStarted", harnessId: "gemini", operationRequestId: "interrupted-install" })]))
+  yield* provideRig(rig, fakes, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    yield* appendSetup([eventOf({ _tag: "HarnessInstallStarted", harnessId: "gemini", operationRequestId: "interrupted-install" })])
+  }))
   expect(closed).toBe(1)
   yield* provideRig(rig, fakes, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     expect((yield* readLog).filter((e) => e.event._tag === "HarnessInstallFinished")).toHaveLength(1)
     expect((yield* readLog).find((e) => e.event._tag === "HarnessInstallFinished")!.event).toMatchObject({ state: "failed", operationRequestId: "interrupted-install" })
   }))
@@ -133,6 +142,7 @@ it.live("audits invalid automatic settings as a failure without appending Harnes
   const base = fixtureHarnessPrograms({ home: rig.home, executable, script })
   const programs = { ...base, defaultSettings: () => harnessSettings("first", { adapterPath: "relative" }) as any }
   yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), harnessPrograms: programs }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
     expect(success(yield* call(ownerCredential, "client.harness.install", { harnessId: "first" }))).toMatchObject({ state: "failed", reason: "The installed harness settings are invalid." })
     expect((yield* readLog).filter((e) => e.event._tag === "HarnessChanged")).toHaveLength(0)
     expect((yield* readLog).filter((e) => e.event._tag === "HarnessInstallFinished")).toHaveLength(1)
