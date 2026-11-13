@@ -1,0 +1,20 @@
+.wfl{padding:var(--gap-group);overflow:auto;height:100%}.wfl>p{margin-block:var(--space-3)}
+.wfl-layout{display:grid;grid-template-columns:180px minmax(0,1fr);gap:var(--gap-group)}
+.wfl-list{list-style:none;padding:0;margin:0;border-right:1px solid var(--color-line)}
+.wfl-list li{padding:var(--inset);border-bottom:1px solid var(--color-line)}
+.wfl-list button{display:block;text-align:left;width:100%;font-weight:var(--weight-strong);padding:var(--space-1)}
+.wfl-list button[aria-current]{background:var(--color-selected);outline:1px solid var(--color-text)}
+.wfl-list small{display:block;margin-top:var(--space-1)}
+.wfl-toolbar{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-block:var(--space-2)}
+.wfl-toolbar h2{font-size:var(--text-lg)}.wfl-toolbar .input{max-width:100%}
+.wfl-picture{display:flex;gap:var(--gap-group);overflow:auto;max-height:60vh;border:1px solid var(--color-line);padding:var(--inset);background:var(--color-bg)}
+.wfl-phase{flex:0 0 240px}.wfl-phase h3{position:sticky;top:0;background:var(--color-surface);padding:var(--space-2);border-bottom:2px solid var(--color-text);z-index:1}
+.wfl-phase ol{list-style:none;padding:0}.wfl-phase li{margin-block:var(--space-3)}
+.wfl-block{display:block;text-align:left;width:100%;padding:var(--inset);border:1px solid var(--color-text);background:var(--color-surface);border-radius:var(--radius-sm)}
+.wfl-block[aria-pressed=true]{outline:2px solid var(--color-focus);outline-offset:2px}.wfl-block small,.wfl-edge small{display:block}
+.wfl-edge{border-left:1px dashed var(--color-text);margin-left:var(--space-3);padding:var(--space-2);font-size:var(--text-sm)}
+.wfl-edge button{text-decoration:underline;text-align:left}.wfl-editor{border:1px solid var(--color-line);padding:var(--inset);margin-top:var(--gap-group)}
+.wfl-editor .field{max-width:480px;margin-block:var(--space-3)}.wfl-editor .input{width:100%}
+.wfl-section{border-top:1px solid var(--color-line);padding-block:var(--inset)}.wfl-section h3{margin-block:var(--space-2)}.wfl-section ul{list-style:none;padding:0}
+.wfl-state{min-height:var(--row)}.wfl [role=alert]{border:1px solid var(--color-text);padding:var(--inset)}
+@media(max-width:700px){.wfl-layout{grid-template-columns:minmax(0,1fr)}.wfl-list{border-right:0;border-bottom:1px solid var(--color-line);display:flex;overflow:auto}.wfl-list li{flex:0 0 180px}.wfl-picture{max-height:50vh}.wfl-toolbar select{max-width:100%}.wfl-toolbar label{max-width:100%}}

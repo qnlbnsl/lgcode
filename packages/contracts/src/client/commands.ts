@@ -1,3 +1,4 @@
+import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "../workflowCommands.ts"
 import { HarnessChoices } from "../harnessChoices.ts"
 import { HarnessId, AccountId } from "../ids.ts"
 import { AgentChoices, AgentConfiguration, ChoiceId, ContextUsage } from "../agentConfiguration.ts"
@@ -86,10 +87,11 @@ export const ClientRpcGroup = RpcGroup.make(
   Rpc.make("alerts.carrier.clear-token", { payload: { ...request, name: Schema.optionalKey(CarrierName) }, success: Ack, error: Refused }),
   Rpc.make("web.settings", { payload: request, success: Schema.Struct({ ...request, ...WebSettings.fields, serverState: WebServerState }), error: Refused }),
   Rpc.make("web.settings.set", { payload: { ...request, settings: WebSettings }, success: Ack, error: Refused })
-).prefix("client.")
+).prefix("client.").merge(WorkflowRpcGroup)
 
 export const clientCommandAccess = {
   "client.harness.choices": ["owner"],
+  ...workflowAccess,
   "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": ["owner", "agent", "service"], "client.roster": ["owner", "agent", "service"],
   "client.thread": ["owner", "agent", "service"], "client.subscribe": ["owner", "agent", "service"],
@@ -104,6 +106,7 @@ export const clientCommandAccess = {
 // The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
   "client.harness.choices",
+  ...workflowCommandNames,
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context",
   "client.web.settings", "client.web.settings.set"
 )

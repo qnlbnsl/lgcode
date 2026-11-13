@@ -988,6 +988,10 @@ The build loop is shown in a "Workflows" tab.
 A user sees the default workflow as a picture.
 A user clones it and changes the copy in a visual editor.
 A user can also make a workflow from nothing.
+The definition store, typed API, terminal commands, and visual clone editor are implemented.
+The format and storage rules are in [the workflow document](workflows.md).
+The visual editor can add and remove every phase and block in a copy.
+A separate creation action and project workflow selection remain planned.
 
 ## Model choices before an agent starts
 
@@ -1011,4 +1015,4 @@ Service settings shows each harness's report as it arrives.
 
 A future harness-specific discovery mode could disable session persistence through supported harness interfaces.
 It must preserve the account's login and the owner's existing history.
-The investigation and its limits are recorded in issue `s4-models-15`.
+The investigation and its limits are recorded in issue 719.

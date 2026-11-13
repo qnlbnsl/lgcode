@@ -12194,3 +12194,99 @@ The model and effort recovery tests retain their real handler, lost reply, resum
 The matching first-run browser fixture had the same dependency.
 It now scripts the peer report separately as well.
 These are test-fixture corrections after separating discovery in review item 7.
+
+## 722. The build-loop diagram still contains a hard exit after round six.
+
+The owner removed the review limit on 2026-11-11.
+The prose now asks for approval before every further round.
+The steps under "Next round" still send round six to cutting, splitting, or accepting the plan.
+The default workflow definition follows the newer decision and repeats the approval request.
+The historical specification was left unchanged.
+
+## 723. Workflow editing does not select or execute a project's workflow.
+
+The engine had no stored workflow definition when this work began.
+The new definition store and visual editor provide configuration operations.
+Project selection and workflow execution remain the later build-loop work.
+The Workflows page states that projects still run the default workflow.
+
+## 724. The remote helper needs approval outside the restricted tool environment.
+
+The local package installation first failed because its store lock was read-only.
+The remote test helper first failed because the restricted environment presented an unsafe system Secure Shell configuration file.
+Automatic approval review initially rejected the remote sync because the destination was unverified.
+The repository's remote-checks document identifies the default address as the owner's test computer.
+Providing that evidence allowed the required helper and the pinned dependency installation to run.
+No system configuration was changed.
+
+## 725. An existing project push command parity test failed once in the full run.
+
+The first full check failed the dotted `project.push` terminal dispatch case.
+The same case passed immediately when run by itself.
+No project push implementation was changed in this work.
+The final full check determines whether the failure repeats.
+The initial output is retained in the worker's result artifacts.
+
+## 726. Serializing a reply before redaction missed secrets with escaped characters.
+
+The first workflow reply sanitizer redacted the serialized JSON string.
+A registered secret containing a newline or quote was escaped before the sanitizer could match it.
+The new regression test failed on that assertion.
+The handler now redacts each string value before serialization.
+The regression test and authenticated workflow API tests pass.
+
+## 727. The existing service-settings browser journey failed once while waiting for its saved state.
+
+The full check passed 8,080 unit tests and 50 browser tests.
+The existing service-settings journey timed out at `studioService.ts:74` after changing the heartbeat from 25 to 31.
+Its save bar did not show "No unsaved changes." within five seconds.
+The unchanged journey passed when run alone.
+The workflow browser journey passed in the full run.
+The service-settings implementation was left to its assigned builder.
+The full check therefore remains a failed run even though the isolated retry passed.
+
+
+## 728. Workflow actions have no event or receipt.
+
+This is open for the owner.
+Workflow actions operate directly on configuration files.
+They write neither an engine event nor an action receipt.
+The owner must decide how workflow changes should appear in the audit history.
+
+## 729. Two browser tabs can overwrite a workflow without a warning.
+
+This is open for the owner.
+The last successful save wins when two tabs edit the same workflow.
+The editor has no revision check or conflict warning.
+
+## 730. Renaming a workflow changes only its display name.
+
+This is open for the owner.
+Saving a different name leaves the workflow identifier and filename unchanged.
+The owner must decide whether a separate identifier rename is needed.
+
+## 731. The visual editor cannot change inner steps.
+
+This is open for the owner.
+The editor shows and preserves a block's inner steps.
+Only the application programming interface (API) and terminal can edit these steps.
+
+
+## 732. The Git browser journey could not approve without evidence.
+
+The review-fix full check passed every unit test.
+The existing Git browser journey timed out at `packages/web/e2e/support/studioGit.ts:100`.
+The Approve without evidence button became disabled while Playwright waited to click it.
+The unchanged journey passed alone in 2.2 minutes.
+The full check remains a failed run.
+The Git implementation and its journey were left unchanged for their assigned builder.
+This intermittent failure remains open.
+
+## 733. A workflow reload could request the list before connecting.
+
+The review-fix full browser run exposed this race.
+The Workflows page requested its list before the live connection was ready.
+It kept The service is not connected after the connection became live.
+The page now waits for the live connection before its first list request.
+It preserves an already loaded draft when the connection recovers.
+A deterministic Studio unit test covers startup and reconnection.

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
 import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgtm/contracts";
 import { afterEach, expect, it } from "vitest";
@@ -57,6 +58,13 @@ for (const { command, words, form } of invocations) {
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       "client.alerts.quiet.set": { quiet: { enabled: true, start: "22:00", end: "07:00", timeZone: "America/Chicago", failureOverride: true } },
       "client.alerts.carrier.enabled.set": { name: "email", enabled: false },
+
+      "client.workflows.list": {},
+      "client.workflows.read": { scope: "default", id: "build-loop" },
+      "client.workflows.clone": { scope: "default", id: "build-loop", target: "user", name: "CLI loop" },
+      "client.workflows.save": { scope: "user", id: "cli-loop", definition: {} },
+      "client.workflows.validate": { definition: {} },
+      "client.workflows.delete": { scope: "user", id: "cli-loop" },
       "client.web.settings": {},
       "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
@@ -161,6 +169,11 @@ for (const { command, words, form } of invocations) {
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
+        "client.workflows.list": { ...base, items: [] },
+        "client.workflows.read": { ...base, workflow: { scope: "default", id: "build-loop", name: "Build loop", readOnly: true, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.clone": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.save": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../../design/mock/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.validate": { ...base, valid: false, error: "Use the workflow format." },
         "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
         "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },

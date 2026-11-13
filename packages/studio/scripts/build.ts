@@ -9,8 +9,9 @@ import { harnessChoicesSource } from "./harnessChoices.ts"
 //    instead of js/main.js, so the website starts in live mode.
 // 3. It bundles src/live.ts, with the connection and the mapping, as live.js.
 //
-// design/mock itself is not changed. It still opens on its own, on its sample data.
-import { cpSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+// The sample gets generated contracts and the canonical default before copying.
+import { cpSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { build } from "vite"
@@ -20,7 +21,7 @@ const mock = fileURLToPath(new URL("../../../design/mock/", import.meta.url))
 const defaultDist = join(root, "dist")
 
 // The parts of design/mock that the page loads. Its notes and briefs stay behind.
-const parts = ["css", "js", "fonts", "vendor", "plans"]
+const parts = ["css", "js", "fonts", "vendor", "plans", "workflows"]
 
 export function rewriteIndex(html: string): { readonly page: string; readonly theme: string } {
   const inline = /<script>\s*([\s\S]*?)\s*<\/script>/.exec(html)
@@ -28,6 +29,7 @@ export function rewriteIndex(html: string): { readonly page: string; readonly th
   const main = '<script type="module" src="js/main.js"></script>'
   if (!html.includes(main)) throw new Error("design/mock/index.html no longer loads js/main.js")
   const page = html
+    .replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, "")
     .replace(inline[0], '<script src="theme.js"></script>')
     .replace(main, '<script type="module" src="live.js"></script>')
     // The policy allows no data: address, and an empty icon is not needed.
@@ -44,15 +46,38 @@ function assertNoLinks(folder: string): void {
   }
 }
 
+// Browser fixtures can build concurrently. Publish complete sample assets with
+// a rename so another build or sample reader never sees a truncated file.
+function writeGenerated(path: string, bytes: Buffer): void {
+  const temporary = path + "." + randomUUID()
+  writeFileSync(temporary, bytes)
+  renameSync(temporary, path)
+}
+
 // Tests build into a folder of their own. The engine serves the default folder.
 export async function buildStudio(dist = defaultDist): Promise<string> {
   rmSync(dist, { recursive: true, force: true })
   mkdirSync(dist, { recursive: true })
+  // Both page modes use the contracts source. The mock's small re-export is
+  // replaced in the live output, and its import map loads the same sample bundle.
+  await build({
+    configFile: false, root, logLevel: "warn",
+    build: {
+      outDir: join(dist, "js"), emptyOutDir: false, target: "esnext", copyPublicDir: false,
+      lib: { entry: join(root, "src/workflows.ts"), formats: ["es"], fileName: () => "workflow-contracts.js" }
+    }
+  })
+  const contracts = readFileSync(join(dist, "js/workflow-contracts.js"))
+  writeGenerated(join(mock, "vendor/workflow-contracts.js"), contracts)
+  mkdirSync(join(mock, "workflows"), { recursive: true })
+  writeGenerated(join(mock, "workflows/build-loop.json"), readFileSync(join(root, "../engine/src/workflows/build-loop.json")))
   for (const part of parts) cpSync(join(mock, part), join(dist, part), { recursive: true, dereference: true })
   for (const path of ["js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
     const target = join(dist, path)
     writeFileSync(target, harnessChoicesSource(path, readFileSync(target, "utf8")))
   }
+
+  writeFileSync(join(dist, "js/workflow-contracts.js"), contracts)
   const { page, theme } = rewriteIndex(readFileSync(join(mock, "index.html"), "utf8"))
   writeFileSync(join(dist, "index.html"), page)
   writeFileSync(join(dist, "theme.js"), theme)
