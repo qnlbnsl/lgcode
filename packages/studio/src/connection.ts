@@ -12,6 +12,7 @@ import { connect, type Client, type ClientEnvelope } from "@lgtm/client/browser"
 import type { ClientSnapshot, EventSequence, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
+import * as board from "./board.ts"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable"
@@ -19,6 +20,14 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly session?: { readonly status: SessionStatus; readonly firstRun: boolean }
   readonly conn?: StoreConn
   readonly owner?: StoreOwner
+  readonly boardUnread?: Record<string, number>
+  readonly boardRevision?: number
+  readonly boardDetails?: object
+  readonly channels?: ReturnType<typeof board.snapshotChannels>
+  readonly posts?: ReadonlyArray<ReturnType<typeof board.mapPost>>
+  readonly taskDetails?: object
+  readonly boardAgents?: object
+  readonly setupData?: object | null
 }
 export type Write = (patch: StorePatch) => void
 
@@ -26,6 +35,8 @@ export type Write = (patch: StorePatch) => void
 export interface LiveConnection {
   readonly kind: "engine"
   readonly label: string
+  readonly board: typeof board
+  request(tag: string, payload: object): Promise<unknown>
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
   open(write: Write): void
@@ -56,9 +67,9 @@ const refreshTags = new Set([
   "AgentStarted", "AgentStartFailed", "SessionOpened", "AgentGrouped", "ModeChanged",
   "TurnStarted", "TurnEnded", "AgentCrashed", "AgentInterrupted", "AgentStopped", "AgentReloadFailed",
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
-  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
+  "AgentConfigurationChosen", "AgentConfigurationApplied", "AgentConfigurationRefused", "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
 ])
-const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("project.") || tag.startsWith("client.Alert")
+const needsRefresh = (tag: string) => refreshTags.has(tag) || tag.startsWith("board.") || tag.startsWith("project.") || tag.startsWith("roles.") || tag.startsWith("client.Alert")
 
 const emptyRecords: EngineRecords = { machines: [], subscriptions: [], repos: [], projects: [], teams: [], agents: [], requests: [], worktrees: [], sprints: [], tasks: [] }
 
@@ -86,6 +97,8 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   let controller: AbortController | undefined
   let offlineTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
+  let activeClient: Client | undefined
+  let boardRevision = 0
 
   const setConn = (status: ConnectionStatus) => {
     clearTimeout(offlineTimer)
@@ -95,7 +108,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined) })
+  const forget = () => write({ ...emptyRecords, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, boardUnread: {}, boardRevision: 0, boardDetails: {} })
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -107,7 +120,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     } catch { return undefined }
   }
 
-  const stop = () => { controller?.abort(); controller = undefined }
+  const stop = () => { activeClient = undefined; controller?.abort(); controller = undefined }
 
   // Reads the snapshot, then follows the stream, until the session ends or the page closes.
   const follow = () => {
@@ -120,12 +133,42 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     const publish = (snapshot: ClientSnapshot) => {
       current = snapshot
       after = snapshot.sequence
-      if (!signal.aborted) write(mapSnapshot(snapshot, now()))
+      const records = board.mapBoardRecords(snapshot, mapSnapshot(snapshot, now()))
+      if (!signal.aborted) write({ ...records, channels: board.snapshotChannels(snapshot, records), boardUnread: board.mapUnread(snapshot.board), boardRevision, boardDetails: board.mapStalls(snapshot.roles),
+        session: { status: "in", firstRun: snapshot.project?.setup !== undefined && snapshot.project.setup.completedAt === undefined } })
     }
     const program = Effect.gen(function* () {
       while (!ended && !signal.aborted) {
         yield* Effect.scoped(Effect.gen(function* () {
           const client: Client = yield* open({ url })
+          activeClient = client
+          // The snapshot is bounded. Page its navigation records when its project
+          // section was cut short, and retry if the log changed during that read.
+          const hydrate = (snapshot: ClientSnapshot) => Effect.gen(function* () {
+            if (!snapshot.project?.truncated) return snapshot
+            const pageAll = (tag: "project.repositories" | "project.workspaces" | "project.read", payload: object) => Effect.gen(function* () {
+              const items: unknown[] = [], cursors = new Set<string>()
+              let after: string | undefined
+              for (;;) {
+                const reply = yield* client[tag]({ ...payload, requestId: requestId(), limit: 200, ...(after === undefined ? {} : { after }) } as never)
+                if (!("items" in reply)) return yield* Effect.fail(new Error("Project records unavailable"))
+                items.push(...reply.items)
+                if (reply.next === undefined) return items
+                if (!reply.items.length || cursors.has(reply.next)) return yield* Effect.fail(new Error("Project cursor did not advance"))
+                cursors.add(reply.next); after = reply.next
+              }
+            })
+            const repositories = yield* pageAll("project.repositories", {})
+            const workspaces = yield* pageAll("project.workspaces", {})
+            const projects = yield* pageAll("project.read", { collection: "projects" })
+            const teams = yield* pageAll("project.read", { collection: "teams" })
+            const sprints = yield* pageAll("project.read", { collection: "sprints" })
+            const tasks = yield* pageAll("project.read", { collection: "tasks" })
+            const agents = yield* pageAll("project.read", { collection: "agents" })
+            const end = yield* client["client.sequence"]({ requestId: requestId() })
+            if (end.sequence !== snapshot.sequence) return undefined
+            return { ...snapshot, project: { ...snapshot.project, truncated: false, repositories, workspaces, projects, teams, sprints, tasks, agents } } as ClientSnapshot
+          })
           const refresh = (minimum = 0) => Effect.gen(function* () {
             for (;;) {
               const started = clock()
@@ -134,7 +177,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
                 timing.snapshotMs = clock() - started
                 debug(`LGTM Studio: the snapshot took ${timing.snapshotMs.toFixed(1)} ms`)
               }
-              if (snapshot.sequence >= minimum) { publish(snapshot); return }
+              if (snapshot.sequence >= minimum) { const complete = yield* hydrate(snapshot); if (complete !== undefined) { publish(complete); return } }
               // Publication may lag the log. Read again until the snapshot holds the event.
               yield* Effect.sleep(25)
             }
@@ -142,10 +185,13 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
           if (current === undefined) yield* refresh()
           if (!signal.aborted) setConn("live")
           // The owner's name is the one saved in the engine's settings, or else Git's
-          // user.name, read once for each connection. The current page reads it the same way.
-          const settings = yield* client["project.settings"]({ requestId: requestId() }).pipe(Effect.option)
-          const name = settings._tag === "Some" ? settings.value.settings?.displayName ?? settings.value.ownerNameSuggestion : undefined
-          if (!signal.aborted) write({ owner: mapOwner(name) })
+          // user.name. Refresh it when settings change as well as on connection.
+          const refreshOwner = () => Effect.gen(function* () {
+            const settings = yield* client["project.settings"]({ requestId: requestId() }).pipe(Effect.option)
+            const name = settings._tag === "Some" ? settings.value.settings?.displayName ?? settings.value.ownerNameSuggestion : undefined
+            if (!signal.aborted) write({ owner: mapOwner(name) })
+          })
+          yield* refreshOwner()
           const subscribed = clock()
           yield* client["client.subscribe"]({ requestId: requestId(), after }).pipe(Stream.runForEach((item) => Effect.gen(function* () {
             if (timing.firstPushMs === undefined) {
@@ -156,13 +202,17 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
                 + (timing.firstPushDeliveryMs === undefined ? "" : `, ${timing.firstPushDeliveryMs} ms after the engine recorded it`))
             }
             if (item.sequence <= after) return
-            if ("event" in item) yield* apply(item, refresh)
+            if ("event" in item) {
+              if (item.event._tag === "project.SettingsChanged") yield* refreshOwner()
+              yield* apply(item, refresh)
+            }
             else if (item._tag === "client.Oversized" && needsRefresh(item.tag)) yield* refresh(item.sequence)
             after = Math.max(after, item.sequence) as EventSequence
             failures = 0
           })))
         })).pipe(Effect.catch((error) => Effect.gen(function* () {
           if (signal.aborted) return
+          activeClient = undefined
           setConn("reconnecting")
           // A browser hides an HTTP refusal of a WebSocket. Ask the session route instead.
           const status = yield* Effect.promise(() => post("/api/session"))
@@ -176,6 +226,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     // A pushed event either changes one agent's state in place or asks for a fresh snapshot.
     const apply = (item: ClientEnvelope, refresh: (minimum?: number) => Effect.Effect<void, unknown>) => Effect.gen(function* () {
       const event = item.event
+      if (event._tag.startsWith("project.") || event._tag.startsWith("board.") && event._tag !== "board.Read") boardRevision++
       if (event._tag === "StateChanged" && current !== undefined) {
         publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => agent.agentId === event.agentId ? { ...agent, state: event.state } : agent) })
       } else if (needsRefresh(event._tag)) yield* refresh(item.sequence)
@@ -196,6 +247,17 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
     label: "the service",
     // Sending changes to the engine is step 2 of the plan. Until then the website refuses
     // each action before it reaches this point.
+    board,
+    async request(tag, payload) {
+      const client = activeClient
+      if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
+      const method = (client as unknown as Record<string, (payload: object) => Effect.Effect<unknown, unknown>>)[tag]
+      if (method === undefined) throw new Error("This request is not available.")
+      const result = await Effect.runPromise(Effect.result(method({ ...payload, requestId: requestId() })), { signal: controller!.signal })
+      if (result._tag === "Success") return result.success
+      const error = result.failure
+      throw new Error(typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string" ? error.reason : "The service could not confirm the request.")
+    },
     call() {},
     push() {},
     open(next) {

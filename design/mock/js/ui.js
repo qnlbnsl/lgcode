@@ -138,9 +138,17 @@ export function Dialog({ title, onClose, children, foot, size, onSubmit }) {
 const dialogTypes = {};
 export function registerDialog(type, component) { dialogTypes[type] = component; }
 function ConfirmDialog({ d }) {
-  return html`<${Dialog} title=${d.title} size="narrow" onClose=${act.closeDialog}
-    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
-      <button type="button" class=${cx('btn', d.danger ? 'danger' : 'primary')} onClick=${() => { act.closeDialog(); d.onConfirm?.(); }}>${d.action}</button>`}>
+  const [pending, setPending] = useState(false);
+  const close = () => { if (!pending) act.closeDialog(); };
+  const confirm = async () => {
+    if (pending) return;
+    if (!d.waitForReply) { act.closeDialog(); d.onConfirm?.(); return; }
+    setPending(true);
+    try { if (await d.onConfirm?.()) act.closeDialog(); } finally { setPending(false); }
+  };
+  return html`<${Dialog} title=${d.title} size="narrow" onClose=${close}
+    foot=${html`<button type="button" class="btn" disabled=${pending} onClick=${close}>Cancel</button>
+      <button type="button" class=${cx('btn', d.danger ? 'danger' : 'primary')} aria-busy=${pending} disabled=${pending} onClick=${confirm}>${pending ? d.pendingLabel || 'Working…' : d.action}</button>`}>
     ${d.body && html`<p style="line-height:1.55">${d.body}</p>`}
     ${d.lost?.length > 0 && html`<ul class="col" style="gap:4px">${d.lost.map((l) => html`<li class="row"><${Icon} name="triangle-alert" size=${14} class="warn-text" /><span>${l}</span></li>`)}</ul>`}
   <//>`;
@@ -148,9 +156,17 @@ function ConfirmDialog({ d }) {
 function RenameDialog({ d }) {
   const [v, setV] = useState(d.value); const taken = d.taken?.includes(v.trim()) && v.trim() !== d.value;
   const bad = !v.trim() ? 'A name is needed.' : taken ? 'That name is already in use.' : null;
-  return html`<${Dialog} title=${d.title || 'Rename'} size="narrow" onClose=${act.closeDialog} onSubmit=${() => { if (!bad) { act.closeDialog(); d.onRename(v.trim()); } }}
-    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!bad}>Rename</button>`}>
-    <div class="field"><label for="rename-field">Name</label><input id="rename-field" class="input" value=${v} onInput=${(e) => setV(e.target.value)} autofocus />
+  const [pending, setPending] = useState(false);
+  const close = () => { if (!pending) act.closeDialog(); };
+  const rename = async () => {
+    if (bad || pending) return;
+    if (!d.waitForReply) { act.closeDialog(); d.onRename(v.trim()); return; }
+    setPending(true);
+    try { if (await d.onRename(v.trim())) act.closeDialog(); } finally { setPending(false); }
+  };
+  return html`<${Dialog} title=${d.title || 'Rename'} size="narrow" onClose=${close} onSubmit=${rename}
+    foot=${html`<button type="button" class="btn" disabled=${pending} onClick=${close}>Cancel</button><button type="submit" class="btn primary" disabled=${!!bad || pending} aria-busy=${pending}>${pending ? 'Renaming…' : 'Rename'}</button>`}>
+    <div class="field"><label for="rename-field">Name</label><input id="rename-field" class="input" disabled=${pending} value=${v} onInput=${(e) => setV(e.target.value)} autofocus />
       ${bad && v !== d.value && html`<span class="error">${bad}</span>`}</div>
     ${d.note && html`<p class="muted" style="font-size:var(--text-sm)">${d.note}</p>`}
   <//>`;

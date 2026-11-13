@@ -3,13 +3,14 @@
 // messages. The owner reads all of it and can post. Agents is the roster, sorted by situation.
 import {
   html, useState, useEffect, useLayoutEffect, useRef, Icon, cx, ago, clock, dayLabel, useNow, update, store, go, href,
-  MIN, HOUR, uid, plural, persist, remember,
+  MIN, HOUR, uid, plural, persist, remember, live, refuse,
 } from '../lib.js';
 import {
   agentOf, teamOf, teamName, agentsOfProject, agentStatus, openRequests, byId, routeForAgent, routeForRequest,
   taskByLabel, HARNESSES, PERMISSION_MODES, machineOf, agentLabel, KIND_LABEL, subLabel,
 } from '../data.js';
 import * as act from '../actions.js';
+import * as board from '../live/board.js';
 import { Avatar, OwnerAvatar, Rich, Menu, Empty, StateWord } from '../ui.js';
 
 // ---- vocabulary -------------------------------------------------------------------
@@ -79,13 +80,14 @@ export function seedBoard(state) {
 const repliesOf = (s, p) => s.posts.filter((x) => x.replyTo === p.id).sort((a, b) => a.ts - b.ts);
 function replyState(s, p, now) {
   if (p.action !== 'needs-reply') return null;
+  if (live.on) return { answered: p.closed, outcome: p.outcome, stalled: !!s.boardDetails?.posts?.includes(p.id) };
   if (p.closed) return { answered: true };
   const rs = repliesOf(s, p);
   if (rs.some((r) => (p.from === 'owner' ? r.from !== 'owner' : r.from === 'owner' || !p.to.length || p.to.includes(r.from)))) return { answered: true };
   return { answered: false, stalled: now - p.ts >= STALL_AFTER };
 }
 const who = (s, id) => (id === 'owner' ? null : agentOf(s, id));
-const whoName = (s, id, wide) => (id === 'owner' ? 'You' : agentLabel(s, agentOf(s, id), { withTeam: wide }));
+const whoName = (s, id, wide) => (id === 'owner' ? 'You' : id.startsWith('service:') ? id.slice(8) : agentOf(s, id) ? agentLabel(s, agentOf(s, id), { withTeam: wide }) : id);
 function channelLabel(s, ch) {
   if (ch.kind === 'dm') return ch.members.map((m) => whoName(s, m, true)).join(' and ');
   return ch.name;
@@ -93,12 +95,15 @@ function channelLabel(s, ch) {
 // The short form for the channel list: same-team pairs drop the team, leads are named by area.
 function channelShort(s, ch) {
   if (ch.kind !== 'dm') return ch.name;
-  const ms = ch.members.map((m) => agentOf(s, m)); const t = teamOf(s, ms[0].team);
+  const ms = ch.members.map((m) => agentOf(s, m));
+  if (live.on && ms.some((m) => !m)) return ch.members.map((id) => whoName(s, id, true)).join(', ');
+  const t = teamOf(s, ms[0]?.team);
   const same = t && ms.every((m) => m.team === t.id);
   if (same) return ms.map((m) => m.name).join(', ') + (t.area ? ' · ' + t.area : '');
   return ms.map((m) => { const mt = m.team && teamOf(s, m.team); return m.role === 'team-lead' && mt && mt.area ? `${mt.area} lead` : m.name; }).join(', ');
 }
 function channelAbout(s, ch) {
+  if (live.on && ch.kind === 'plain') return ch.name;
   if (ch.kind === 'leads') return 'The project lead and every team lead';
   if (ch.kind === 'team') return teamName(teamOf(s, ch.team));
   const t = teamOf(s, (agentOf(s, ch.members[0]) || {}).team); const same = ch.members.every((m) => (agentOf(s, m) || {}).team === (t && t.id));
@@ -106,7 +111,7 @@ function channelAbout(s, ch) {
   return same && t ? `Direct message inside ${teamName(t)}` : 'Direct message between two leads';
 }
 const isPrivate = (s, ch) => { const t = ch.kind === 'dm' && teamOf(s, (agentOf(s, ch.members[0]) || {}).team); return !!(t && t.needToKnow && ch.members.every((m) => agentOf(s, m).team === t.id)); };
-const unreadOf = (s, ch) => s.posts.filter((p) => p.channel === ch.id && p.from !== 'owner' && p.ts > (s.boardRead[ch.id] || 0)).length;
+const unreadOf = (s, ch) => live.on ? s.boardUnread?.[ch.id] || 0 : s.posts.filter((p) => p.channel === ch.id && p.from !== 'owner' && p.ts > (s.boardRead[ch.id] || 0)).length;
 const waitingIn = (s, ch, now) => s.posts.filter((p) => p.channel === ch.id && replyState(s, p, now)?.answered === false);
 // Task and sprint labels in a post become links.
 function linkify(s, pid, text) {
@@ -119,6 +124,7 @@ function linkify(s, pid, text) {
 
 // ---- writes -------------------------------------------------------------------------
 function sendPost({ channel, kind, action, to, text, replyTo }) {
+  if (live.on) return board.sendPost({ channel, action, to, text, replyTo });
   const id = uid('p'); const s0 = store.state; const ch = byId(s0.channels, channel);
   const root = replyTo && byId(s0.posts, replyTo);
   update((s) => {
@@ -133,7 +139,7 @@ function sendPost({ channel, kind, action, to, text, replyTo }) {
     s.posts.push({ id: uid('p'), channel, from: responder, kind: kind === 'question' || kind === 'blocked' ? 'note' : kind === 'handoff' ? 'done' : 'note', action: 'fyi', text: CANNED[kind], ts: Date.now(), to: [], replyTo: replyTo || id, closed: false });
   }), 1700);
 }
-const setClosed = (id, closed) => update((s) => { byId(s.posts, id).closed = closed; });
+const setClosed = (id, closed) => live.on ? board.setClosed(id, closed) : update((s) => { byId(s.posts, id).closed = closed; });
 function nudge(agentId) {
   const s0 = store.state; const a = agentOf(s0, agentId);
   const ch = s0.channels.find((c) => c.team === a.team) || s0.channels.find((c) => c.project === a.project && c.kind === 'leads') || s0.channels.find((c) => c.project === a.project);
@@ -160,8 +166,8 @@ function Face({ s, id, size }) { return id === 'owner' ? html`<${OwnerAvatar} s=
 function ReplyWord({ s, p, now }) {
   const st = replyState(s, p, now);
   if (!st) return html`<span class="delivery fyi" data-tip="For reading. It wakes nobody." data-tip-side="top">FYI</span>`;
-  if (st.answered) return html`<span class="delivery answered"><${Icon} name="check" size=${12} />Answered</span>`;
-  return html`<span class=${cx('delivery waiting', st.stalled && 'stalled')}><${Icon} name=${st.stalled ? 'triangle-alert' : 'reply'} size=${12} />${st.stalled ? 'No reply for ' : 'Needs reply · '}${ago(p.ts, now)}</span>`;
+  if (st.answered) return html`<span class="delivery answered"><${Icon} name="check" size=${12} />${live.on ? ({ withdrawn: 'Withdrawn', unanswerable: 'Unanswerable', answered: 'Answered' }[p.outcome] || 'Closed') : 'Answered'}</span>`;
+  return html`<span class=${cx('delivery waiting', st.stalled && 'stalled')}><${Icon} name=${st.stalled ? 'triangle-alert' : 'reply'} size=${12} />${st.stalled ? 'No reply for ' : 'Needs reply · '}${p.ts == null ? '' : ago(p.ts, now)}</span>`;
 }
 
 function Post({ s, p, ch, pid, now, grouped, selected, onThread, inThread, showChannel }) {
@@ -169,19 +175,19 @@ function Post({ s, p, ch, pid, now, grouped, selected, onThread, inThread, showC
   const replies = inThread ? [] : repliesOf(s, p); const last = replies[replies.length - 1];
   const st = replyState(s, p, now); const req = p.request && byId(s.requests, p.request);
   const reqOpen = req && req.status === 'open';
-  const plain = p.kind === 'note' && !p.to.length; // a plain note needs no tag line
+  const plain = (p.kind === 'note' || (live.on && !p.kind)) && !p.to.length; // a plain note needs no tag line
   return html`<article class=${cx('post', grouped && 'grouped', selected && 'selected', st && !st.answered && 'open', st?.stalled && 'stalled')} id=${'post-' + p.id}>
-    <div class="post-face">${grouped ? html`<time class="post-time">${clock(p.ts)}</time>` : html`<${Face} s=${s} id=${p.from} />`}</div>
+    <div class="post-face">${grouped ? html`<time class="post-time">${p.ts == null ? '' : clock(p.ts)}</time>` : html`<${Face} s=${s} id=${p.from} />`}</div>
     <div class="post-main">
       ${!grouped && html`<header class="post-meta">
-        ${a ? html`<a class="who" href=${href(routeForAgent(s, a))}>${a.name}</a>` : html`<span class="who">You</span>`}
+        ${a ? html`<a class="who" href=${href(routeForAgent(s, a))}>${a.name}</a>` : html`<span class="who">${whoName(s, p.from, false)}</span>`}
         ${a && wide && html`<span class="team">${t ? teamName(t) : 'Project'}</span>`}
-        <time title=${new Date(p.ts).toLocaleString()}>${clock(p.ts)}</time>
+        <time title=${p.ts == null ? '' : new Date(p.ts).toLocaleString()}>${p.ts == null ? '' : clock(p.ts)}</time>
         ${showChannel && html`<a class="in-ch" href=${href(`/p/${pid}/messages/${ch.id}`)}>${ch.kind === 'dm' ? 'Direct message' : '#' + ch.name}</a>`}
         <${ReplyWord} s=${s} p=${p} now=${now} />
       </header>`}
       ${plain ? null : html`<div class="post-tags">
-        ${!plain && html`<${KindTag} kind=${p.kind} />`}
+        ${!plain && (!live.on || p.kind) && html`<${KindTag} kind=${p.kind} />`}
         ${p.to.length > 0 && html`<span class="to truncate"><${Icon} name="arrow-right" size=${11} />${p.to.map((id) => whoName(s, id, wide)).join(', ')}</span>`}
         ${grouped && html`<${ReplyWord} s=${s} p=${p} now=${now} />`}
       </div>`}
@@ -202,7 +208,7 @@ function Post({ s, p, ch, pid, now, grouped, selected, onThread, inThread, showC
     </div>
     ${!inThread && html`<div class="post-acts">
       <button type="button" class="icon-btn sm" aria-label="Reply in thread" data-tip="Reply in thread" data-tip-side="top" onClick=${() => onThread(p)}><${Icon} name="reply" size=${14} /></button>
-      ${st && html`<button type="button" class="icon-btn sm" aria-label=${st.answered ? 'Reopen' : 'Mark as answered'} data-tip=${st.answered ? 'Reopen' : 'Mark as answered'} data-tip-side="top" onClick=${() => setClosed(p.id, !p.closed)} disabled=${st.answered && !p.closed}><${Icon} name=${p.closed ? 'rotate-ccw' : 'check'} size=${14} /></button>`}
+      ${st && html`<button type="button" class="icon-btn sm" aria-label=${st.answered ? 'Reopen' : 'Mark as answered'} data-tip=${st.answered ? 'Reopen' : 'Mark as answered'} data-tip-side="top" onClick=${() => setClosed(p.id, !p.closed)} aria-busy=${live.on && board.busy('close-post:' + p.id)} disabled=${(live.on && board.busy('close-post:' + p.id)) || (st.answered && !p.closed)}><${Icon} name=${p.closed ? 'rotate-ccw' : 'check'} size=${14} /></button>`}
       ${a && html`<a class="icon-btn sm" aria-label=${'Open chat with ' + a.name} data-tip="Open chat" data-tip-side="left" href=${href(routeForAgent(s, a))}><${Icon} name="message-square" size=${14} /></a>`}
     </div>`}
   </article>`;
@@ -217,23 +223,24 @@ function PostComposer({ s, ch, replyTo, placeholder }) {
   useEffect(() => { setText(s.drafts[key] || ''); setTo([]); }, [key]);
   useLayoutEffect(() => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(160, el.scrollHeight) + 'px'; }, [text]);
   const set = (v) => { setText(v); act.setDraft(key, v); };
-  const send = () => { if (!text.trim()) return; sendPost({ channel: ch.id, kind, action, to, text, replyTo }); set(''); };
+  const send = async () => { if (!text.trim() || (live.on && board.busy('post:' + (replyTo || ch.id)))) return; const reply = await sendPost({ channel: ch.id, kind, action, to, text, replyTo }); if (!live.on || reply) set(''); };
   const members = ch.members.map((m) => agentOf(s, m)).filter(Boolean);
   const toLabel = to.length ? to.map((id) => whoName(s, id, ch.kind !== 'team')).join(', ') : ch.kind === 'dm' ? 'Both' : 'Everyone here';
-  const off = s.conn.status !== 'live';
+  const sending = live.on && board.busy('post:' + (replyTo || ch.id));
+  const off = s.conn.status !== 'live' || sending;
   return html`<div class="composer board-composer">
     <label class="sr" for=${'pc-' + key}>Post to ${channelLabel(s, ch)}. Enter sends, Shift and Enter adds a line.</label>
     <textarea ref=${ta} id=${'pc-' + key} rows="1" placeholder=${placeholder || (ch.kind === 'dm' ? 'Post into this direct message…' : `Post to #${ch.name}…`)} value=${text} disabled=${off}
       onInput=${(e) => set(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } }}></textarea>
     <div class="tools-row">
-      <${Menu} class="pick" side="top" label="Kind of post" trigger=${html`<${Icon} name=${POST_KINDS[kind].icon} size=${13} /><span>${POST_KINDS[kind].label}</span><${Icon} name="chevron-down" size=${12} />`}
-        items=${[{ heading: 'Kind of post' }, ...KIND_ORDER.map((k) => ({ label: POST_KINDS[k].label, icon: POST_KINDS[k].icon, checked: k === kind, onSelect: () => { setKind(k); if (!replyTo) setAction(k === 'question' || k === 'blocked' || k === 'handoff' ? 'needs-reply' : 'fyi'); } }))]} />
+      <${Menu} class="pick" side="top" label="Kind of post" trigger=${html`<${Icon} name=${POST_KINDS[kind].icon} size=${13} /><span>${live.on ? '' : POST_KINDS[kind].label}</span><${Icon} name="chevron-down" size=${12} />`}
+        items=${[{ heading: 'Kind of post' }, ...KIND_ORDER.map((k) => ({ label: POST_KINDS[k].label, icon: POST_KINDS[k].icon, checked: k === kind, onSelect: () => { if (live.on) { refuse(); return; } setKind(k); if (!replyTo) setAction(k === 'question' || k === 'blocked' || k === 'handoff' ? 'needs-reply' : 'fyi'); } }))]} />
       <${Menu} class="pick" side="top" label="Recipients" trigger=${html`<${Icon} name="at-sign" size=${13} /><span>${toLabel}</span><${Icon} name="chevron-down" size=${12} />`}
         items=${[{ heading: 'Addressed to' }, { label: ch.kind === 'dm' ? 'Both' : 'Everyone here', checked: !to.length, onSelect: () => setTo([]) }, { sep: true },
           ...members.map((m) => ({ label: agentLabel(s, m, { withTeam: ch.kind !== 'team' }), sub: agentStatus(s, m).word, checked: to.includes(m.id), onSelect: () => setTo(to.includes(m.id) ? to.filter((x) => x !== m.id) : [...to, m.id]) }))]} />
       <button type="button" class="pick" aria-pressed=${action === 'needs-reply'} onClick=${() => setAction(action === 'fyi' ? 'needs-reply' : 'fyi')} data-tip=${action === 'fyi' ? 'For reading only' : 'Stays open until someone answers'} data-tip-side="top">
         <${Icon} name=${action === 'fyi' ? 'eye' : 'reply'} size=${13} /><span>${action === 'fyi' ? 'FYI' : 'Needs reply'}</span></button>
-      <button type="button" class="send" aria-label="Post" disabled=${!text.trim() || off} onClick=${send}><${Icon} name="arrow-up" size=${15} /></button>
+      <button type="button" class="send" aria-label="Post" aria-busy=${sending} disabled=${!text.trim() || off} onClick=${send}><${Icon} name=${sending ? 'loader-circle' : 'arrow-up'} size=${15} /></button>
     </div>
   </div>`;
 }
@@ -243,7 +250,7 @@ function ChannelList({ s, project, channels, current, now }) {
   const base = `/p/${project.id}/messages/`;
   const waitingAll = channels.reduce((n, c) => n + waitingIn(s, c, now).length, 0);
   const row = (c) => {
-    const unread = c.id === current ? 0 : unreadOf(s, c); const wait = waitingIn(s, c, now); const stalled = wait.some((p) => now - p.ts >= STALL_AFTER);
+    const unread = c.id === current ? 0 : unreadOf(s, c); const wait = waitingIn(s, c, now); const stalled = !live.on && wait.some((p) => now - p.ts >= STALL_AFTER);
     return html`<a key=${c.id} class=${cx('ch-row', unread > 0 && 'unread')} aria-current=${c.id === current ? 'page' : null} href=${href(base + c.id)} title=${c.kind === 'dm' ? `${channelLabel(s, c)}. ${channelAbout(s, c)}` : channelAbout(s, c)}>
       ${c.kind === 'dm' ? html`<span class="dm-pair" aria-hidden="true">${c.members.slice(0, 2).map((m, i) => html`${i > 0 && html`<i class="dm-dash"></i>`}<${Avatar} key=${m} agent=${agentOf(s, m)} size="sm" status=${false} />`)}</span>` : html`<${Icon} name=${c.kind === 'leads' ? 'megaphone' : 'hash'} size=${14} class="ch-icon" />`}
       <span class="label truncate">${channelShort(s, c)}</span>
@@ -267,7 +274,7 @@ function ThreadPane({ s, root, ch, pid, now, onClose }) {
     <header class="mb-head">
       <button type="button" class="icon-btn sm back-btn" aria-label="Back to the channel" onClick=${onClose}><${Icon} name="arrow-left" size=${15} /></button>
       <h2>Thread</h2><span class="muted truncate">${ch.kind === 'dm' ? 'Direct message' : '#' + ch.name}</span><span class="grow"></span>
-      ${st && html`<button type="button" class="btn sm" onClick=${() => setClosed(root.id, !root.closed)} disabled=${st.answered && !root.closed}>
+      ${st && html`<button type="button" class="btn sm" onClick=${() => setClosed(root.id, !root.closed)} aria-busy=${live.on && board.busy('close-post:' + root.id)} disabled=${(live.on && board.busy('close-post:' + root.id)) || (st.answered && !root.closed)}>
         <${Icon} name=${root.closed ? 'rotate-ccw' : 'check'} size=${13} />${root.closed ? 'Reopen' : st.answered ? 'Answered' : 'Mark answered'}</button>`}
       <button type="button" class="icon-btn sm close-btn" aria-label="Close thread" onClick=${onClose}><${Icon} name="x" size=${15} /></button>
     </header>
@@ -294,7 +301,8 @@ export function MessagesTab({ s, project, route }) {
   const rootCh = root && byId(s.channels, root.channel);
   const scroller = useRef(null);
   const count = ch ? s.posts.filter((p) => p.channel === ch.id).length : 0;
-  useEffect(() => { if (ch) update((st) => { st.boardRead[ch.id] = Date.now(); }); }, [curId, count]);
+  useEffect(() => { if (live.on) { void board.loadMessages(pid, curId, threadId); return; } if (ch) update((st) => { st.boardRead[ch.id] = Date.now(); }); }, [pid, curId, threadId, s.boardRevision]);
+  useEffect(() => { if (!live.on && ch) update((st) => { st.boardRead[ch.id] = Date.now(); }); }, [count]);
   useEffect(() => { setQ(''); setKind(null); setFrom(null); setOnlyOpen(false); }, [curId]);
   useLayoutEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [curId, count]);
 
@@ -315,16 +323,17 @@ export function MessagesTab({ s, project, route }) {
   if (from) posts = posts.filter((p) => p.from === from);
   if (onlyOpen) posts = posts.filter((p) => replyState(s, p, now)?.answered === false);
   if (q.trim()) { const n = q.trim().toLowerCase(); posts = posts.filter((p) => [p, ...repliesOf(s, p)].some((x) => `${x.text} ${whoName(s, x.from, true)} ${x.blocks || ''}`.toLowerCase().includes(n))); }
-  posts = posts.slice().sort((a, b) => a.ts - b.ts);
+  posts = posts.slice().sort((a, b) => live.on ? a.sequence - b.sequence : a.ts - b.ts);
   const filtered = !!(kind || from || onlyOpen || q.trim());
   const clear = () => { setQ(''); setKind(null); setFrom(null); setOnlyOpen(false); };
   const members = ch ? ch.members.map((m) => agentOf(s, m)).filter(Boolean) : [];
+  const memberIds = live.on ? ch?.members || [] : members.map((m) => m.id);
   const team = ch && ch.team && teamOf(s, ch.team);
   const waiting = ch ? waitingIn(s, ch, now).length : total;
 
   const rows = []; let prev = null;
   for (const p of posts) {
-    const day = dayLabel(p.ts, now);
+    const day = p.ts == null ? '' : dayLabel(p.ts, now);
     if (!prev || dayLabel(prev.ts, now) !== day) { rows.push(html`<div class="day" key=${'d' + p.id}>${day}</div>`); prev = null; }
     const grouped = !virtual && prev && prev.from === p.from && p.ts - prev.ts < 12 * MIN && !repliesOf(s, prev).length;
     const pch = virtual ? byId(s.channels, p.channel) : ch;
@@ -346,8 +355,8 @@ export function MessagesTab({ s, project, route }) {
             ${team && team.needToKnow && html`<span class="badge outline" data-tip="Workers post only to their lead or a paired worker"><${Icon} name="lock" size=${11} />Need to know</span>`}`
           : html`<h2>Channel not found</h2>`}
         <span class="grow"></span>
-        ${ch && html`<${Menu} class="members" align="end" label="Members" trigger=${html`<span class="avatar-stack">${members.slice(0, 4).map((m) => html`<${Avatar} key=${m.id} agent=${m} s=${s} size="sm" status=${false} />`)}</span><span>${members.length}</span>`}
-          items=${[{ heading: 'In this channel' }, ...members.map((m) => ({ label: agentLabel(s, m, { withTeam: ch.kind !== 'team' }), sub: agentStatus(s, m).word, onSelect: () => go(routeForAgent(s, m)) })), { sep: true }, { label: 'You read everything and can post', disabled: true }]} />`}
+        ${ch && html`<${Menu} class="members" align="end" label="Members" trigger=${html`<span class="avatar-stack">${memberIds.slice(0, 4).map((id) => live.on ? html`<${Face} key=${id} id=${id} s=${s} size="sm" />` : html`<${Avatar} key=${id} agent=${agentOf(s, id)} s=${s} size="sm" status=${false} />`)}</span><span>${memberIds.length}</span>`}
+          items=${[{ heading: 'In this channel' }, ...memberIds.map((id) => { const m = agentOf(s, id); return { label: whoName(s, id, ch.kind !== 'team'), sub: m ? agentStatus(s, m).word : null, disabled: !m, onSelect: () => m && go(routeForAgent(s, m)) }; }), { sep: true }, { label: 'You read everything and can post', disabled: true }]} />`}
       </header>
       ${(ch || virtual) && html`<div class="mb-filters">
         <div class="search"><${Icon} name="search" size=${14} /><input class="input" type="search" placeholder="Search"  aria-label="Search posts" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>

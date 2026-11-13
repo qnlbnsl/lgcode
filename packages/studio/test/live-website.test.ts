@@ -1,6 +1,7 @@
 // Mounts the website from design/mock in live mode, on the engine records in fixtures.ts,
 // and checks that no sample record from seed() reaches the store or any screen.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import * as board from "../src/board.ts"
 import { mapSnapshot } from "../src/mapping.ts"
 import type { LiveConnection, StorePatch, Write } from "../src/connection.ts"
 import { engineSnapshot } from "./fixtures.ts"
@@ -31,6 +32,7 @@ function fakeConnection() {
   const calls: string[] = []
   const connection: LiveConnection = {
     kind: "engine", label: "the test engine",
+    board, async request(tag) { calls.push(tag); throw new Error("Test refusal") },
     call(tag) { calls.push(tag) }, push() {},
     open(next) { write = next; write({ session: { status: "in", firstRun: false }, conn: { status: "live", lastHeard: 1 }, owner: { name: "Test Owner", initials: "TO" }, ...mapSnapshot(engineSnapshot, Date.now()) }) },
     async signIn() { return "in" }, async signOut() { write({ session: { status: "out", firstRun: false } }) },
@@ -174,7 +176,7 @@ describe("the live website", () => {
     expect(JSON.stringify(store.state["requests"])).toBe(before)
     expect((store.state["projects"] as Array<{ archived: boolean }>)[0]!.archived).toBe(false)
     expect((store.state["threads"] as Record<string, unknown[]>)["ag-lead"] ?? []).toEqual([])
-    expect(fake.calls).toEqual([])
+    expect(fake.calls).toContain("project.archive")
     expect(element.querySelector(".toasts")!.textContent).toContain("not connected to the service yet")
   })
 
