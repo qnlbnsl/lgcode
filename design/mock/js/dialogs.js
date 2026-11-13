@@ -8,6 +8,7 @@ import {
 } from './data.js';
 import * as act from './actions.js';
 import * as board from './live/board.js';
+import * as mocks from './live/mocks.js';
 import { Dialog, registerDialog, Avatar, MergeFacts } from './ui.js';
 
 // ---- quick switcher ---------------------------------------------------------------
@@ -39,14 +40,15 @@ export function searchScore(query, item) {
 function Switcher({ s }) {
   const [q, setQ] = useState(''); const [i, setI] = useState(0); const list = useRef(null);
   const all = [];
-  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || 'No remote', text: `${r.description || ''} ${r.remote || ''}`, to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
+  const text = live.on ? mocks.searchText(s) : null;
+  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || (live.on ? '' : 'No remote'), text: live.on ? text.repositories[r.id] : `${r.description || ''} ${r.remote || ''}`, to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
   for (const p of s.projects.filter((x) => !x.archived)) {
     const st = projectStatus(s, p); const sp = s.sprints.filter((x) => x.project === p.id);
-    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, text: `${repoOf(s, p).name} ${p.goal || ''} ${p.branch || ''} ${sp.map((x) => x.name + ' ' + x.goal).join(' ')}`, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
+    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, text: live.on ? text.projects[p.id] : `${repoOf(s, p).name} ${p.goal || ''} ${p.branch || ''} ${sp.map((x) => x.name + ' ' + x.goal).join(' ')}`, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
   }
   for (const a of s.agents) {
-    const p = projectOf(s, a.project); if (p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
-    all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
+    const p = projectOf(s, a.project); if (!p || p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
+    all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: live.on ? text.agents[a.id] : `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
   }
   for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/subscriptions', 'Subscriptions', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
   const ql = q.trim();

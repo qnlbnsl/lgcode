@@ -15,6 +15,9 @@ import * as Stream from "effect/Stream"
 import * as board from "./board.ts"
 import { mapAlerts } from "./git.ts"
 import * as Redacted from "effect/Redacted"
+import * as mocks from "./mocks.ts"
+import * as Schema from "effect/Schema"
+import { DisplayFrame } from "@lgtm/contracts/project/display"
 import { mapConnection, mapOwner, mapSnapshot, type ConnectionStatus, type EngineRecords, type StoreConn, type StoreOwner } from "./mapping.ts"
 
 export type SessionStatus = "checking" | "in" | "out" | "rejected" | "expired" | "unavailable" | "logout-unconfirmed"
@@ -33,6 +36,9 @@ export interface StorePatch extends Partial<EngineRecords> {
   readonly setupData?: object | null
   readonly notifications?: ReturnType<typeof mapAlerts>
   readonly accountLimits?: Readonly<Record<string, number | null>>
+  readonly mocks?: object
+  readonly design?: object
+  readonly machineDetails?: object | null
 }
 export type Write = (patch: StorePatch) => void
 
@@ -41,6 +47,7 @@ export interface LiveConnection {
   readonly kind: "engine"
   readonly label: string
   readonly board: typeof board
+  readonly mocks: typeof mocks
   call(tag: string, payload: unknown): void
   push(kind: string, payload: unknown): void
   request(tag: string, payload: object): Promise<unknown>
@@ -127,7 +134,7 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   }
   const setSession = (status: SessionStatus) => write({ session: { status, firstRun: false } })
   // Records leave the browser when the session ends, so no signed-out page keeps them.
-  const forget = () => { retryIds.clear(); accountLimits = {}; write({ ...emptyRecords, notifications: [], accountLimits, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, boardUnread: {}, boardRevision: 0, boardDetails: {} }) }
+  const forget = () => { retryIds.clear(); accountLimits = {}; write({ ...emptyRecords, notifications: [], accountLimits, owner: mapOwner(undefined), channels: [], posts: [], taskDetails: {}, boardAgents: {}, setupData: null, mocks: {}, design: {}, machineDetails: null, boardUnread: {}, boardRevision: 0, boardDetails: {} }) }
 
   const post = async (path: string, body?: unknown): Promise<number | undefined> => {
     try {
@@ -280,11 +287,27 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
   return {
     kind: "engine",
     label: "the service",
-    board,
+    board, mocks,
     call() {},
     push() {},
     async request(tag, payload) {
       const client = activeClient
+      if (tag === "display.open" || tag === "display.close") {
+        // Cleanup still uses the owner cookie when the WebSocket has gone away.
+        if (tag === "display.open" && (closed || client === undefined || controller?.signal.aborted)) throw new Error("The service is not connected.")
+        const response = await http(tag === "display.open" ? "/api/display/open" : "/api/display/close", {
+          method: "POST", credentials: "same-origin", cache: "no-store", keepalive: tag === "display.close",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000)
+        })
+        if (response.status === 401) { stop(); forget(); setSession("expired"); throw new Error("The session expired. Sign in again.") }
+        if (!response.ok) throw new Error(tag === "display.open" ? "The isolated display could not be opened. Check the display settings and connection, then retry." : "Could not confirm closing the display. Retry closing before reopening.")
+        if (tag === "display.close") return undefined
+        const body = await response.text()
+        if (body.length > 16_384) throw new Error("The display reply is invalid.")
+        const frame = Schema.decodeUnknownSync(DisplayFrame, { onExcessProperty: "error" })(JSON.parse(body))
+        if (!mocks.validDisplayFrame(frame, new URL(`${where.protocol}//${where.host}`).hostname, now())) throw new Error("The display reply is invalid.")
+        return frame
+      }
       if (closed || client === undefined || controller?.signal.aborted) throw new Error("The service is not connected.")
       const invoke = (client as unknown as Record<string, (input: object) => Effect.Effect<unknown, unknown>>)[tag]
       if (typeof invoke !== "function" || tag.endsWith("subscribe")) throw new Error("Unknown service request.")

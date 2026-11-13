@@ -11371,7 +11371,104 @@ An open page of the live website then shows "Offline" and stays there.
 Only a reload brings up the Login page.
 The page should notice that the service answers again and ask the owner to sign in.
 
-## 659. A fast connection reply could leave a reloaded page blank.
+## 659. The live Mocks tab did not read recorded bundles.
+
+The first live connection left each project's mock record empty.
+It also hid the Mocks tab because the snapshot does not carry a bundle flag.
+The step 2 adapter now reads complete mock history when the tab opens.
+It shows the Design stage tab and preserves whole revision approval semantics.
+A browser test covers current artifacts, stale artifact refusal, approval, and reload.
+This problem is fixed on the worker branch.
+
+## 660. The live repository design page used the sample's fixed sheets.
+
+The page did not read the registered design, components, or tokens.
+The step 2 adapter now loads those records when the page opens.
+The canvas retains its menus and tables without inventing flows or token modes.
+The isolated display controls restore keyboard focus after their requests finish.
+Browser tests cover actual mock and component documents, private URL revocation,
+and the editor route's refusal of changed design evidence.
+The expanded standalone test also caught and verified a palette regression introduced
+while connecting this page.
+This problem is fixed on the worker branch.
+
+## 661. Machines displayed unsupported capacity and installation placeholders.
+
+The live page treated a zero slot limit as real capacity.
+It also showed a persistent scanning state without reading harness discovery.
+The step 2 adapter now loads discovery and the saved workspace and web port.
+The page leaves unrecorded status, hardware, versions, limits, and timestamps empty.
+It counts worktrees from the loaded workspace records.
+Pairing, renaming, removing, and changing the limit retain the existing refusal.
+Browser tests cover these refusals, discovery, rescanning, and repository registration.
+This problem is fixed on the worker branch.
+
+## 662. Search treated unavailable repository metadata as known.
+
+The switcher showed "No remote" when the engine had not supplied a remote.
+Its wider agent text also used a lifecycle display word as activity.
+The live search mapping now indexes only the loaded repository, project, sprint,
+team, and role fields that the engine supplies.
+The existing word ranking remains in place.
+Unit tests cover the search mapping and ranking.
+The browser test covers navigation, empty results, and archived project exclusion.
+No search request is made to the engine.
+This problem is fixed on the worker branch.
+
+## 663. Display cleanup depended on a live socket.
+
+The new display adapter initially applied the socket guard to closing a frame.
+A lost socket could therefore prevent navigation cleanup from reaching the
+Hypertext Transfer Protocol (HTTP) endpoint.
+Closing an issued frame now remains available with the owner's session cookie
+after the socket or the connection closes.
+Opening a frame still requires the live connection.
+A focused test verifies both cleanup cases and the authenticated request options.
+This problem is fixed on the worker branch.
+
+## 664. A legacy Git browser case retained its initial uncertainty message.
+
+The full check on `c8f7009` passed all 529 unit test files.
+Its browser run failed the existing lost-reply case at `git.spec.ts:271`.
+The page retained its initial database acknowledgment warning instead of the
+expected terminal uncertainty message.
+Six focused repetitions of this case passed on baseline `803db7f`.
+The affected website source, engine source, and test body are unchanged.
+The cause has not been established.
+The worker result records the full check and baseline comparison outcomes.
+
+## 665. The known repository dialog referenced an unavailable local variable.
+
+The merge review found that opening the live dialog for a known repository
+referenced a `details` variable that the dialog did not define.
+The dialog now uses the repository's recorded local folder.
+It does not construct a folder from an unknown workspace setting.
+A regression test opens the dialog and checks the actual registered path.
+This problem is fixed in the merge.
+
+## 666. An answered question or approval card lost its contents.
+
+The owner reported this on 2026-11-13.
+An answered card in a thread shrank to its title and a short answer line.
+The summary, the recommendation and the report under "Details" were gone.
+The card now keeps everything it showed before the answer.
+The answer buttons leave, and one line states the outcome.
+The outcome line reads "Allowed", "Denied", "Accepted the recommendation", "You answered" with the owner's words, or "Cancelled".
+The change is in `BriefCard` in `design/mock/js/ui.js`, and the live website carries the chosen option's kind as `answerKind`.
+This is a change to the visible mock, and it awaits the owner's approval of the look.
+
+## 667. A lead repeated its question as a message after asking it.
+
+The owner reported this on 2026-11-13.
+The project lead called the `ask` tool, and the owner saw the question as a card.
+The lead then wrote "Sent through LGTM Studio:" and the same question again as an ordinary message.
+The tool's description did not say that the recipient already sees the question.
+The description in `packages/mcp/src/tools.ts` now says so, and it tells the agent not to repeat the question.
+This has not been checked against a real agent.
+A running agent keeps the old description until it is started again.
+The website does not hide a repeated question, because hiding an agent's free text could hide a real message.
+
+## 668. A fast connection reply could leave a reloaded page blank.
 
 Found: 2026-11-13, while testing the service screens against the real engine.
 State: fixed in this change.
@@ -11381,7 +11478,7 @@ A fast session check and snapshot could arrive before that subscription existed.
 The page then kept its initial checking screen until another update arrived.
 The store now subscribes during layout, before asynchronous connection replies can arrive.
 
-## 660. Registered workspaces need their project and team links joined.
+## 669. Registered workspaces need their project and team links joined.
 
 Found: 2026-11-13, while connecting the Git picker.
 State: fixed in this change.
@@ -11390,7 +11487,7 @@ A registered workspace need not hold a project identifier or a team identifier.
 Projects and teams name their workspaces in their own records.
 The mapping now joins those records so that the Git picker includes their worktrees.
 
-## 661. The settings contract does not return effective role defaults.
+## 670. The settings contract does not return effective role defaults.
 
 Found: 2026-11-13, while connecting Service settings.
 State: open.
@@ -11402,7 +11499,7 @@ An unset switch is labelled as not set by the service.
 Worker stall time edits the service-wide stall limit.
 The separate lead and assigned timers have no matching setting and remain empty.
 
-## 662. Notification retries need the original receipt after a lost reply.
+## 671. Notification retries need the original receipt after a lost reply.
 
 Found: 2026-11-13, while connecting notification delivery actions.
 State: fixed in this change.
@@ -11413,7 +11510,7 @@ The connection keeps the request identifier until a reply confirms the result.
 The notification page keeps the original alert generation and attempt while recovery is pending.
 A unit test checks that recovery reuses the identifier.
 
-## 663. Git destinations must keep their workspace identifiers.
+## 672. Git destinations must keep their workspace identifiers.
 
 Found: 2026-11-13, while reviewing the integration mapping.
 State: fixed in this change.
@@ -11423,7 +11520,7 @@ A branch name alone does not identify a registered workspace.
 The mapping also keeps the parent workspace identifier.
 Integration and main review use that identifier to select their destinations.
 
-## 664. The existing website's browser assertions failed in the full check.
+## 673. The existing website's browser assertions failed in the full check.
 
 Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
 State: open.
@@ -11465,7 +11562,7 @@ The component preview case observed issuance status 0 instead of 200 at `new-pro
 The separate credits check passed.
 No existing website assertion or deadline was changed.
 
-## 665. The automatic merge retained duplicate shared declarations.
+## 674. The automatic merge retained duplicate shared declarations.
 
 Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
 State: fixed in the merge.
@@ -11477,7 +11574,7 @@ The automatic merge also duplicated the JavaScript request export and the dialog
 The merge now keeps one request method, one request export, and one live import.
 The test connection keeps the board builder's request recording.
 
-## 666. The review control fixtures did not load connected service settings.
+## 675. The review control fixtures did not load connected service settings.
 
 Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
 State: fixed in the merge.
@@ -11496,7 +11593,7 @@ A later remote run observed an empty value after the initial stall-time edit.
 The remote settings save also waits for the form to report no unsaved changes before reloading.
 A subsequent run read the previous check-in value after reloading.
 
-## 667. The Home reader retained an answered request after logout.
+## 676. The Home reader retained an answered request after logout.
 
 Found: 2026-11-13, while merging the chat work with the connection review fixes.
 State: fixed in the merge.
@@ -11507,7 +11604,7 @@ The reader now retains an answered request only while its agent is still present
 A regression test loads an answered request through the Home reader and clicks the actual logout control.
 It checks that the connection signs out and the request store becomes empty.
 
-## 668. The Nudge regression test still expected an unconnected control after the merge.
+## 677. The Nudge regression test still expected an unconnected control after the merge.
 
 Found: 2026-11-13, while merging the area branch into the chat worker branch.
 State: fixed in this merge.
@@ -11518,7 +11615,7 @@ The merged test now checks that the request reaches the connection.
 It also checks that an engine refusal appears and leaves the local posts empty.
 The other unconnected controls keep their original refusal checks.
 
-## 669. The merged Messages module imported the live binding twice.
+## 678. The merged Messages module imported the live binding twice.
 
 Found: 2026-11-13, during the remote browser check of this merge.
 State: fixed in this merge.
@@ -11529,7 +11626,7 @@ The browser rejected the module and left both the live page and the standalone m
 The test transformer accepted the declarations, so the Studio tests did not expose the error.
 Removing the redundant import lets the browser parse the module.
 
-## 670. The board mapping replaced worker names with role labels.
+## 679. The board mapping replaced worker names with role labels.
 
 Found: 2026-11-13, during the merged chat browser journey.
 State: fixed in this merge.

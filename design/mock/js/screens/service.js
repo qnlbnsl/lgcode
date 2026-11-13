@@ -8,6 +8,7 @@ import {
 } from '../data.js';
 import * as act from '../actions.js';
 import * as board from '../live/board.js';
+import * as mocks from '../live/mocks.js';
 import { Avatar, Menu, Dialog, registerDialog, Empty, StateWord } from '../ui.js';
 
 // ---- seed ----------------------------------------------------------------------
@@ -99,7 +100,8 @@ function Command({ text }) {
 
 // ---- machines --------------------------------------------------------------------
 function MachineDetail({ s, m, now }) {
-  const ags = machineAgents(s, m.id); const live = ags.filter(running);
+  const ags = machineAgents(s, m.id); const runningAgents = ags.filter(running);
+  const details = s.machineDetails;
   const repos = s.repos.filter((r) => r.folders[m.id]);
   const trees = s.projects.filter((p) => p.machine === m.id && !p.archived);
   const subs = s.subscriptions.filter((x) => x.machine === m.id);
@@ -110,16 +112,16 @@ function MachineDetail({ s, m, now }) {
     <div>
       <h3>This machine</h3>
       <dl class="dl">
-        <dt>Workspace</dt><dd class="mono">${m.workspace}</dd>
-        <dt>System</dt><dd>${m.os} · ${m.cores} cores · ${m.ram} GB</dd>
-        <dt>LGTM Studio</dt><dd>${m.version}${m.version !== s.settings.version ? html` <span class="warn-text">· older than the service (${s.settings.version})</span>` : ''}</dd>
+        <dt>Workspace</dt><dd class="mono">${live.on ? details?.workspace : m.workspace}</dd>
+        <dt>System</dt><dd>${!live.on && html`${m.os} · ${m.cores} cores · ${m.ram} GB`}</dd>
+        <dt>LGTM Studio</dt><dd>${!live.on && m.version}${!live.on && m.version !== s.settings.version ? html` <span class="warn-text">· older than the service (${s.settings.version})</span>` : ''}</dd>
         ${m.connectedFor && m.status === 'online' && html`<dt>Connected</dt><dd>${ago(now - m.connectedFor, now)}</dd>`}
-        <dt>Agent limit</dt><dd><${Num} id=${'lim-' + m.id} value=${m.slots.limit} min=${1} max=${64} unit="at once" onChange=${(v) => update(() => { m.slots.limit = v; })} /></dd>
+        <dt>Agent limit</dt><dd><${Num} id=${'lim-' + m.id} value=${live.on ? '' : m.slots.limit} min=${1} max=${64} unit="at once" onChange=${(v) => update(() => { m.slots.limit = v; })} /></dd>
       </dl>
     </div>
     <div>
       <h3>Harnesses</h3>
-      <ul class="svc-lines">${Object.keys(HARNESSES).map((h) => { const v = m.harnesses?.[h]; const n = subs.filter((x) => x.harness === h && x.signedIn).length;
+      <ul class="svc-lines">${live.on ? (details?.harnesses || []).map((h) => html`<li key=${h.id}><${Icon} name=${h.installed ? 'circle-check' : 'circle-alert'} size=${14} /><b>${HARNESSES[h.id]?.name || h.id}</b><span class="muted">${h.installed ? `Installed · ${h.signedIn} signed in` : 'Not installed'}</span></li>`) : Object.keys(HARNESSES).map((h) => { const v = m.harnesses?.[h]; const n = subs.filter((x) => x.harness === h && x.signedIn).length;
         return html`<li key=${h}><${Icon} name=${v ? 'circle-check' : 'circle-alert'} size=${14} class=${v ? 'success-text' : 'warn-text'} /><b>${HARNESSES[h].name}</b>
           ${v ? html`<span class="muted">${v} · ${n ? n + ' signed in' : 'not signed in'}</span>` : html`<span class="muted">Not installed</span>`}</li>
           ${!v && html`<li><${Command} text=${h === 'codex' ? 'npm install -g @openai/codex' : 'npm install -g @anthropic-ai/claude-code'} /></li>`}`; })}</ul>
@@ -133,8 +135,8 @@ function MachineDetail({ s, m, now }) {
       ${trees.length === 0 && html`<p class="muted">No project runs here.</p>`}
       <ul class="svc-lines">${trees.map((p) => { const pa = agentsOfProject(s, p.id); const n = pa.filter(running).length;
         return html`<li key=${p.id}><${Icon} name="git-branch" size=${14} class="faint" /><a class="link truncate" href=${href(`/p/${p.id}/board`)} title=${p.branch}>${p.name}</a>
-          <span class="grow"></span><span class="muted" style="white-space:nowrap">${1 + teamsOf(s, p.id).length} worktrees · ${n} of ${pa.length} running</span></li>`; })}</ul>
-      ${live.length > 0 && html`<ul class="svc-agents">${live.map((a) => { const st = agentStatus(s, a);
+          <span class="grow"></span><span class="muted" style="white-space:nowrap">${live.on ? s.worktrees.filter((w) => w.project === p.id || w.id === p.worktreeId).length : 1 + teamsOf(s, p.id).length} worktrees · ${n} of ${pa.length} running</span></li>`; })}</ul>
+      ${runningAgents.length > 0 && html`<ul class="svc-agents">${runningAgents.map((a) => { const st = agentStatus(s, a);
         return html`<li key=${a.id}><a class="row" href=${href(routeForAgent(s, a))}><${Avatar} agent=${a} s=${s} size="sm" /><b>${a.name}</b><span class="muted truncate">${projectOf(s, a.project).name}</span></a>
           <span class="truncate" style="font-size:var(--text-sm)"><${StateWord} status=${st} /></span></li>`; })}</ul>`}
     </div>
@@ -142,6 +144,7 @@ function MachineDetail({ s, m, now }) {
 }
 export function Machines({ s }) {
   const now = useNow(10_000);
+  useEffect(() => { if (live.on) void mocks.loadMachines(); }, [s.boardRevision]);
   const online = s.machines.filter((m) => m.status === 'online').length;
   const remove = (m) => { const ags = machineAgents(s, m.id).filter(running); const subs = s.subscriptions.filter((x) => x.machine === m.id);
     act.confirm({ title: `Remove ${m.name}?`, body: `${m.name} is disconnected and forgotten. Its folders stay on its disk. Pair it again to bring it back.`, action: 'Remove machine',
@@ -149,36 +152,36 @@ export function Machines({ s }) {
       onConfirm: () => { update((st) => { st.machines = st.machines.filter((x) => x.id !== m.id); st.subscriptions = st.subscriptions.filter((x) => x.machine !== m.id);
         for (const a of st.agents) if ((projectOf(st, a.project) || {}).machine === m.id && running(a)) { a.prevState = a.state; a.state = 'stopped'; a.activity = `Stopped · ${m.name} was removed`; } }); act.toast(`Removed ${m.name}`); } }); };
   return html`<div class="view-body"><div class="page">
-    <div class="page-head"><h1 class="page-title">Machines</h1><span class="sub">${online} of ${s.machines.length} online</span><span class="grow"></span>
-      <button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'pair-machine' })}><${Icon} name="plus" size=${14} />Add machine</button></div>
-    <div class="table-wrap" data-main><table class="table svc-machines">
-      <thead><tr><th>Machine</th><th class="c-mid">Role</th><th>Status</th><th class="c-wide">Address</th><th class="c-wide">Harnesses</th><th>Agents</th><th class="c-mid">CPU</th><th class="c-mid">Memory</th><th class="c-mid">Last seen</th><th></th></tr></thead>
-      <tbody>${s.machines.map((m) => { const k = 'machine:' + m.id; const open = !!s.expanded[k]; const off = m.status === 'offline'; const n = machineAgents(s, m.id).filter(running).length;
+    <div class="page-head"><h1 class="page-title">Machines</h1><span class="sub">${!live.on && html`${online} of ${s.machines.length} online`}</span><span class="grow"></span>
+      <button type="button" class="btn primary" onClick=${() => live.on ? refuse() : act.openDialog({ type: 'pair-machine' })}><${Icon} name="plus" size=${14} />Add machine</button></div>
+    <div class="table-wrap" data-main aria-busy=${live.on && mocks.busy('read-machines')}><table class="table svc-machines">
+      <thead><tr><th>Machine</th><th class="c-mid">Role</th><th>Status</th><th class="c-wide">${live.on ? 'Web port' : 'Address'}</th><th class="c-wide">Harnesses</th><th>Agents</th><th class="c-mid">CPU</th><th class="c-mid">Memory</th><th class="c-mid">Last seen</th><th></th></tr></thead>
+      <tbody>${s.machines.filter((m) => !live.on || m.id === 'local').map((m) => { const k = 'machine:' + m.id; const open = !!s.expanded[k]; const off = m.status === 'offline'; const n = machineAgents(s, m.id).filter(running).length;
         const full = n >= m.slots.limit;
         return html`<tr key=${m.id} class=${cx('click', off && 's-warn', off && 'off')} aria-expanded=${open} onClick=${() => act.toggleExpanded(k)}>
             <td class="state-cell"><span class="row" style="gap:8px"><button type="button" class=${cx('svc-twist', open && 'open')} aria-expanded=${open} aria-label=${(open ? 'Hide' : 'Show') + ' details for ' + m.name} onClick=${(e) => { e.stopPropagation(); act.toggleExpanded(k); }}><${Icon} name="chevron-right" size=${13} /></button>
-              <${Icon} name="server" size=${14} class="faint" /><b>${m.name}</b>${m.here && html`<span class="badge outline not-phone">This computer</span>`}</span></td>
-            <td class="muted c-mid">${m.role === 'master' ? 'Master' : 'Worker'}</td>
-            <td><span class="row" style="gap:6px"><i class=${cx('dot', off ? 'waiting' : m.status === 'pairing' ? 'starting' : 'working')}></i><span class=${cx(off && 'warn-text')} style=${off ? 'font-weight:var(--weight-medium)' : ''}>${off ? 'Offline' : m.status === 'pairing' ? 'Pairing' : 'Online'}</span></span></td>
-            <td class="mono muted c-wide">${m.address}</td>
-            <td class="c-wide">${Object.keys(HARNESSES).map((h) => m.harnesses?.[h] ? html`<span key=${h} class="tag" style="margin-right:4px">${HARNESSES[h]?.name || ''}</span>` : null)}${m.harnesses && !m.harnesses.codex && html`<span class="warn-text" style="font-size:var(--text-sm)">Codex missing</span>`}${!m.harnesses && html`<span class="muted">Scanning…</span>`}</td>
-            <td class="num" style="text-align:left"><span class=${cx(full && 'warn-text')}>${n}</span><span class="muted"> of ${m.slots.limit}</span></td>
+              <${Icon} name="server" size=${14} class="faint" /><b>${m.name}</b>${m.here && !live.on && html`<span class="badge outline not-phone">This computer</span>`}</span></td>
+            <td class="muted c-mid">${live.on ? '' : m.role === 'master' ? 'Master' : 'Worker'}</td>
+            <td>${!live.on && html`<span class="row" style="gap:6px"><i class=${cx('dot', off ? 'waiting' : m.status === 'pairing' ? 'starting' : 'working')}></i><span class=${cx(off && 'warn-text')} style=${off ? 'font-weight:var(--weight-medium)' : ''}>${off ? 'Offline' : m.status === 'pairing' ? 'Pairing' : 'Online'}</span></span>`}</td>
+            <td class="mono muted c-wide">${live.on ? s.machineDetails?.port ?? '' : m.address}</td>
+            <td class="c-wide">${live.on ? (s.machineDetails?.harnesses || []).filter((h) => h.installed).map((h) => html`<span key=${h.id} class="tag" style="margin-right:4px">${HARNESSES[h.id]?.name || h.id}</span>`) : html`${Object.keys(HARNESSES).map((h) => m.harnesses?.[h] ? html`<span key=${h} class="tag" style="margin-right:4px">${HARNESSES[h].name}</span>` : null)}${m.harnesses && !m.harnesses.codex && html`<span class="warn-text" style="font-size:var(--text-sm)">Codex missing</span>`}${!m.harnesses && html`<span class="muted">Scanning…</span>`}`}</td>
+            <td class="num" style="text-align:left"><span class=${cx(!live.on && full && 'warn-text')}>${n}</span>${!live.on && html`<span class="muted"> of ${m.slots.limit}</span>`}</td>
             <td class="c-mid">${off || m.status === 'pairing' ? html`<span class="faint">—</span>` : html`<${Meter} pct=${m.cpu} />`}</td>
             <td class="c-mid">${off || m.status === 'pairing' ? html`<span class="faint">—</span>` : html`<${Meter} pct=${m.mem} />`}</td>
-            <td class=${cx('c-mid', off ? 'warn-text' : 'muted')}>${off ? ago(m.lastSeen, now) + ' ago' : 'Now'}</td>
+            <td class=${cx('c-mid', off ? 'warn-text' : 'muted')}>${live.on ? '' : off ? ago(m.lastSeen, now) + ' ago' : 'Now'}</td>
             <td class="svc-acts" onClick=${(e) => e.stopPropagation()}><${Menu} class="icon-btn sm" label=${'Actions for ' + m.name} align="end" width=${230} trigger=${html`<${Icon} name="ellipsis" size=${15} />`}
               items=${[
                 { label: 'Rename', icon: 'pencil', onSelect: () => act.openDialog({ type: 'rename', title: `Rename ${m.name}`, value: m.name, taken: s.machines.map((x) => x.name), onRename: (v) => { update(() => { m.name = v; }); act.toast('Machine renamed'); } }) },
-                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => { if (act.refused()) return; act.toast(`Scanned ${m.name}. Nothing changed.`); } },
+                { label: 'Scan harnesses again', icon: 'scan-search', disabled: off || live.on && mocks.busy('read-machines'), why: off ? `${m.name} is offline.` : null, onSelect: () => live.on ? mocks.loadMachines() : act.toast(`Scanned ${m.name}. Nothing changed.`) },
                 { label: 'Add repository', icon: 'folder-git-2', disabled: off, why: off ? `${m.name} is offline.` : null, onSelect: () => act.openDialog({ type: 'add-repository', machine: m.id }) },
                 off && { label: 'Try to reconnect', icon: 'refresh-cw', onSelect: () => { if (act.refused()) return; act.toast(`Calling ${m.name}…`); setTimeout(() => { update(() => { m.status = 'online'; m.lastSeen = Date.now(); m.cpu = 9; m.mem = 31; }); act.toast(`${m.name} is back online`); }, 1500); } },
                 { sep: true },
-                { label: 'Remove machine', icon: 'trash-2', danger: true, disabled: m.role === 'master', why: m.role === 'master' ? 'The master runs the service and cannot be removed.' : null, onSelect: () => remove(m) },
+                { label: 'Remove machine', icon: 'trash-2', danger: true, disabled: !live.on && m.role === 'master', why: !live.on && m.role === 'master' ? 'The master runs the service and cannot be removed.' : null, onSelect: () => live.on ? refuse() : remove(m) },
               ].filter(Boolean)} /></td>
           </tr>
           ${open && html`<tr key=${m.id + '-d'} class="svc-detail-row"><td colspan="10"><${MachineDetail} s=${s} m=${m} now=${now} /></td></tr>`}`; })}</tbody>
     </table></div>
-    <p class="svc-foot-note">The master runs the service and this page. A worker runs agents in its own workspace and reports back to the master.</p>
+    <p class="svc-foot-note">${live.on ? 'The service accepts only the local machine.' : 'The master runs the service and this page. A worker runs agents in its own workspace and reports back to the master.'}</p>
   </div></div>`;
 }
 
@@ -219,7 +222,7 @@ function AddRepository({ s, d }) {
   const [machine, setMachine] = useState(live.on ? 'local' : d.machine || 'studio'); const m = machineOf(s, machine);
   const [path, setPath] = useState(() => `${machineOf(s, live.on ? 'local' : d.machine || 'studio').workspace}/${known ? known.name : ''}`);
   const [found, setFound] = useState(null);
-  useEffect(() => { if (!known) return; setPath(`${m.workspace}/${known.name}`); }, [machine]);
+  useEffect(() => { if (!known) return; setPath(live.on ? known.folders[machine] || '' : `${m.workspace}/${known.name}`); }, [machine]);
   const name = path.replace(/\/+$/, '').split('/').pop() || '';
   const valid = /^(~|\/)/.test(path.trim()) && name && name !== '~' && path.trim() !== m.workspace;
   useEffect(() => {

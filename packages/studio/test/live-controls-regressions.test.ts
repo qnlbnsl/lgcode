@@ -1,5 +1,6 @@
 import * as board from "../src/board.ts"
 import * as git from "../src/git.ts"
+import * as mocks from "../src/mocks.ts"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { Client, connect } from "@lgtm/client/browser"
 import * as Effect from "effect/Effect"
@@ -29,13 +30,15 @@ afterEach(() => { website.unmount(element); element.remove() })
 async function mount(route: string, connection?: LiveConnection, records = mapSnapshot(engineSnapshot, 1)) {
   const calls: string[] = []
   const screenReads: Record<string, unknown> = {
-    accounts: { accounts: [] }, harnesses: { harnesses: [] }, "project.settings": { settings: undefined },
+    "project.setup.discover": { result: { state: "available", repositories: [], truncated: false, harnesses: [{ harness: "codex", installed: true, configured: false, accounts: [] }] } },
+    "client.sequence": { sequence: engineSnapshot.sequence }, "project.mocks.read": { items: [] },
+    accounts: { accounts: [] }, harnesses: { harnesses: [] }, "project.settings": { settings: { workspaceFolder: "/srv/repos", shell: "sh" } },
     "roles.settings.get": { settings: {} }, "client.web.settings": { enabled: false, port: 8787, heartbeatSeconds: 25, proxyMode: false },
     "roles.role-file.get": { file: null }, "client.snapshot": engineSnapshot,
     "client.alerts.settings": { carrier: { _tag: "none" }, tokenSet: false, kinds: [], pushPromptDismissed: false }
   }
   const live: LiveConnection = connection ?? {
-    kind: "engine", label: "test engine", board,
+    kind: "engine", label: "test engine", board, mocks,
     async request(tag) { calls.push(tag); if (Object.hasOwn(screenReads, tag)) return screenReads[tag]; throw new Error("Test refusal") },
     call(tag) { calls.push(tag) }, push() {},
     open(write) { write({ ...records, session: { status: "in", firstRun: false }, conn: { status: "reconnecting", lastHeard: 0 } }) },
@@ -49,8 +52,8 @@ async function mount(route: string, connection?: LiveConnection, records = mapSn
   // Opening a connected screen reads its settings. The assertions below inspect
   // every request after the control is clicked, independently of those reads.
   expect(calls.every((tag) => Object.hasOwn(screenReads, tag))).toBe(true)
-  calls.length = 0
-  return { store, calls }
+  const initialCalls = calls.splice(0)
+  return { store, calls, initialCalls }
 }
 function button(text: string, root: ParentNode = document) {
   const found = [...root.querySelectorAll<HTMLElement>("button,[role=menuitem]")].find((b) => b.textContent?.trim().startsWith(text))
@@ -106,11 +109,24 @@ it("restart refuses before scheduling a simulated restart (finding 7)", async ()
   expect(store.state.conn.status).toBe("reconnecting")
 })
 
-it("Scan harnesses again refuses instead of claiming a scan (finding 7)", async () => {
-  const { store, calls } = await mount("/machines")
+it("Scan harnesses again reads the engine instead of claiming a simulated scan (finding 7)", async () => {
+  const { store, calls, initialCalls } = await mount("/machines")
+  const reads = ["project.setup.discover", "project.settings", "client.web.settings"]
+  expect(initialCalls).toEqual(reads)
   element.querySelector<HTMLElement>('.svc-machines [aria-haspopup="menu"]')!.click(); await settle()
   button("Scan harnesses again").click(); await settle()
-  noticeOnly(store.state)
+  expect(calls).toEqual(reads)
+  expect(store.state.machineDetails.harnesses).toEqual([{ id: "codex", installed: true, signedIn: 0 }])
+  expect(store.state.toasts).toEqual([])
+  expect(element.textContent).not.toContain("Scanned")
+})
+
+it("a known repository dialog uses its registered local folder", async () => {
+  const { store, calls } = await mount("/r/rp-orchard")
+  const actions = await import("../../../design/mock/js/actions.js" as string) as { openDialog(d: unknown): void }
+  actions.openDialog({ type: "add-repository", machine: "local", repo: "rp-orchard" }); await settle()
+  expect((document.querySelector("#ar-path") as HTMLInputElement).value).toBe("/srv/repos/orchard")
+  expect(store.state.toasts).toEqual([])
   expect(calls).toEqual([])
 })
 

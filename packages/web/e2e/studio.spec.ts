@@ -4,7 +4,7 @@ import { exerciseStudioService } from './support/studioService.ts'
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"
 import { execFileSync } from "node:child_process"
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -22,6 +22,9 @@ import { seedAccount, harnessSettings, agentCredential, appendSetup, eventOf, ow
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { buildStudio } from "../../studio/scripts/build.ts"
+import { httpsProxy } from "./support/httpsProxy.ts"
+
+test.use({ ignoreHTTPSErrors: true })
 
 test.use({ actionTimeout: 10_000 })
 
@@ -307,13 +310,17 @@ test("live projects and board: signs in through the engine, shows its real recor
   mkdirSync(staticRoot)
   writeFileSync(join(staticRoot, "index.html"), "<!doctype html><title>Current page</title><main>Current page</main>")
   const errors: string[] = []
+  let expectedDisplayRefusal = false
+  let displayProxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
   const violations: string[] = []
   const timings: string[] = []
+  const sent: string[] = []
+  page.on("websocket", (socket) => socket.on("framesent", (frame) => sent.push(String(frame.payload))))
   page.on("pageerror", (error) => errors.push(error.stack ?? error.message))
   page.on("console", (message) => {
     // The browser logs the engine's refusal of a signed-out session check and of a wrong
     // password. Those refusals are expected here.
-    if (message.type() === "error" && !/status of 401/.test(message.text())) errors.push(message.text())
+    if (message.type() === "error" && !/status of 401/.test(message.text()) && !(expectedDisplayRefusal && /status of 503/.test(message.text()))) errors.push(message.text())
     if (message.type() === "debug" && message.text().startsWith("LGTM Studio:")) timings.push(message.text())
   })
   await page.addInitScript(() => {
@@ -330,7 +337,9 @@ test("live projects and board: signs in through the engine, shows its real recor
     execFileSync("git", ["-C", additionalRepo, "init", "-b", "main"], { stdio: "ignore" })
     execFileSync("git", ["-C", additionalRepo, "-c", "user.name=Owner", "-c", "user.email=owner@example.test", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
     const studioRoot = await buildStudio(join(rig.root, "studio"))
-    const port = await unusedPort()
+    const port = await unusedPort(), displayPort = await unusedPort()
+    displayProxy = await httpsProxy(displayPort, rig.root)
+    const webSettings = { enabled: true, port, heartbeatSeconds: 25, proxyMode: false, display: { port: displayPort, publicAddress: displayProxy.origin.replace("127.0.0.1", "localhost") } }
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const runner = yield* makeFakeRunner()
       runner.script("choices", () => Effect.succeed({ models: { source: "negotiated", options: [{ id: "test-model", label: "Test model" }, { id: "model-next", label: "Next model" }] }, efforts: { source: "negotiated", options: [{ id: "high", label: "High" }, { id: "medium", label: "Medium" }] } }))
@@ -344,9 +353,27 @@ test("live projects and board: signs in through the engine, shows its real recor
           eventOf({ _tag: "project.RepositoryLocated", repoId: project.repoId, machineId: "local", path: rig.work }),
           eventOf({ _tag: "project.WorktreeCreated", repoId: project.repoId, worktreeId: project.worktreeId,
           branch: "main", path: rig.work, machineId: "local", checkout: "main" })])
+        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
+        writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Recorded screen evidence</h1>")
+        writeFileSync(join(rig.work, "studio-data.json"), "{}")
+        const componentText = '<h1>Actual registered component</h1><script>document.body.dataset.ready="yes"</script>'
+        mkdirSync(join(rig.work, "studio-components"))
+        writeFileSync(join(rig.work, "studio-components/card.html"), componentText)
+        writeFileSync(join(rig.work, "studio-design.pen"), "Registered design bytes")
+        writeFileSync(join(rig.work, "studio-tokens.json"), JSON.stringify({ tokens: [{ name: "engine.ink", value: "#123456" }] }))
+        success(yield* call(ownerCredential, "project.design.record", { projectId: project.projectId, design: {
+          repoId: project.repoId, worktreeId: project.worktreeId, file: "studio-design.pen", tokensPath: "studio-tokens.json",
+          components: [{ componentId: "card", name: "Engine Card", reference: "studio-components/card.html", variants: "Compact", fingerprint: createHash("sha256").update(componentText).digest("hex") }]
+        } }))
+        const field = { entity: "request", name: "title", type: "string", description: "Engine field description", screens: ["requests"], sourceId: "data" }
+        const mockRevision = success(yield* call(ownerCredential, "project.mocks.record", { projectId: project.projectId, bundle: {
+          sources: [{ sourceId: "screens", worktreeId: project.worktreeId, path: "studio-screen.html", kind: "screens" },
+            { sourceId: "data", worktreeId: project.worktreeId, path: "studio-data.json", kind: "data" }],
+          screens: [{ screenId: "requests", sourceId: "screens", name: "Engine requests screen", summary: "Actual screen summary", route: "/requests", scenarioRoutes: [] }],
+          components: [], scenarios: [], draftedFields: [field], reviewedComparisons: [{ field, status: "differs", known: "number" }]
+        } }))
         const taskId = success(yield* call(ownerCredential, "project.task.create", { ...project.task, title: "Engine task", label: "TK-1" })).taskId
         success(yield* call(ownerCredential, "project.task.note", { projectId: project.projectId, taskId, title: "Recorded note", detail: "Actual engine history" }))
-        success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash" } }))
         yield* seedAccount("studio-ready", "cursor")
         success(yield* call(ownerCredential, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
         success(yield* call(ownerCredential, "accounts set-secret", { accountId: "studio-ready", name: "CURSOR_API_KEY", nonce: "studio-browser", value: Redacted.make("synthetic-studio-browser-key") }))
@@ -354,8 +381,8 @@ test("live projects and board: signs in through the engine, shows its real recor
         success(yield* call(ownerCredential, "board.members", { channelId, add: [project.workerId], remove: [] }))
         success(yield* call(project.workerCredential, "board.post", { channelId, text: "Engine board post", to: [{ _tag: "owner" }], reply: "none" }))
         yield* completedSetup(project.projectId)
-        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists,
-          settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        success(yield* call(ownerCredential, "client.web.settings.set", { settings: webSettings }))
+        yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists: engineLists, registerSecret: () => {} })
         yield* Effect.promise(async () => {
           const origin = `http://127.0.0.1:${port}`
           // The current page keeps working at the root, and /studio is sent to /studio/.
@@ -377,6 +404,105 @@ test("live projects and board: signs in through the engine, shows its real recor
           await expect(sidebar.locator(".tree-row.project")).toContainText("Project")
           await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(0)
           for (const word of ["Maya Okafor", "lgtm-studio", "Agent console", "Workstation"]) await expect(page.locator("body")).not.toContainText(word)
+
+          await page.keyboard.press("Control+k")
+          const switcher = page.getByRole("dialog", { name: "Find project or agent", exact: true })
+          const query = switcher.getByRole("textbox")
+          await query.fill("Real decisions")
+          await expect(switcher.getByRole("option")).toHaveCount(1)
+          await expect(switcher.getByRole("option")).toContainText("Project")
+          await query.fill("Repository")
+          await expect(switcher.getByRole("option").first()).toContainText("Repository")
+          await expect(switcher).not.toContainText("No remote")
+          await query.fill("Engine task")
+          await expect(switcher).toContainText('Nothing matches')
+          await query.fill("agent builder")
+          await expect(switcher.getByRole("option").first()).toContainText("Agent")
+          await query.press("Enter")
+          await expect(page).toHaveURL(new RegExp(`/chat/${project.workerId}$`))
+          expect(sent.join("\n")).not.toContain("context.search")
+
+          // Mock data is fetched when its tab opens, with no sample thumbnails.
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/mocks`)
+          await expect(page.locator(".mk-screens")).toContainText("Engine requests screen")
+          await expect(page.locator(".mk-screens")).toContainText(mockRevision.revisionId)
+          await expect(page.locator(".mk-mini")).toBeEmpty()
+          await page.getByRole("link", { name: /^Changes/ }).click()
+          await expect(page.locator(".mk-changes")).toContainText(mockRevision.revisionId)
+          await expect(page.locator(".mk-changes")).toContainText("Owner")
+          await expect(page.locator(".mk-changes")).not.toContainText("New")
+          await page.getByRole("link", { name: /^Data/ }).click()
+          await expect(page.locator(".main .table")).toContainText("request.title")
+          await expect(page.locator(".main .table")).toContainText("Engine field description")
+          await page.getByRole("link", { name: /^Screens/ }).click()
+          await page.getByRole("link", { name: "Engine requests screen", exact: true }).click()
+          await expect(page.getByRole("button", { name: "Edit design", exact: true })).toBeDisabled()
+          await page.getByRole("button", { name: "Open preview", exact: true }).click()
+          const preview = page.locator('section[aria-label="Engine requests screen preview"]')
+          await expect(preview.frameLocator("iframe").getByRole("heading", { name: "Recorded screen evidence" })).toBeVisible()
+          const privateMockUrl = await preview.locator("iframe").getAttribute("src")
+          await preview.getByRole("button", { name: "Close display", exact: true }).click()
+          await expect(preview.locator("iframe")).toHaveCount(0)
+          expect((await page.request.get(privateMockUrl!)).ok()).toBe(false)
+          await page.getByRole("button", { name: "Approve", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(page.locator(".mk-stagebar")).toContainText("Draft")
+          await page.getByRole("link", { name: "Screens", exact: true }).click()
+          await page.getByRole("button", { name: "Request changes", exact: true }).click()
+          await page.locator("#mc-text").fill("Please revise the engine screen")
+          // The existing socket carries the prompt. No optimistic comment is created.
+          await page.getByRole("dialog").getByRole("button", { name: "Send", exact: true }).click()
+          await expect(page.getByRole("dialog")).toHaveCount(0)
+          await expect(page.locator(".toasts")).toContainText("Change request sent")
+          writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Changed evidence</h1>")
+          await page.getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await page.getByRole("dialog").getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("artifact is unavailable or changed")
+          await expect(page.locator(".wf-status")).not.toContainText("Approved")
+          writeFileSync(join(rig.work, "studio-screen.html"), "<h1>Recorded screen evidence</h1>")
+          await page.getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await page.getByRole("dialog").getByRole("button", { name: "Approve mocks", exact: true }).click()
+          await expect(page.locator(".wf-status")).toContainText("Approved")
+          await page.reload()
+          await expect(page.locator(".wf-status")).toContainText("Approved")
+          await page.goto(`${origin}/studio/#/p/${project.projectId}/board`)
+          await page.reload()
+          await expect(page.getByRole("tab", { name: "Mocks", exact: true })).toBeVisible()
+
+          await page.goto(`${origin}/studio/#/r/${project.repoId}/design`)
+          await expect(page.locator(".dz-file")).toContainText("studio-design.pen")
+          await expect(page.locator(".dz-file")).toContainText("Owner")
+          await expect(page.locator(".dz-canvas")).toContainText("No flows")
+          await page.getByRole("button", { name: "Category", exact: true }).click()
+          await page.getByRole("menuitemradio", { name: "Components", exact: true }).click()
+          await expect(page.locator(".dz-canvas")).toContainText("Engine Card")
+          await expect(page.locator(".dz-canvas")).toContainText("Compact")
+          await page.getByRole("button", { name: "View component", exact: true }).click()
+          const display = page.getByRole("dialog", { name: "Engine Card preview", exact: true })
+          await display.getByRole("button", { name: "Open display", exact: true }).click()
+          await expect(display.frameLocator("iframe").locator("body")).toHaveAttribute("data-ready", "yes")
+          expect(await display.locator("iframe").getAttribute("sandbox")).toBe("allow-scripts")
+          const privateComponentUrl = await display.locator("iframe").getAttribute("src")
+          await page.keyboard.press("Escape")
+          await expect(display).toHaveCount(0)
+          await expect.poll(async () => (await page.request.get(privateComponentUrl!)).ok()).toBe(false)
+          await page.getByRole("button", { name: "Category", exact: true }).click()
+          await page.getByRole("menuitemradio", { name: "Palette", exact: true }).click()
+          await expect(page.locator(".dz-canvas")).toContainText("engine.ink")
+          await expect(page.locator(".dz-canvas")).toContainText("#123456")
+          await expect(page.locator(".dz-canvas")).not.toContainText("Dusk")
+          // A changed design is refused by the real display route before editor startup.
+          writeFileSync(join(rig.work, "studio-design.pen"), "Changed design bytes")
+          await page.getByRole("button", { name: "Open in OpenPencil", exact: true }).click()
+          expectedDisplayRefusal = true
+          const refusedDisplay = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/display/open")
+          await page.getByRole("dialog").getByRole("button", { name: "Open display", exact: true }).click()
+          expect((await refusedDisplay).status()).toBe(503)
+          await expect(page.locator(".toasts")).toContainText("isolated display could not be opened")
+          expectedDisplayRefusal = false
+          await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click()
+          await expect(page.getByRole("dialog")).toHaveCount(0)
+          writeFileSync(join(rig.work, "studio-design.pen"), "Registered design bytes")
 
           // The project's lead and its team come from the engine.
           await page.goto(`${origin}/studio/#/p/${encodeURIComponent(project.projectId)}/agents`)
@@ -458,10 +584,44 @@ test("live projects and board: signs in through the engine, shows its real recor
           await page.goto(`${origin}/studio/#/projects`)
           await page.getByRole("button", { name: /^Archived/ }).click()
           await expect(page.locator(".main .table")).toContainText("Renamed project")
+          await page.keyboard.press("Control+k")
+          await page.getByRole("dialog").getByRole("textbox").fill("Renamed")
+          await expect(page.getByRole("dialog")).toContainText("Nothing matches")
+          await page.keyboard.press("Escape")
           await page.getByRole("button", { name: "Restore", exact: true }).click()
           await expect(page.getByRole("button", { name: "Restore", exact: true })).toHaveCount(0)
           await page.goto(`${origin}/studio/#/machines`)
+          await expect(page.locator(".svc-machines tbody > tr")).toHaveCount(1)
+          const machine = page.locator(".svc-machines tbody > tr").first()
+          await expect(machine).toContainText("local")
+          await expect(machine).toContainText(String(port))
+          await expect(machine.locator("td").nth(1)).toBeEmpty()
+          await expect(machine.locator("td").nth(2)).toBeEmpty()
+          await expect(machine.locator("td").nth(8)).toBeEmpty()
+          await page.getByRole("button", { name: "Add machine", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(page.getByRole("dialog")).toHaveCount(0)
           await page.getByRole("button", { name: /^Show details for / }).click()
+          await expect(page.locator(".svc-detail")).toContainText(rig.root)
+          await expect(page.locator(".svc-detail")).toContainText("Installed · 1 signed in")
+          await expect(page.locator("#lim-local")).toHaveValue("")
+          await page.locator("#lim-local").fill("2")
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await page.getByRole("button", { name: "Actions for local", exact: true }).click()
+          await page.getByRole("menuitem", { name: "Scan harnesses again", exact: true }).click()
+          await expect(page.locator(".svc-machines").locator("..")).toHaveAttribute("aria-busy", "false")
+          await expect(page.locator(".svc-detail")).toContainText("Installed · 1 signed in")
+          await page.getByRole("button", { name: "Actions for local", exact: true }).click()
+          await page.getByRole("menuitem", { name: "Rename", exact: true }).click()
+          await page.locator("#rename-field").fill("Other machine")
+          await page.getByRole("dialog").getByRole("button", { name: "Rename", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(machine).toContainText("local")
+          if (await page.getByRole("dialog").count()) await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click()
+          await page.getByRole("button", { name: "Actions for local", exact: true }).click()
+          await page.getByRole("menuitem", { name: "Remove machine", exact: true }).click()
+          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(page.locator(".svc-machines tbody > tr")).toHaveCount(2)
           await page.getByRole("button", { name: "Add repository", exact: true }).click()
           await expect(page.locator("#ar-machine option")).toHaveCount(1)
           await page.locator("#ar-path").fill(additionalRepo)
@@ -494,7 +654,7 @@ test("live projects and board: signs in through the engine, shows its real recor
           // A reload keeps the session, which is the engine's cookie.
           await page.reload()
           await expect(sidebar.locator(".tree-row.project").filter({ hasText: "Renamed project" })).toBeVisible()
-          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(2)
+          await expect.poll(() => timings.filter((line) => line.includes("snapshot took")).length).toBe(4)
 
           // Logging out ends the session and leaves no records on the page.
           await page.getByRole("button", { name: "Log out" }).click()
@@ -510,6 +670,7 @@ test("live projects and board: signs in through the engine, shows its real recor
   } finally {
     if (errors.length) console.log("PAGE ERRORS", errors)
     if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome
+    await displayProxy?.close()
     removeRig(rig)
   }
 })
@@ -541,7 +702,7 @@ test("design mock: still opens on its sample data with no console error", async 
     await expect(page.locator(".sidebar")).toContainText("Maya Okafor")
     await expect(page.locator(".sidebar")).toContainText("lgtm-studio")
     await expect(page.getByRole("button", { name: "Mock controls" })).toHaveCount(1)
-    for (const route of ["/projects", "/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/sprint/sp1", "/p/console/task/t15", "/p/console/team/console-shell", "/p/console/messages", "/p/console/settings", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
+    for (const route of ["/projects", "/p/console/board", "/p/console/chat", "/p/console/agents", "/p/console/sprint/sp1", "/p/console/task/t15", "/p/console/team/console-shell", "/p/console/messages", "/p/console/settings", "/p/console/mocks", "/p/console/mocks/screen/requests", "/r/lgtm/design/components/overview", "/r/lgtm/design/palette/colour", "/p/console/terminal", "/p/console/files", "/machines", "/settings"]) {
       await page.goto(`${origin}/mock/#${route}`)
       await expect(page.locator(".main")).toBeVisible()
     }

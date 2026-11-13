@@ -27,6 +27,7 @@ import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSetting
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
 import { emptyWorkflow } from './screens/workflow.js';
 import { emptyMocks } from './screens/mocks.js';
+import * as mocks from './live/mocks.js';
 
 // ---- named places ---------------------------------------------------------------
 // A page that mounts the website can fill these places with its own components, without
@@ -242,6 +243,7 @@ function SidePanel({ s, agent, project }) {
   </aside>`;
 }
 function ProjectView({ s, route, project }) {
+  useEffect(() => { if (live.on && route.parts[2] !== 'mocks') void mocks.loadMocks(project.id); }, [project.id, s.boardRevision]);
   const tab = route.parts[2] || 'board'; const lead = leadOf(s, project);
   const chatAgent = tab === 'chat' ? agentOf(s, route.parts[3] || lead.id) : null;
   const other = s.ui.panelAgent && agentOf(s, s.ui.panelAgent);
@@ -251,7 +253,7 @@ function ProjectView({ s, route, project }) {
   const tabs = [
     { id: 'board', label: 'Board' },
     { id: 'workflow', label: 'Workflow' },
-    project.hasMocks && { id: 'mocks', label: 'Mocks' },
+    (project.hasMocks || live.on && (project.stage === 'Design' || s.mocks[project.id]?.screens.length)) && { id: 'mocks', label: 'Mocks' },
     chatAgent && chatAgent.role !== 'project-lead'
       ? { id: 'chat', label: agentLabel(s, chatAgent, { withTeam: true }), icon: 'eye' }
       : { id: 'chat', label: 'Chat', count: open, tone: 'warn' },
@@ -390,7 +392,7 @@ function mountLive(el) {
   for (const key of Object.keys(state.settings)) state.settings[key] = typeof state.settings[key] === 'boolean' || typeof state.settings[key] === 'number' ? null : typeof state.settings[key] === 'string' ? '' : {};
   state.settings.quiet = { on: null, from: '', to: '', failed: null };
   seedTerminal(state);
-  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], phoneOffer: null, workflow: {}, mocks: {}, design: {} });
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], phoneOffer: null, workflow: {}, mocks: {}, design: {}, machineDetails: null });
   store.state = guardStore(state);
   act.applyPrefs();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
