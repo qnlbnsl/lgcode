@@ -12418,3 +12418,15 @@ The journey now waits for that preceding action's existing aria-busy state to be
 This is separate from the removed merge-review background-read wait.
 No timeout is raised and automatic reads still do not disable owner controls.
 The final full-check failure is retained in the handoff.
+
+
+## s4-git2-23. The Git journey reopened review before send-back completed.
+
+The browser-only rerun passed the corrected discard boundary and failed at the second Open merge review action.
+The send-back operation closes its dialog before completing its workspace readback.
+The journey treated the closed dialog as completion and could start another action while send-back still held the owner's pending key.
+The journey now waits for that preceding owner action's existing aria-busy state to become false.
+This wait is before opening the next review, rather than after opening a review during an automatic refresh.
+The production background-read fix is unchanged.
+No timeout is raised.
+The failed browser-only run had 52 passes and one failure in 7.6 minutes.
