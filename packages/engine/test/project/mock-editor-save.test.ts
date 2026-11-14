@@ -10,6 +10,7 @@ import { fingerprint } from "../../src/project/artifacts.ts"
 import { saveMockEditorFile } from "../../src/project/mockEditorFile.ts"
 import { projectView } from "../../src/project/view.ts"
 import { provideBoard, snapshot } from "../board/wakeFixtures.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { connect } from "../support/socketClient.ts"
 import { agentCredential, call, failureOf, freshRequest, makeRig, ownerCredential as owner, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
 import { screenBundle, seedScreens } from "./mockScreenFixtures.ts"
@@ -26,6 +27,7 @@ const seedEditor = () => Effect.gen(function* () {
 })
 
 it.live("saves exported bytes through the authenticated owner API and records the replacement design and mock revision", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedEditor(), bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "editor.sock")
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
   const api = yield* connect(socket, bearer), agent = yield* connect(socket, f.designer.token)
@@ -55,6 +57,7 @@ it.live("saves exported bytes through the authenticated owner API and records th
 })))
 
 it.live("refuses stale files, noncanonical exports, oversized exports and private content without changing recorded file bytes", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedEditor(), path = join(rig.work, "mocks/layout.pen")
   for (const [content, reason] of [
     ['$(touch escaped); ../../outside', "mock editor export must be base64 data of at most 512 KiB"],
@@ -69,6 +72,7 @@ it.live("refuses stale files, noncanonical exports, oversized exports and privat
 }), ["private-editor-token"]))
 
 it.live("refuses symbolic links and hostile identity strings rather than using them as paths or Git options", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedEditor(), path = join(rig.work, "mocks/layout.pen"), outside = join(rig.outside, "layout.pen")
   writeFileSync(outside, "original design"); unlinkSync(path); symlinkSync(outside, path)
   expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: Buffer.from("edited").toString("base64") }))?.reason).toBe("registered design needs an unchanged file in a dedicated design folder")
@@ -81,6 +85,7 @@ it.live("refuses symbolic links and hostile identity strings rather than using t
 })))
 
 it.live("refuses parent traversal and linked parent directories, and replaces hard links without writing their outside inode", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   yield* seedEditor()
   const outside = join(rig.outside, "layout.pen"), original = Buffer.from("original design"), edited = Buffer.from("edited design")
   writeFileSync(outside, original)

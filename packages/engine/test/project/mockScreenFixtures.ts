@@ -2,13 +2,12 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import * as Effect from "effect/Effect"
-import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { appendSetup, call, eventOf, ownerCredential, seedAccount, seedAgent, seedHarness, success, type Rig } from "../support/handlerRig.ts"
 
 export const screenBundle = () => ({ sources: [{ sourceId: "page", worktreeId: "workspace", path: "mocks/page.html", kind: "screens" }],
   screens: [{ screenId: "home", sourceId: "page", name: "Home", route: "/home", scenarioRoutes: [] }], scenarios: [], draftedFields: [], components: [] })
 export const seedScreens = (rig: Rig) => Effect.gen(function* () {
-  yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
+  yield* seedAccount(); yield* seedHarness()
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
   const lead = yield* seedAgent({ id: "project-lead", name: "Project lead" }), designer = yield* seedAgent({ id: "designer", name: "Designer", parent: "project-lead" }), stranger = yield* seedAgent({ id: "stranger", name: "Other project agent" })
   success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "sh" } }))

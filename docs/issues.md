@@ -12573,3 +12573,13 @@ The public reason list omitted that fixed mock reason.
 It also omitted fixed artifact and design reasons used by editor saves.
 The list now includes those fixed sentences without exposing paths or host errors.
 The authenticated screen and editor tests now assert stale-revision reasons across the transport.
+
+## s6-mocks-4. The full check found missing event fixtures and indirect rebuild registration.
+
+The first full Mocks check passed type checking and failed seven tests.
+Four exhaustive fixtures omitted the three new screen review events.
+Those fixtures now cover event tags, owner-only subscriptions, stored identity preservation, and prose redaction.
+The two new engine test files registered their rebuild checks through a shared fixture.
+The discovery guard requires a direct registration in each test file.
+Each test now registers the real rebuild comparison before seeding its engine state.
+The shared fixture no longer registers a duplicate comparison.

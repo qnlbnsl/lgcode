@@ -8,6 +8,7 @@ import { afterEach, beforeEach, expect, vi } from "vitest"
 import * as Server from "../../src/api/server.ts"
 import { mockScreenKey, projectView } from "../../src/project/view.ts"
 import { provideBoard, snapshot } from "../board/wakeFixtures.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { connect } from "../support/socketClient.ts"
 import { agentCredential, call, failureOf, freshRequest, makeRig, ownerCredential as owner, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
 import { screenBundle, seedScreens } from "./mockScreenFixtures.ts"
@@ -17,6 +18,7 @@ beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LG
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 
 it.live("stores a redacted plain text owner comment, exposes it to its project tools, and replays its recorded author and time", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedScreens(rig), requestId = freshRequest()
   const hostile = 'Please change <script>alert(1)</script> ; $(touch escaped) `touch escaped` --upload-pack=evil ../../outside\u0000\u001b\u0085 private-comment-token'
   const payload = { ...f.selection, requestId, text: hostile }
@@ -42,6 +44,7 @@ it.live("stores a redacted plain text owner comment, exposes it to its project t
 }), ["private-comment-token"]))
 
 it.live("refuses empty, oversized, absent-screen and stale comments without altering the review", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedScreens(rig)
   for (const [patch, reason] of [
     [{ text: "\u0000 \u001b" }, "mock comment must contain between 1 and 4096 characters"],
@@ -54,6 +57,7 @@ it.live("refuses empty, oversized, absent-screen and stale comments without alte
 })))
 
 it.live("returns exact public reasons through the authenticated screen API", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedScreens(rig), bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "screen.sock")
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
   const api = yield* connect(socket, bearer), agent = yield* connect(socket, f.designer.token)
@@ -74,6 +78,7 @@ it.live("returns exact public reasons through the authenticated screen API", () 
 })))
 
 it.live("approves and withdraws one screen as the owner without moving the stage or granting agents approval authority", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedScreens(rig), requestId = freshRequest(), payload = { ...f.selection, approved: true, requestId }
   expect(failureOf(yield* call(agentCredential(f.designer.token), "project.mocks.screen.approve", payload))?.reason).toBe("command refused")
   success(yield* call(owner, "project.mocks.screen.approve", payload))
@@ -97,6 +102,7 @@ it.live("approves and withdraws one screen as the owner without moving the stage
 })))
 
 it.live("stores seen marks at an exact version and keeps historical marks from clearing a new version", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
   const f = yield* seedScreens(rig), requestId = freshRequest()
   expect(failureOf(yield* call(agentCredential(f.designer.token), "project.mocks.seen", f.selection))?.reason).toBe("command refused")
   success(yield* call(owner, "project.mocks.seen", { ...f.selection, requestId }))
