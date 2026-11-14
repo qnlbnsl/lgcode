@@ -12613,4 +12613,10 @@ The assignment's known intermittent Git failure was named at line 100.
 This output does not establish that the new failure is the same one.
 Both Mocks journeys and the corrected email journey passed.
 The Mocks builder has not changed the Git journey, Git implementation, or its timeout.
-An isolated Git run is requested to establish whether this failure repeats.
+The unchanged journey passed its isolated rerun.
+The fourth full check repeated the same failure while the other 54 browser tests passed.
+The saved browser snapshot contains an enabled Use both control at failure capture.
+The journey's refresh helper waits for the Git mutation aria-busy flag to be false.
+The merged build tracks refreshes under the separate git-read key, so that flag does not prove that refresh has finished.
+This provides a concrete synchronization mismatch for the Git lead to review.
+The Mocks builder leaves the Git implementation and journey unchanged.
