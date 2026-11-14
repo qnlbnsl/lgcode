@@ -12,6 +12,12 @@ export function gitActionsSource(path: string, source: string): string {
     replace("function abortMerge(s, w) { if (live.on) return refuse();", "function abortMerge(s, w) { if (live.on) return liveGit.abortMerge(w.id);")
   }
   if (path === "js/live/git.js") {
+    // Index and file-only actions read back their checkout. Head-changing
+    // actions retain all-workspace reads because parent-relative counts change.
+    replace("async function loadGit(project) {", "async function loadGit(project, ids) {")
+    replace("for (const w of list) {", "for (const w of list.filter((w) => !ids || ids.includes(w.id))) {")
+    replace("if (selected) await loadGitDetail(selected.id);", "if (selected && (!ids || ids.includes(selected.id))) await loadGitDetail(selected.id);")
+    replace("return gitDetail(id, commit);", "if (!tab) return run('git', () => { revision++; return loadGit(wt(id)?.project || screen?.project, [id]); });\n  return gitDetail(id, commit);")
     // Automatic reads never disable an owner action. An explicit refresh must
     // start a fresh generation even when an older automatic read is pending.
     replace("if (screen.name === 'git') return refreshGit(screen.project);", "if (screen.name === 'git') return refreshGit(screen.project, true);")
@@ -27,6 +33,9 @@ export function gitActionsSource(path: string, source: string): string {
     replace("for (const f of w.merge.files) {", "for (const f of w.merge.files) {\n      if (f.resolved) { files.push({ ...f, loaded: true }); continue; }")
     replace("export function answerReview(id, option) {\n  if (option !== 'merge') { refuse(); return; }", "export function answerReview(id, option, reason) {\n  if (option === 'decline') return declineReview(id, reason);\n  if (option !== 'merge') { refuse(); return; }")
     replace("if (!value) { refuse(); return; }", "if (!value) return reopen(id, fid);")
+    replace("await loadGit(screen?.project);\n}); }\nexport function discard", "await loadGit(screen?.project, [w.id]);\n}); }\nexport function discard")
+    replace("confirmed: true }); await loadGit(screen?.project);", "confirmed: true }); await loadGit(screen?.project, [w.id]);")
+    replace("await loadGit(screen?.project);\n    act.toast('File resolved.", "await loadGit(screen?.project, [w.id]);\n    act.toast('File resolved.")
     source += `
 export function abortMerge(id) {
   const w = wt(id);
@@ -49,7 +58,7 @@ function reopen(id, fid) {
     onConfirm: () => run('git', async () => {
       revision++;
       try { await request('project.conflict.reopen', observed); }
-      finally { await loadGit(screen?.project); }
+      finally { await loadGit(screen?.project, [w.id]); }
     }) });
 }
 export function updateFromBase(id) { return run('git', async () => {
@@ -62,7 +71,7 @@ export async function declineReview(id, reason) { const completed = await run('g
   if (!reason?.trim()) throw new Error('Give a reason for sending the review back.');
   const review = read(await request('project.review.decline', { ...scope(w), projectId: r.project, reviewId: r.id, expectedHead: r.head, expectedBaseHead: r.baseHead, reason: reason.trim() }));
   writeWt(w.id, { review: mapping.mapMainReview(review, undefined, r.agent) });
-  await loadGit(r.project);
+  await loadGit(r.project, [w.id]);
 }); if (completed) act.closeDialog(); return completed; }
 `
   }

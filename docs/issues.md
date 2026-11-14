@@ -12961,3 +12961,30 @@ The journey now observes the reopening confirmation closing before choosing line
 An owner sees that same progress and waits for the dialog to finish.
 This wait uses the existing expectation budget and raises no timeout.
 The page fix itself is unchanged.
+
+
+## s4-git2-7. Git action readback reread every unrelated worktree in sequence.
+
+The first complete validation on 7c37033 passed all 55 browser cases in 10.5 minutes.
+Its Git journey took 5.8 minutes.
+The second run passed the external-merge and reopening steps but exceeded the whole journey's unchanged six-minute limit during final approval.
+The end snapshot showed that final review with current passed evidence and an owner readback still marked Working.
+That run had 54 passes and one failure in 10.6 minutes.
+Each mutation had reread the project, its teams, its builders, and its base even when only one checkout changed.
+Stage, unstage, discard, resolution, reopening, and send-back now read back their selected checkout.
+Operations that can move a branch head retain the complete project readback because sibling parent-relative counts can change.
+The Git worktree picker refreshes the chosen checkout before its owner controls become available.
+Other checkouts retain their cache across index-only changes.
+Explicit and automatic project refreshes retain their complete workspace reads.
+Regressions hold an unrelated checkout during staging, retain all sibling reads after integration, and require fresh Git state through the Git picker.
+No engine gate, authorization check, Git command, or timeout is changed.
+
+
+## s4-git2-8. The global inspection selector does not call the Git detail reader.
+
+The global inspection menu in the copied app updates the selected branch directly.
+The Git worktree picker calls the Git selection action and refreshes its records.
+Selecting an unread checkout through the global menu can therefore show cached file rows without loading their details.
+This path was already present on the assigned baseline.
+The current assignment keeps out of the app source and does not change that global menu.
+The owner can use the Git worktree picker or Refresh Git for a fresh read.

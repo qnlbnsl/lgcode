@@ -13,7 +13,7 @@ function fixture(request: (tag: string, payload: any) => Promise<unknown>) {
   const act: any = { confirm: (d: any) => dialogs.push(d), closeDialog: vi.fn(), toast: (s: string) => toasts.push(s) };
   const source = copied("js/live/git.js").replace(/^import .*;$/gm, "").replace(/export /g, "");
   const actions = new Function("store", "live", "engineWrite", "notify", "engine", "act", "update", "addEventListener", "removeEventListener",
-    `${source}\nreturn { installMappings, openScreen, refreshGit, busy, declineReview, discard };`)(
+    `${source}\nreturn { installMappings, openScreen, refreshGit, busy, declineReview, discard, stage, integrate, selectGit };`)(
     { state }, { on: true }, (p: object) => Object.assign(state, p), () => {}, { request }, act, (f: (s: any) => void) => f(state), () => {}, () => {});
   actions.installMappings({ mapGitState: (s: any) => s, mapGitChanges: (items: any[]) => items,
     mapMainReview: (r: any) => r, mapConflict: (c: any) => ({ ...c, id: c.path, selection: c }) });
@@ -116,4 +116,75 @@ it("the conflict view shows loading while its selection is still being read", as
     expect(element.querySelector('[role="status"]')?.textContent).toBe("Loading conflicts…");
     expect([...element.querySelectorAll("button")].find((b) => b.textContent === "Mark resolved")?.disabled).toBe(true);
   } finally { kit.render(null, element); element.remove(); }
+});
+
+
+it("a stage readback finishes without rereading an unrelated workspace", async () => {
+  const unrelated = gate(), reads: string[] = []; let finished = false, hold = false;
+  const f = fixture(async (tag, payload) => {
+    if (tag === "project.stage.all") return {};
+    if (tag === "project.git.state") { reads.push(payload.worktreeId); if (hold && payload.worktreeId === "other") await unrelated.held; return { result: { mergeHead: null } }; }
+    if (tag === "project.changes") return { result: { items: [], truncated: false } };
+    if (tag === "project.review.status") return { result: { review: null } };
+    throw new Error(tag);
+  });
+  f.state.worktrees.push({ ...f.state.worktrees[0], id: "other", kind: "team", branch: "other" });
+  const close = f.actions.openScreen("git", "project");
+  // Finish the initial all-workspace read before holding the unrelated checkout.
+  await vi.waitFor(() => expect(f.actions.busy("git-read")).toBe(false));
+  reads.length = 0; hold = true;
+  const action = f.actions.stage("workspace", [], true, true).then(() => { finished = true; });
+  try {
+    await vi.waitFor(() => expect(finished).toBe(true));
+    expect(reads).toEqual(["workspace"]);
+  } finally { unrelated.release(); await action; close(); }
+});
+
+it("integration also refreshes sibling counts when its destination head advances", async () => {
+  const reads: string[] = [];
+  const f = fixture(async (tag, payload) => {
+    if (tag === "project.integrate") return {};
+    if (tag === "project.git.state") { reads.push(payload.worktreeId); return { result: { mergeHead: null } }; }
+    if (tag === "project.changes") return { result: { items: [], truncated: false } };
+    if (tag === "project.review.status") return { result: { review: null } };
+    throw new Error(tag);
+  });
+  Object.assign(f.state.worktrees[0], { kind: "agent", parentId: "team" });
+  f.state.worktrees.push({ ...f.state.worktrees[0], id: "team", branch: "team", kind: "team" }, { ...f.state.worktrees[0], id: "other", branch: "other" });
+  const close = f.actions.openScreen("git", "project");
+  try {
+    await vi.waitFor(() => expect(f.actions.busy("git-read")).toBe(false)); reads.length = 0;
+    await f.actions.integrate("workspace");
+    expect(reads).toEqual(["workspace", "team", "other"]);
+    expect(f.toasts).toEqual([]);
+  } finally { close(); }
+});
+
+it("picking another worktree refreshes its cached Git state before the owner can act", async () => {
+  const reads: string[] = [];
+  const f = fixture(async (tag, payload) => {
+    if (tag === "project.git.state") { reads.push(payload.worktreeId); return { result: { head: "new-head", mergeHead: null } }; }
+    if (tag === "project.changes") return { result: { items: [], truncated: false } };
+    throw new Error(tag);
+  });
+  f.state.worktrees.push({ ...f.state.worktrees[0], id: "other", branch: "other", kind: "team", head: "old-head" });
+  await f.actions.selectGit("other");
+  expect(reads).toEqual(["other"]);
+  expect(f.state.worktrees.find((w: any) => w.id === "other").head).toBe("new-head");
+  expect(f.toasts).toEqual([]);
+});
+
+
+it("an explicit project refresh still reads every worktree", async () => {
+  const reads: string[] = [];
+  const f = fixture(async (tag, payload) => {
+    if (tag === "project.git.state") { reads.push(payload.worktreeId); return { result: { mergeHead: null } }; }
+    if (tag === "project.changes") return { result: { items: [], truncated: false } };
+    if (tag === "project.review.status") return { result: { review: null } };
+    throw new Error(tag);
+  });
+  f.state.worktrees.push({ ...f.state.worktrees[0], id: "other", kind: "team", branch: "other" });
+  await f.actions.refreshGit("project");
+  expect(reads).toEqual(["workspace", "other"]);
+  expect(f.toasts).toEqual([]);
 });
