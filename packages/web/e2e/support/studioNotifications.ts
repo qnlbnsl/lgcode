@@ -30,6 +30,9 @@ export async function exerciseStudioNotifications(page: Page) {
     const studioRoot = await buildStudio(join(rig.root, 'studio'))
     const staticRoot = join(rig.root, 'sample')
     cpSync(resolve('design/mock'), staticRoot, { recursive: true, dereference: true })
+    // This fixture serves the sample through the engine's strict script policy,
+    // which blocks its inline import map. Use the same built contracts module.
+    cpSync(join(studioRoot, 'js/workflow-contracts.js'), join(staticRoot, 'js/workflow-contracts.js'))
     const port = await unusedPort()
     mkdirSync('.foundry', { recursive: true })
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {

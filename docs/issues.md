@@ -12594,3 +12594,13 @@ The new Mocks journey passed in that full run.
 The email journey separately failed to find its Notifications heading.
 Its reported source line points at a later password assertion, so the exact navigation boundary is not established by this output.
 The next request reruns that unchanged journey in isolation before choosing a fix.
+
+## s6-mocks-6. The email browser fixture served the sample without a usable workflow module.
+
+The isolated email journey again failed to find its Notifications heading.
+The fixture serves the standalone sample through the engine's strict script policy.
+That policy blocks the sample's inline import map.
+The sample workflow module then imports an unavailable TypeScript source path, so the application cannot load.
+The fixture now copies the workflow contracts bundle from its existing Studio build over the sample's source re-export.
+The engine's content policy and the standalone sample sources are unchanged.
+The next isolated email run will verify this fixture correction.
