@@ -52,3 +52,46 @@ for (const [label, command, key, action] of cases) for (const rejected of [false
   } else expect(lib.store.state.mocks.project.persisted).toBe(true)
   if (label === "editor") expect(request.mock.calls.find(([tag]) => tag === command)?.[1]).toEqual({ projectId: "project", revisionId: "v1", designRevision: "design", worktreeId: "workspace", content: "ZXhwb3J0" })
 })
+
+it("review item 1: marks all displayed unseen versions with one engine request", async () => {
+  vi.useFakeTimers()
+  lib.live.on = true
+  lib.store.state = lib.guardStore({ mocks: { project: structuredClone(mocks) }, design: {}, session: { status: "in" }, ui: {}, boardRevision: 1, toasts: [] })
+  const request = vi.fn(async (tag: string, _payload?: unknown) => {
+    if (tag === "client.sequence") return { sequence: 1 }
+    if (tag === "project.mocks.read") return { items: [] }
+    if (tag === "project.mocks.reviews.read") return { reviews: [] }
+    return { requestId: "ack" }
+  })
+  engine.setConnection({ request, mocks: { mapMocks: () => mocks } })
+  await controls.markSeen(project, { ...mocks, changes: [
+    { screen: "home", to: "v1", seen: false }, { screen: "home", to: "v2", seen: false }, { screen: "other", to: "v2", seen: true }
+  ] })
+  const mutations = request.mock.calls.filter(([tag]) => tag.startsWith("project.mocks.seen"))
+  expect(mutations).toHaveLength(1)
+  expect(mutations[0]?.[1]).toMatchObject({ projectId: "project", versions: [
+    { revisionId: "v1", screenId: "home" }, { revisionId: "v2", screenId: "home" }
+  ] })
+})
+
+it("review item 5: asks before an editor save and sends explicit confirmation only after acceptance", async () => {
+  vi.useFakeTimers()
+  lib.live.on = true
+  lib.store.state = lib.guardStore({ mocks: { project: structuredClone(mocks) }, design: {}, session: { status: "in" }, ui: {}, boardRevision: 1, toasts: [], dialog: null })
+  const request = vi.fn(async (tag: string, _payload?: unknown) => {
+    if (tag === "client.sequence") return { sequence: 1 }
+    if (tag === "project.mocks.read") return { items: [] }
+    if (tag === "project.mocks.reviews.read") return { reviews: [] }
+    if (tag === "project.design.read") return { result: { _tag: "registered", record: { revisionId: "design", design: { worktreeId: "workspace" } } } }
+    return { requestId: "ack" }
+  })
+  engine.setConnection({ request, mocks: { mapMocks: () => mocks, mapDesign: () => ({}) } })
+  const pending = controls.saveEditor(project, mocks, file)
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+  expect(request.mock.calls.some(([tag]) => tag === "project.mocks.editor.save")).toBe(false)
+  expect(lib.store.state.dialog).toMatchObject({ type: "confirm", body: expect.stringContaining("Design") })
+  expect(lib.store.state.dialog.body).toContain("overall approval")
+  await lib.store.state.dialog.onConfirm()
+  await pending
+  expect(request.mock.calls.find(([tag]) => tag === "project.mocks.editor.save")?.[1]).toMatchObject({ confirmed: true })
+})

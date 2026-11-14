@@ -12962,3 +12962,22 @@ The journey's refresh helper waits for the Git mutation aria-busy flag to be fal
 The merged build tracks refreshes under the separate git-read key, so that flag does not prove that refresh has finished.
 This provides a concrete synchronization mismatch for the Git lead to review.
 The Mocks builder leaves the Git implementation and journey unchanged.
+
+## s6-mocks-8. The review found Mocks behavior and coverage gaps.
+
+The review found that the feedback loader makes one read per screen version and fails when any engine event arrives during the load.
+Earlier screen comments disappear from the page after a new mock revision.
+A comment does not notify the project's designer or lead.
+The terminal editor-save command cannot carry a large export as one argument.
+Editor saves need explicit stage-reset confirmation, format checks, preserved modes, and recovery after a file replacement whose recording fails.
+The build transformation accepts duplicate matches and silently accepts a missing seen-badge replacement.
+The test fixtures also need a second actual project, a direct saver symbolic-link check, package-relative execution, and oversized contract coverage.
+These findings are the scope of `.foundry/fix-task.md`.
+The builder is adding failing regression tests before changing each implementation.
+
+## s6-mocks-9. Compressed design exports are not inspected for registered secrets.
+
+The editor-save redaction check scans decoded export bytes as text.
+A secret inside a compressed `.fig` export is not detected by that check.
+The review found this limitation and asked that it be recorded for the owner.
+A file signature check does not inspect compressed document contents.
