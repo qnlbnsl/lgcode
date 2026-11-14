@@ -41,3 +41,12 @@ test('saved auto-nudge, attempt count and replacement threshold change who is wo
     expect(evaluate(saved, settings.replaceAfter)).toEqual([])
   }
 }), registerRebuildCheck()))
+
+test('zero, negative and huge stall values are refused without replacing saved settings', async () => run(Effect.gen(function* () {
+  const settings = { assignedStallMinutes: 7, leadStallMinutes: 31, limits: { stallMinutes: 11 } }
+  expect((yield* call(ownerCredential, 'roles.settings.set', { settings }))._tag).toBe('Success')
+  for (const value of [0, -1, Number.MAX_SAFE_INTEGER]) for (const patch of [{ assignedStallMinutes: value }, { leadStallMinutes: value }, { limits: { stallMinutes: value } }]) {
+    expect(yield* call(ownerCredential, 'roles.settings.set', { settings: patch })).toMatchObject({ _tag: 'Failure' })
+    expect((yield* read('roles.settings.get')).settings).toEqual(settings)
+  }
+}), registerRebuildCheck()))

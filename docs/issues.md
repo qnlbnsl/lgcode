@@ -13032,3 +13032,42 @@ The credit check passed after that retry.
 The service-settings, email, new settings, and standalone sample journeys passed in the full run.
 The full check remains a failed run.
 The settings worker changed no Git timeout or implementation beyond the lead's required integration merge.
+
+## s6-settings-15. Service build replacements could silently stop matching.
+
+The settings transformer used unchecked string replacements.
+The merged Harnesses screen still matches every patch.
+Every replacement now checks its exact match count and fails the build on a mismatch.
+Two intentional repeated labels and five busy indicators have explicit counts.
+Regression tests remove and duplicate each source fragment.
+
+## s6-settings-16. Holder stall notices used wording addressed to the stalled agent.
+
+A disabled nudge or an increased replacement threshold could send the holder the agent's instructions.
+Notice wording now follows the recipient at every occurrence.
+The running watch test changes an armed timer in both directions without restarting.
+Zero, negative, and huge timer settings are refused.
+The existing timer rearming already honored saved changes.
+
+## s6-settings-17. Partial project settings could clear the workflow folder and review defaults.
+
+Omitting these two fields now preserves their stored values.
+The request has an explicit clearWorkflowFolder flag.
+The live page offers a button to restore the default workflow folder.
+Review defaults are preserved during that clear.
+
+## s6-settings-18. Restart executes the writable checkout under the same user.
+
+Restart runs the installed Node.js executable and the script currently at the recorded path.
+An agent running as the owner's user can change that checkout before an owner requests restart.
+The same-user limit described in SECURITY.md applies to these launch files too.
+Existence, regular-file, read, and execute checks prevent an accidental missing launch file from stopping every agent.
+They do not establish that the program is trusted or unchanged.
+Agent sandboxes remain planned.
+
+## s6-settings-19. A stop signal during the restart window can still reexecute the service.
+
+The restart acknowledgement schedules shutdown after a short transport drain.
+A stop signal during this window interrupts the service but leaves the restart flag set.
+The process can therefore start again after that signal.
+This review records the behavior without changing signal semantics in this fix.

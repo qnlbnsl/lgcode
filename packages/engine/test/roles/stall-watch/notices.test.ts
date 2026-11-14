@@ -31,3 +31,13 @@ it("N03 a stall watch turn is distinguished from a wake carrying another author'
   expect(isStallWatchTurn({ posts: [{ author: { _tag: "service", service: "roles.stallWatch" } }], completions: [], reminders: ["reminder"], noAnswers: [] })).toBe(false);
   expect(isStallWatchTurn({ posts: [{ author: { _tag: "service", service: "roles.stallWatch" } }], completions: [], reminders: [], noAnswers: ["no-answer"] })).toBe(false);
 });
+
+it.each([1, 2, 4])('uses holder wording for occurrence %s regardless of the nudge setting', async (occurrence) => {
+  const { noticeText } = await import('../../../src/roles/stall-watch/notices.ts')
+  for (const recipient of ['lead', 'owner']) {
+    const text = noticeText('roles.StallSeen', 'Worker', { agentId: 'worker', noticeRecipient: recipient, occurrence } as any)
+    expect(text).toBe('This agent has stalled on an open post. Review the unanswered work and help it continue. Agent: Worker.')
+  }
+  expect(noticeText('roles.StallSeen', 'Worker', { agentId: 'worker', noticeRecipient: 'worker', occurrence } as any))
+    .toBe('Work is waiting. Check the board and carry on, or report what is blocking it. Agent: Worker.')
+})

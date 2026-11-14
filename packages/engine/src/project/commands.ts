@@ -51,9 +51,11 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
     if (!(await stat(folder)).isDirectory()) throw new Error()
     return folder
   }, catch: () => refused("workspace folder must be an existing absolute directory") })
-  const workflowFolder = p.settings.workflowFolder === undefined ? undefined : yield* Effect.tryPromise({
+  const previous = projectView(input.snapshot).settings
+  const workflowFolder = p.clearWorkflowFolder ? undefined : p.settings.workflowFolder === undefined ? previous?.workflowFolder : yield* Effect.tryPromise({
     try: () => validateWorkflowFolder(p.settings.workflowFolder!, input.runtime.stateFolder), catch: () => refused(workflowFolderReason),
   })
+  const reviewDefaults = p.settings.reviewDefaults ?? previous?.reviewDefaults
   const lead = p.settings.lead
   if (lead !== undefined) {
     const harness = (yield* readHarnesses(input.runtime)).find((row) => row.id === lead.harness)
@@ -63,7 +65,7 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
       || lead.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(lead.effort)) return yield* refused("invalid lead defaults")
     for (const value of [lead.model, lead.effort]) if (value !== undefined && (!validChoiceId(value) || (yield* input.runtime.log.redactText(value)) !== value)) return yield* refused("invalid lead defaults")
   }
-  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, ...(p.settings.reviewDefaults === undefined ? {} : { reviewDefaults: p.settings.reviewDefaults }), ...(workflowFolder === undefined ? {} : { workflowFolder }), shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }),
+  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, ...(reviewDefaults === undefined ? {} : { reviewDefaults }), ...(workflowFolder === undefined ? {} : { workflowFolder }), shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }),
     ...(p.settings.displayName !== undefined ? { displayName: yield* cleanName(input, p.settings.displayName) } : projectView(input.snapshot).settings?.displayName === undefined ? {} : { displayName: projectView(input.snapshot).settings!.displayName! }) } }])
 })
 type Checkout = Effect.Success<ReturnType<typeof inspectCheckout>>
