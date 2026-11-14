@@ -8,7 +8,7 @@ export const clientEventTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
-  "client.WebServerDown", "client.WebServerUp"
+  "client.ServiceRestartRequested", "client.WebServerDown", "client.WebServerUp"
 ] as const
 const attempt = {
   alertId: AlertId, carrier: CarrierName, generation: EventSequence,
@@ -37,6 +37,7 @@ export const ClientEvent = Schema.Union([
   Schema.TaggedStruct("client.AlertCarrierTokenSet", { origin: Schema.NonEmptyString, carrierGeneration: CarrierTokenGeneration }),
   Schema.TaggedStruct("client.AlertCarrierTokenCleared", {}),
   Schema.TaggedStruct("client.WebSettingsChanged", { settings: WebSettings }),
+  Schema.TaggedStruct("client.ServiceRestartRequested", {}),
   Schema.TaggedStruct("client.WebServerDown", { reason: Schema.String }),
   Schema.TaggedStruct("client.WebServerUp", {})
 ])

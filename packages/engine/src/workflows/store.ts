@@ -1,3 +1,4 @@
+import { withWorkflowFolder } from './folder.ts'
 import { constants as C, promises as fs } from 'node:fs'
 import type { FileHandle } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -16,13 +17,19 @@ const removal = 'Remove or replace this entry manually in your workflow folder b
 export class WorkflowStore {
   readonly home: string
   readonly repository: string | undefined
-  constructor(home: string, repository?: string) { this.home = home; this.repository = repository }
+  readonly workflowFolder: string | undefined
+  readonly stateFolder: string | undefined
+  constructor(home: string, repository?: string, workflowFolder?: string, stateFolder?: string) { this.home = home; this.repository = repository; this.workflowFolder = workflowFolder; this.stateFolder = stateFolder }
   private async ready() {
     try { await fs.access('/proc/self/fd') }
     catch { fail('Workflow storage requires the descriptor filesystem on this system.') }
   }
   private async folder<T>(scope: string, create: boolean, run: (folder: string) => Promise<T>): Promise<T> {
     await this.ready()
+    if (scope === 'user' && this.workflowFolder !== undefined) {
+      if (!this.stateFolder) return fail('The service state folder is unavailable.')
+      return withWorkflowFolder(this.workflowFolder, this.stateFolder, run)
+    }
     const base = scope === 'user' ? this.home : scope === 'repository' ? this.repository : undefined
     if (!base) return fail('Choose a user or repository workflow folder.')
     // Hold each directory open. Every child operation uses the held descriptor,

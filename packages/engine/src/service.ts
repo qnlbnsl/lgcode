@@ -1,3 +1,5 @@
+import { restartAfterShutdown } from './client/restartLaunch.ts';
+import { installRestarter, captureRunningVersion } from "./client/serviceControl.ts"
 import { lstatSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
@@ -199,6 +201,9 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
 // A graceful signal interrupts the whole scoped program. Finalizers close
 // connections and adapters before releasing the lifetime lock.
 if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  await captureRunningVersion(fileURLToPath(new URL("../../..", import.meta.url)));
+  const launchEnvironment = { ...process.env } as Record<string, string>;
+  let restarting = false;
   const inheritedToken = process.env.LGTM_TOKEN;
   const webPassword = process.env.LGTM_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.LGTM_WEB_PASSWORD);
   delete process.env.LGTM_WEB_PASSWORD;
@@ -206,12 +211,20 @@ if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === imp
   process.umask(0o077);
   const fiber = Effect.runFork(program(inheritedToken, webPassword));
   const stop = () => fiber.interruptUnsafe();
+  if (typeof process.execve === "function") installRestarter(() => {
+    if (restarting) return;
+    restarting = true;
+    // Let the acknowledgement leave both transports before closing scopes.
+    setTimeout(stop, 250);
+  });
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
   const result = await Effect.runPromise(Fiber.await(fiber));
+  installRestarter(undefined);
   process.removeListener("SIGTERM", stop);
   process.removeListener("SIGINT", stop);
-  if (Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
+  if (restarting) restartAfterShutdown(() => process.execve!(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], launchEnvironment));
+  if (!restarting && Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
     // Startup failures contain fixed service-owned categories only. Never
     // serialize a cause: the underlying database may quote stored data.
     const allowed = ["state folder is a symbolic link", "state folder mode is not 0700", "state folder is owned by another user", "state folder is not a directory", "socket path exceeds 100 bytes"];

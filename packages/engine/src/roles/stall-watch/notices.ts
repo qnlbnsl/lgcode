@@ -35,8 +35,8 @@ export const noticeText = (
   kind: RolesAction["_tag"], name: string,
   action?: Pick<RolesAction, "agentId" | "noticeRecipient" | "occurrence">,
 ): string => {
-  const text = kind === "roles.StallSeen" && action?.occurrence === 2 && action.noticeRecipient !== action.agentId
-    ? "This agent has stalled twice on the same open post. Review the unanswered work and help it continue."
+  const text = kind === "roles.StallSeen" && action !== undefined && action.noticeRecipient !== action.agentId
+    ? "This agent has stalled on an open post. Review the unanswered work and help it continue."
     : fixedText[kind];
   return `${text} Agent: ${sanitizeName(name) || "Unnamed agent"}.`;
 };

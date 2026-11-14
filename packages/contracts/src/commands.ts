@@ -1,3 +1,4 @@
+import { ServiceControlRpcGroup, serviceControlAccess, serviceControlCommandNames } from "./serviceCommands.ts"
 import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "./workflowCommands.ts"
 import { QuestionMetadataFields } from "./questions.ts"
 import { ChoiceId } from "./agentConfiguration.ts"
@@ -146,7 +147,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-const StandardClientRpcGroup = ClientRpcGroup.omit(...workflowCommandNames)
+const StandardClientRpcGroup = ClientRpcGroup.omit(...workflowCommandNames, ...serviceControlCommandNames)
 export const WebRpcGroup = StandardClientRpcGroup.omit(
   "client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check",
   "client.harness.choices",
@@ -155,7 +156,7 @@ export const WebRpcGroup = StandardClientRpcGroup.omit(
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
 )
 export const ClientReadsRpcGroup = StandardClientRpcGroup.omit("client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
-const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup).merge(WorkflowRpcGroup)
+const InstalledClientRpcGroup = ServiceControlRpcGroup.merge(ClientReadsRpcGroup).merge(AlertRpcGroup).merge(WebRpcGroup).merge(WorkflowRpcGroup)
 export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(InstalledClientRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup).merge(ProjectRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
@@ -170,6 +171,7 @@ export const commandAccess = {
   "client.alerts.carrier.remove": ["owner"], "client.alerts.quiet.set": ["owner"], "client.alerts.carrier.enabled.set": ["owner"],
   "client.alerts.carrier.clear-token": ["owner"],
   ...workflowAccess,
+  ...serviceControlAccess,
   ...boardAccess,
   ...rolesAccess,
   ...projectAccess,

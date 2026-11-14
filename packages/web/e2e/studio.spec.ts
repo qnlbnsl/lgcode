@@ -1,3 +1,4 @@
+import { exerciseStudioSettings } from './support/studioSettings.ts'
 import { exerciseStudioGit } from './support/studioGit.ts'
 import { exerciseStudioService } from './support/studioService.ts'
 // The live website from packages/studio, served by the real engine at /studio/, on a real
@@ -1111,6 +1112,7 @@ test('workflows: sees default phases, clones, edits and saves across reload with
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 })
 
+test("live service settings: timers, nudges, workflow folder, review defaults and upkeep", async ({ page }) => exerciseStudioSettings(page))
 test('live website: Harnesses installs a missing harness with a fake recipe and adds its account', async ({ page }) => {
   test.setTimeout(90_000)
   const { exerciseStudioHarnesses } = await import('./support/studioHarnesses.ts')

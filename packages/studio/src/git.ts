@@ -41,10 +41,10 @@ export function mapServiceSettings(project: ProjectSettings | undefined, harness
   return { defaultHarness: lead?.harness ?? "", defaultModel: lead?.model ?? harness?.defaultModel ?? "", defaultEffort: lead?.effort ?? harness?.defaultEffort ?? "",
     defaultPermission: lead ? mapPermission(lead.permission) : "", webEnabled: web.enabled, port: web.port, checkIn: web.heartbeatSeconds,
     proxyMode: web.proxyMode, publicAddress: web.publicAddress ?? "", stallWatch: roles.stallWatch ?? null, standingRules: roles.standingRules ?? null,
-    stallWorker: roles.limits?.stallMinutes ?? null, stallLead: null, stallAssigned: null, capacityBackoff: roles.limits?.capacityBackoffMinutes ?? null,
+    stallWorker: roles.limits?.stallMinutes ?? null, stallLead: roles.leadStallMinutes ?? null, stallAssigned: roles.assignedStallMinutes ?? null, capacityBackoff: roles.limits?.capacityBackoffMinutes ?? null,
     capacityRetries: roles.limits?.capacityRetries ?? null, crashRetries: roles.limits?.crashRetries ?? null, teamIdle: roles.limits?.teamIdleMinutes ?? null,
-    roleFile, needToKnow: null, removeCredits: null, autoNudge: null, replaceAfter: null, workflowPath: "", maxRounds: null,
-    testsDefault: null, reviewDefault: null, gitModel: "", version: "", commit: "", dataFolder: "" }
+    roleFile, needToKnow: null, removeCredits: null, autoNudge: roles.autoNudge ?? true, nudgeAttempts: roles.nudgeAttempts ?? 2, replaceAfter: roles.replaceAfter ?? 3, workflowPath: project?.workflowFolder ?? "", maxRounds: null,
+    reviewers: project?.reviewDefaults?.reviewers ?? null, differentVendor: project?.reviewDefaults?.differentVendor ?? null, testsDefault: null, reviewDefault: null, gitModel: "", version: "", commit: "", dataFolder: "" }
 }
 
 export function mapAlertSettings(settings: AlertSettings) {

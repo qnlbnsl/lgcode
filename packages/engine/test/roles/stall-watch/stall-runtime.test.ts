@@ -54,8 +54,8 @@ const setup = Effect.gen(function* () {
   yield* eventually(roles, (view) => view.baseline !== undefined);
 });
 const episode = (postId: string, occurrence: number) => eventually(roles, (view) => view.stalls[stallKey(postId, "worker")]?.occurrence === occurrence);
-const assign = (configured: EngineLists) => Effect.gen(function* () {
-  const client = yield* socket(configured);
+const assign = (configured: EngineLists, connected?: any) => Effect.gen(function* () {
+  const client = connected ?? (yield* socket(configured));
   const result = yield* client["board.post"]!({ requestId: "assigned-task", direct: { _tag: "agent", agentId: "worker" },
     to: [{ _tag: "agent", agentId: "worker" }], reply: "all", text: "Finish the assigned task." });
   // board.post immediately delivers an all-reply assignment. Finish that
@@ -89,7 +89,7 @@ it.effect("socket assignments emit two complete nudges, persist the holder notic
     ]);
     const holderNotice = (yield* roles).actions.find((row) => row._tag === "roles.StallSeen" && row.noticeRecipient === "lead");
     expect((yield* alertLog).find((row) => row.event._tag === "board.PostWritten" && row.event.postId === holderNotice?.postId)?.event)
-      .toMatchObject({ text: expect.stringContaining("stalled twice on the same open post") });
+      .toMatchObject({ text: expect.stringContaining("stalled on an open post") });
   }));
   yield* run(noFlush, Effect.gen(function* () {
     expect((yield* roles).stalls[stallKey(postId, "worker")]?.occurrence).toBe(2);
@@ -291,3 +291,24 @@ it.effect("a reciprocal idle wait group stays live until the production team-idl
     expect(obligations.map(id => board.posts[id]?.status)).toEqual(["open", "open"]);
   }));
 }));
+
+it.effect('an already armed saved stall timer follows both shorter and longer settings without restarting', () => run(noFlush, Effect.gen(function* () {
+  yield* setup
+  const client = yield* socket(noFlush)
+  yield* client['roles.settings.set']!({ requestId: 'timer-initial', settings: { limits: { stallMinutes: 20 }, autoNudge: false, replaceAfter: 5 } })
+  const postId = yield* assign(noFlush, client)
+  yield* episode(postId, 0)
+  yield* TestClock.adjust('4 minutes'); yield* pause(30)
+  expect((yield* roles).stalls[stallKey(postId, 'worker')]?.occurrence).toBe(0)
+  yield* client['roles.settings.set']!({ requestId: 'timer-shorter', settings: { limits: { stallMinutes: 5 }, autoNudge: false, replaceAfter: 5 } })
+  yield* TestClock.adjust('1 minute'); yield* episode(postId, 1)
+  yield* client['roles.settings.set']!({ requestId: 'timer-longer', settings: { limits: { stallMinutes: 20 }, autoNudge: false, replaceAfter: 5 } })
+  yield* TestClock.adjust('5 minutes'); yield* pause(30)
+  expect((yield* roles).stalls[stallKey(postId, 'worker')]?.occurrence).toBe(1)
+  yield* TestClock.adjust('15 minutes'); yield* episode(postId, 2)
+  const notices = (yield* alertLog).filter((row) => row.event._tag === 'board.PostWritten' && row.event.author._tag === 'service')
+  expect(notices.map((row: any) => row.event.text)).toEqual([
+    'This agent has stalled on an open post. Review the unanswered work and help it continue. Agent: name-worker.',
+    'This agent has stalled on an open post. Review the unanswered work and help it continue. Agent: name-worker.',
+  ])
+})))

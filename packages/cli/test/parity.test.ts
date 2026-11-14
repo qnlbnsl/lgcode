@@ -34,6 +34,7 @@ for (const { command, words, form } of invocations) {
   it(`P03 ${command} ${form} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
+      "client.service.version": { check: true }, "client.service.restart": { confirmed: true },
       "client.alerts.retry": { alertId: "alert-1", generation: 7, attempt: 2 },
       "client.alerts.test": {}, "client.alerts.prompt.dismiss": {},
       "client.alerts.list": { after: 0, limit: 1, status: "open" },
@@ -165,10 +166,12 @@ for (const { command, words, form } of invocations) {
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
-        "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
+      "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
         "client.alerts.list": { ...base, items: [], next: 10 },
         "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
+        "client.service.version": { ...base, version: "0.0.1", commit: "abc123", dataFolder: root.work, checkout: root.work, comparison: "unchecked", updateCommands: [] },
+        "client.service.restart": { ...base, restarting: true },
         "client.harness.status": { ...base, harnesses: [{ harnessId: "fake", installed: false }] },
         "client.harness.recipe": { ...base, recipe: { harnessId: "fake", name: "Fixture", automatic: true, packages: ["fixture@1.2.3"], registry: "https://example.test", source: "https://example.test/install", commands: ["fixed fixture command"], signInCommand: "fixture login", signInArguments: ["login"] } },
         "client.harness.install": { ...base, state: "installed", installation: { harnessId: "fake", installed: true, path: "/tmp/fixture", version: "1.2.3" }, output: "Fixture installed." },

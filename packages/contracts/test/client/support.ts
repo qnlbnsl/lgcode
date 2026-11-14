@@ -12,6 +12,7 @@ export const clientCommands = [
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token",
   "client.web.settings", "client.web.settings.set",
+  "client.service.version", "client.service.restart",
   "client.workflows.list", "client.workflows.read", "client.workflows.clone", "client.workflows.save", "client.workflows.validate", "client.workflows.delete",
 ] as const;
 export const clientTags = [
@@ -19,7 +20,7 @@ export const clientTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
-  "client.WebServerDown", "client.WebServerUp",
+  "client.ServiceRestartRequested", "client.WebServerDown", "client.WebServerUp",
 ] as const;
 
 export const definitions = () => {

@@ -1,3 +1,4 @@
+import { ServiceControlRpcGroup, serviceControlAccess, serviceControlCommandNames } from "../serviceCommands.ts"
 import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "../workflowCommands.ts"
 import { HarnessChoices } from "../harnessChoices.ts"
 import { HarnessInstallation, HarnessRecipe, HarnessInstallResult } from "../harnessInstallation.ts"
@@ -97,12 +98,13 @@ export const ClientRpcGroup = RpcGroup.make(
   Rpc.make("alerts.carrier.clear-token", { payload: { ...request, name: Schema.optionalKey(CarrierName) }, success: Ack, error: Refused }),
   Rpc.make("web.settings", { payload: request, success: Schema.Struct({ ...request, ...WebSettings.fields, serverState: WebServerState }), error: Refused }),
   Rpc.make("web.settings.set", { payload: { ...request, settings: WebSettings }, success: Ack, error: Refused })
-).prefix("client.").merge(WorkflowRpcGroup)
+).prefix("client.").merge(WorkflowRpcGroup).merge(ServiceControlRpcGroup)
 
 export const clientCommandAccess = {
   "client.harness.status": ["owner"], "client.harness.recipe": ["owner"], "client.harness.install": ["owner"], "client.harness.account.check": ["owner"],
   "client.harness.choices": ["owner"],
   ...workflowAccess,
+  ...serviceControlAccess,
   "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": ["owner", "agent", "service"], "client.roster": ["owner", "agent", "service"],
   "client.thread": ["owner", "agent", "service"], "client.subscribe": ["owner", "agent", "service"],
@@ -119,6 +121,7 @@ export const AlertRpcGroup = ClientRpcGroup.omit(
   "client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check",
   "client.harness.choices",
   ...workflowCommandNames,
+  ...serviceControlCommandNames,
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context",
   "client.web.settings", "client.web.settings.set"
 )

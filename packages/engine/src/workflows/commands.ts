@@ -14,7 +14,7 @@ const handler = (operation: string): ReadHandler => (input: Input, payload: Reco
   if (payload.repoId !== undefined && !repository) return yield* Effect.fail(refused('Choose a registered repository.'))
   const result = yield* Effect.tryPromise({
     try: async () => {
-      const store = new WorkflowStore(input.runtime.home, repository?.path)
+      const store = new WorkflowStore(input.runtime.home, repository?.path, projectView(input.snapshot).settings?.workflowFolder, input.runtime.stateFolder)
       switch (operation) {
         case 'list': return await store.list()
         case 'read': return { workflow: await store.read(payload.scope as string, payload.id as string) }

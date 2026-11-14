@@ -39,8 +39,8 @@ it.each(["first", "fixture"])("keeps %s installation metadata when the built pag
     }
     throw new Error(`Unexpected request: ${tag}`)
   }
-  const actions = new Function("store", "live", "engineWrite", "notify", "engine", "act", "HARNESSES", "addEventListener", "removeEventListener", `${source}\nreturn { installMappings, openScreen, busy };`)(
-    { state }, { on: true }, (patch: object) => Object.assign(state, patch), () => {}, { request }, { toast: (value: string) => toasts.push(value) }, table, () => {}, () => {})
+  const actions = new Function("serviceSettings", "store", "live", "engineWrite", "notify", "engine", "act", "HARNESSES", "addEventListener", "removeEventListener", `${source}\nreturn { installMappings, openScreen, busy };`)(
+    { loadVersion: async () => {} }, { state }, { on: true }, (patch: object) => Object.assign(state, patch), () => {}, { request }, { toast: (value: string) => toasts.push(value) }, table, () => {}, () => {})
   actions.installMappings(mappings)
   const close = actions.openScreen("harnesses")
   try {

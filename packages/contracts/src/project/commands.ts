@@ -38,7 +38,7 @@ export const ProjectRpcGroup = RpcGroup.make(
   Rpc.make("context.search", { payload: { ...request, ...ContextSearchFields },
     success: Schema.Union([Schema.Struct({ ...request, result: ContextSearchResult }), Schema.Struct({ ...request, data: Schema.String })]), error: Refused }),
   Rpc.make("settings", { payload: request, success: Schema.Struct({ ...request, settings: Schema.optionalKey(ProjectSettings), ownerNameSuggestion: Schema.optionalKey(ProjectName) }), error: Refused }),
-  Rpc.make("settings.set", { payload: { ...request, settings: ProjectSettings }, success: Ack, error: Refused }),
+  Rpc.make("settings.set", { payload: { ...request, settings: ProjectSettings, clearWorkflowFolder: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused }),
   Rpc.make("repository.add", { payload: { ...request, name: ProjectName, path: Repository.fields.path, machineId: ProjectName }, success: Schema.Struct({ ...request, repoId: Repository.fields.repoId }), error: Refused }),
   Rpc.make("repository.locate", { payload: { ...request, ...RepositoryLocation.fields }, success: Ack, error: Refused }),
   Rpc.make("repositories", { payload: { ...request, ...paging }, success: page(Repository), error: Refused }),

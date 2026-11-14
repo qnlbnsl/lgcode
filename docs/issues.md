@@ -12888,3 +12888,260 @@ The live copy now includes the shared harness defaults editor for that explicit 
 The ordinary Service settings address and the standalone sample keep their current layouts.
 The editor uses the same asynchronous model reports on both addresses.
 The browser journey is unchanged.
+
+
+## 800. Service updates remain manual.
+
+The service settings page does not download or execute an update.
+An update replaces the program that holds the owner's credentials and runs agents.
+The page shows the terminal commands for the owner to inspect and run.
+Its update button retains the explicit refusal.
+The version check uses a fixed Git argument list and permits only HTTPS transport.
+A different remote head is reported as different, because it does not prove that the remote commit is newer than a local worker branch.
+
+## 801. Reviewer defaults have no automatic selector yet.
+
+The engine stores the default reviewer count and the different-vendor rule in project settings.
+The page says that these values are saved for future reviewer assignment.
+No engine code currently selects reviewers.
+The defaults therefore do not yet assign a reviewer or enforce a vendor choice.
+The first reviewer selector must read these defaults.
+
+## 802. Several service controls still lack their execution paths.
+
+The need-to-know default has no team-creation privacy setting to consume it.
+Removing agent credits would need a defined commit-rewriting policy before the approved Git heads change.
+The Git message model has no service-owned message-generation request to consume it.
+The tests-first default, agent-review default, and review-round limit have no workflow executor to consume them.
+These controls retain the notice that they are not connected and change nothing.
+Standing permission rules still await the owner's harness recordings, as AGENTS.md requires.
+The existing standing-rules setting is outside this implementation and still does not enforce permission rules.
+
+## 803. Stall timers currently follow idle board obligations.
+
+The existing stall rule watches idle agents with unanswered board work.
+It deliberately excludes a working turn, queued delivery, account hold, and open dependency.
+The assigned timer applies before the first recorded turn.
+The worker and lead timers apply to subsequent eligible stall episodes.
+These settings do not detect a silent active turn.
+The separate runaway turn timer still governs long active turns.
+The live page explains the idle-obligation scope so that the owner does not mistake the values for active-turn output deadlines.
+
+## 804. The parity fixture depended on generated mock output.
+
+The command parity fixture read the workflow sample from a generated design file.
+A fresh remote copy did not contain that file before a website build.
+Several command tests then timed out after their fake engine threw while preparing replies.
+The fixture now reads the canonical engine workflow file.
+This removes the build-order dependency.
+
+## 805. The settings live check passed 17 of 23 stages.
+
+The settings worker ran the required live check with private temporary state.
+The run passed 17 stages out of 23.
+Claude did not attempt the removed-variables, state-read, always-allow, or permission-kinds probes.
+The token scan found agent tokens in process arguments.
+Recording was skipped because earlier stages failed.
+The final event, reply, and output scan passed.
+The reload and token-revocation probes passed for both harnesses.
+These results have the execution-context limitation described in issue 526.
+The token exposure remains the previously reported issue 240.
+This run does not establish the known 19-of-23 baseline.
+
+## 806. The new browser test used an unsupported declaration option.
+
+The first full settings check stopped during TypeScript checking.
+The new browser test passed a timeout property as Playwright test metadata.
+Playwright ran the isolated journey but rejected that property during type checking.
+The test now uses the configured browser timeout.
+The next check found two unbranded request identifiers in the executable restart test.
+Those synthetic identifiers now use the client contract's request identifier type.
+
+## 807. Service controls were missing from the standalone client declarations.
+
+The full unit run found six contract inventory failures after adding the service controls.
+The running service exposed both requests through the installed group.
+The standalone client definition group did not include them.
+Both requests now belong to that group and its owner-only access table.
+The explicit inventory tests include both requests.
+The alert, read, and web subgroups still exclude them before installation.
+
+## 808. A Git transport default alone did not constrain URL rewriting.
+
+A repository can override a general transport default with a per-protocol setting.
+A URL rewrite could then select an executable helper after the HTTPS URL check.
+The version checker now sets Git's HTTPS-only protocol environment allowlist.
+Git documents that this allowlist overrides existing protocol configuration.
+A test combines an HTTPS remote, an executable URL rewrite, and an explicit protocol allowance.
+The check refuses the rewritten transport without creating its marker file.
+The relevant Git documentation is at https://git-scm.com/docs/git.
+
+## 809. The workflow redaction fixture omitted project state.
+
+The full unit run found one workflow redaction failure in addition to the six contract failures.
+The fixture passed an empty snapshot to the workflow handlers.
+Reading the saved workflow folder now requires the normal project view.
+The fixture now supplies an empty project view and its private state folder.
+Its real redactor and secret assertions remain unchanged.
+
+## 810. The heartbeat save race recurred in the settings full check.
+
+The settings full check passed all 552 unit files and 8,303 tests.
+Two unit tests were skipped.
+The browser run passed 53 journeys and failed two.
+The existing service-settings journey failed at `studioService.ts:74` after saving a 31-second heartbeat.
+This is the same unsaved-state failure recorded in issue 727.
+The unchanged journey passed in the targeted retry.
+The new settings journey passed both times.
+The full check remains a failed run.
+
+## 811. The existing email journey could not find its Notifications heading.
+
+The settings full browser run failed the existing email journey.
+The targeted retry reproduced the failure.
+The error says that the Notifications heading was not found.
+The reported source location maps to `studioNotifications.ts:73` instead of the heading assertion.
+The failure therefore does not establish that email credentials were saved or tested.
+The standalone sample journey passed in the full browser run.
+The sample fixture used an inline import map under the engine's strict Content Security Policy.
+That policy blocks the map, so the workflow contract import cannot resolve.
+The fixture now serves the existing generated workflow bundle directly at the sample module path.
+Neither the policy nor the design files change.
+The corrected email journey passed alone in six seconds.
+
+## 812. The merged live check matched the known baseline.
+
+The required live check ran again after merging `origin/area/build-loop`.
+It passed 19 stages out of 23.
+The removed-variables, always-allow, and token-scan stages failed.
+Recording was skipped because earlier stages failed.
+Both harnesses passed reload recovery and old-token refusal.
+The final event, reply, and output scan passed.
+The run used private state under `/tmp/lgtm-live-HIveOX`.
+The owner's service was not changed.
+
+## 813. The merged full check failed while waiting for Use both.
+
+The merged full check passed all 554 unit files.
+It passed 8,392 unit tests and skipped two.
+The browser run passed 54 journeys and failed the Git journey.
+The failure was a ten-second click timeout at `studioGit.ts:157` while waiting for Use both.
+This is a different location from the task's known intermittent failure at line 100.
+The unchanged Git journey passed alone in 3.1 minutes.
+The credit check passed after that retry.
+The service-settings, email, new settings, and standalone sample journeys passed in the full run.
+The full check remains a failed run.
+The settings worker changed no Git timeout or implementation beyond the lead's required integration merge.
+
+## 814. Service build replacements could silently stop matching.
+
+The settings transformer used unchecked string replacements.
+The merged Harnesses screen still matches every patch.
+Every replacement now checks its exact match count and fails the build on a mismatch.
+Each individual replacement must match exactly once.
+The existing replacement of all five busy indicators has an explicit count.
+Regression tests remove and duplicate each source fragment.
+
+## 815. Holder stall notices used wording addressed to the stalled agent.
+
+A disabled nudge or an increased replacement threshold could send the holder the agent's instructions.
+Notice wording now follows the recipient at every occurrence.
+The running watch test changes an armed timer in both directions without restarting.
+Zero, negative, and huge timer settings are refused.
+The existing timer rearming already honored saved changes.
+
+## 816. Partial project settings could clear the workflow folder and review defaults.
+
+Omitting these two fields now preserves their stored values.
+The request has an explicit clearWorkflowFolder flag.
+The live page offers a button to restore the default workflow folder.
+Review defaults are preserved during that clear.
+
+## 817. Restart executes the writable checkout under the same user.
+
+Restart runs the installed Node.js executable and the script currently at the recorded path.
+An agent running as the owner's user can change that checkout before an owner requests restart.
+The same-user limit described in SECURITY.md applies to these launch files too.
+Existence, regular-file, read, and execute checks prevent an accidental missing launch file from stopping every agent.
+They do not establish that the program is trusted or unchanged.
+Agent sandboxes remain planned.
+
+## 818. A stop signal during the restart window can still reexecute the service.
+
+The restart acknowledgement schedules shutdown after a short transport drain.
+A stop signal during this window interrupts the service but leaves the restart flag set.
+The process can therefore start again after that signal.
+This review records the behavior without changing signal semantics in this fix.
+
+## 819. Restart lacked a durable owner receipt and checked launch files too late.
+
+Restart is now a mutation with an owner-attributed ServiceRestartRequested event.
+The event and its request identifier receipt commit before any agent stop.
+A replay returns the receipt without restarting again, including after reexecution.
+A distinct request during a pending restart is refused.
+The launch preflight refuses missing files, directories, unreadable files, and a nonexecutable Node.js program before stopping agents.
+An execution failure after teardown writes a fixed recovery line and sets exit status 78.
+Launch-file substitution by the same user remains subject to issue 817.
+
+## 820. Version checks trusted checkout TLS configuration and assumed the default branch.
+
+A per-URL certificate setting could override the command's general certificate check.
+Network comparison now runs in an empty temporary directory with system and global Git configuration disabled.
+The checkout supplies only its tracked remote URL and branch metadata.
+The temporary directory is removed after comparison, including failure.
+The version check now searches the fixed /usr/bin:/bin path for Git instead of naming one absolute binary.
+The Git service also launches Git by its command name.
+The comparison and displayed update commands use the tracked branch.
+A checkout without tracking receives a fixed explanation and no update commands.
+Credential-bearing URLs are tested independently from executable transport refusal.
+The output and time limits are exercised against real child processes.
+
+## 821. Settings regression fixtures needed corrections during review fixes.
+
+The first build-transformer test used an unavailable TypeScript compiler runtime enum.
+It now reads the transformer's literal patch fragments directly.
+The first running-timer fixture bound the same socket twice.
+It now reuses its existing connection.
+The audit test initially named a nonexistent caller_json column.
+The event table stores the caller as a fixed caller key.
+The standalone Harnesses test now supplies the added version-loader dependency when evaluating the built module.
+The version-reply race test already passed before changing the settings reference.
+The existing state object reads settings at reply time rather than holding a settings snapshot.
+The code now explicitly merges the returned version fields into the current store's settings.
+
+## 822. The restart continuation needed an explicit recursive effect type.
+
+The first review-fix type check found a cycle between the mutation handler and its stop continuation.
+The handler now has its existing public execute type as an explicit annotation.
+The continuation uses the concrete command and log error types instead of an unconstrained effect.
+The following type check passed for every package and the root.
+The affected suite passed 312 tests.
+The live settings browser journey passed with the folder reset and no-tracking explanation.
+
+## 823. The first full review-fix check found a visibility fixture gap and a forbidden type import.
+
+The new restart event was missing from the exhaustive subscription visibility samples.
+Its empty payload now has a sample, so the existing tests check owner-only visibility in catch-up and live streams.
+A type-only import of LogWriteFailed from the client piece also crossed the repository's piece boundary.
+The restart continuation now preserves its caller's error type through a generic parameter.
+The client piece does not import the log writer.
+
+## 824. Two process-only tests omitted the required rebuild registration.
+
+The first full check finished with 8,547 passed tests, five failed tests, and two skipped tests.
+The exhaustive registration guard found the new restart-launch and version-process files.
+These two tests create no engine log.
+They now register the explicit noLog form required for those tests.
+The browser and credit stages did not run because the unit stage failed.
+
+## 825. The final review-fix check still hit the known Git browser timeout.
+
+The final full check passed all package and root type checks.
+All 567 unit files passed, with 8,552 passed tests and two skipped tests.
+The browser stage passed 55 of 56 journeys.
+The Git journey timed out for ten seconds while clicking Use both after reopening a conflict.
+The merged file reports this at packages/web/e2e/support/studioGit.ts:165, rather than the earlier line 157.
+The live settings, Harnesses, Notifications, and standalone sample journeys passed.
+The credit check passed separately after the failed browser stage skipped its chained invocation.
+The settings worker changed no Git implementation or timeout beyond the required integration merge.
+The lead assigned that Git problem to another builder.

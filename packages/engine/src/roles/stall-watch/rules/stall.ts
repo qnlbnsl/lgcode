@@ -36,8 +36,8 @@ export interface StallInput {
     readonly sequence: number;
     readonly agents: Readonly<Record<string, Agent>>;
     readonly deliveries: Readonly<Record<string, { readonly agentId?: string; readonly target?: string; readonly status?: string;
-      readonly stallWatch?: boolean; readonly source?: { readonly _tag: string; readonly namespace?: string } }>>;
-    readonly roles: { readonly settings: { readonly stallWatch?: boolean }; readonly actions: ReadonlyArray<{
+      readonly stallWatch?: boolean; readonly autoNudge?: boolean; readonly nudgeAttempts?: number; readonly replaceAfter?: number; readonly source?: { readonly _tag: string; readonly namespace?: string } }>>;
+    readonly roles: { readonly settings: { readonly stallWatch?: boolean; readonly autoNudge?: boolean; readonly nudgeAttempts?: number; readonly replaceAfter?: number }; readonly actions: ReadonlyArray<{
       readonly _tag: string; readonly agentId: string; readonly stalledPostId?: string; readonly postId?: string; readonly occurrence: number;
     }> };
   };
@@ -174,16 +174,18 @@ export const evaluateStall = (input: StallInput): ReadonlyArray<NoticeAction> =>
       || input.status.own?.some((post) => post.postId === episode.post.postId && post.replies?.some((reply) => partyId(reply.author) === episode.addressee));
     const previous = progressed ? 0 : episode.occurrence ?? Math.max(0, ...input.snapshot.roles.actions.filter((action) => action.agentId === episode.addressee
       && (action.stalledPostId ?? action.postId) === episode.post.postId && ["roles.StallSeen", "roles.ReplaceAdvised"].includes(action._tag)).map((action) => action.occurrence));
-    if (previous >= 3) continue;
+    const replaceAfter = input.snapshot.roles.settings.replaceAfter ?? 3;
+    const nudges = input.snapshot.roles.settings.autoNudge === false ? 0 : input.snapshot.roles.settings.nudgeAttempts ?? 2;
+    if (previous >= replaceAfter) continue;
     const occurrence = previous + 1;
     const base = { agentId: episode.addressee, stalledPostId: episode.post.postId,
       triggerSequence: episode.originSequence ?? episode.post.sequence ?? input.snapshot.sequence,
       sourceSequence: input.snapshot.sequence, occurrence };
     const action = (tag: "roles.StallSeen" | "roles.ReplaceAdvised", recipient: string) => ({ ...base, _tag: tag, noticeRecipient: recipient }) as NoticeAction;
-    if (occurrence === 3) actions.push(action("roles.ReplaceAdvised", holder(input, episode.addressee)));
+    if (occurrence === replaceAfter) actions.push(action("roles.ReplaceAdvised", holder(input, episode.addressee)));
     else {
-      actions.push(action("roles.StallSeen", episode.addressee));
-      if (occurrence === 2) actions.push(action("roles.StallSeen", holder(input, episode.addressee)));
+      if (occurrence <= nudges) actions.push(action("roles.StallSeen", episode.addressee));
+      if (occurrence >= 2 || occurrence > nudges) actions.push(action("roles.StallSeen", holder(input, episode.addressee)));
     }
   }
   return actions;
