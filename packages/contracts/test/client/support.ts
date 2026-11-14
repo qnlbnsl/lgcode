@@ -20,7 +20,7 @@ export const clientTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
-  "client.WebServerDown", "client.WebServerUp",
+  "client.ServiceRestartRequested", "client.WebServerDown", "client.WebServerUp",
 ] as const;
 
 export const definitions = () => {

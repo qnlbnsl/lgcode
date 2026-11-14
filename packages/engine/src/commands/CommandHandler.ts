@@ -1,4 +1,4 @@
-import { serviceRestartPending } from "../client/serviceControl.ts"
+import { serviceRestartPending, completeServiceRestart } from "../client/serviceControl.ts"
 import { recoverInstalls } from "../harnesses/lifecycle.ts";
 import { acceptCache, type CacheTarget } from "./cache.ts";
 import { randomUUID } from "node:crypto";
@@ -296,9 +296,9 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     }).pipe(Effect.provideService(SqlClient.SqlClient, sql));
 
     type Step = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
-    const executeMutation = (credential: Credential, name: string, rawPayload: unknown) => Effect.suspend(() => {
+    const executeMutation: CommandHandler["Service"]["execute"] = (credential, name, rawPayload) => Effect.suspend(() => {
       const prepare = (step: Step) => Effect.gen(function* () {
-        if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
+        if (serviceRestartPending() && !["stop", "client.service.restart"].includes(name)) return yield* refused("service restarting");
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         let external: { readonly plan?: Plan; readonly finalize?: Planner; readonly failure?: CommandRefused | LogWriteFailed; readonly finished?: Event } | undefined;
         if (Object.hasOwn(gitPlanners, name) || Object.hasOwn(registrationPlanners, name)
@@ -365,7 +365,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           return yield* prepareProjectLifecycle({ runtime, actor, snapshot: yield* views.snapshot }, name, payload, bodyHash);
         }));
         return yield* step(log.transact((append) => Effect.gen(function* () {
-          if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
+          if (serviceRestartPending() && !["stop", "client.service.restart"].includes(name)) return yield* refused("service restarting");
           // Invalid credentials never write an event or retrieve a receipt.
           const actor = yield* resolveCredential(credential, name);
           const rpc = lists.commands.requests.get(name);
@@ -449,7 +449,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               failure.reason === "no usable account" || projectLifecycleCommand(name) && !initialMainRefusal ? false : undefined);
             return { failure, afterCommit: undefined };
           }
-          if (serviceRestartPending() && name !== "stop") return yield* refused("service restarting");
+          if (serviceRestartPending() && !["stop", "client.service.restart"].includes(name)) return yield* refused("service restarting");
           const plan = planned.success;
           yield* append(actor, requestId, bodyHash, (pieceNamespace(name) === undefined || projectLifecycleCommand(name)) ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
             plan.reply === undefined ? replyFor(snapshot, name, requestId, batch, settings).reply : plan.reply(batch));
@@ -457,12 +457,16 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           const written = yield* sql<{ result_json: string }>`
             SELECT result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
           if (written[0] === undefined) return yield* new LogWriteFailed({ reason: "receipt insert returned no result" });
-          return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
+          return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit, restartAccepted: name === "client.service.restart" };
         })));
       });
       const finish = (outcome: Effect.Success<ReturnType<typeof prepare>>, step: Step) => Effect.gen(function* () {
         if (outcome.failure !== undefined) return yield* outcome.failure;
         if (name === "client.web.settings.set") yield* webSettingsCommitted(views);
+        if ("restartAccepted" in outcome && outcome.restartAccepted) yield* completeServiceRestart(
+          { runtime, actor: { _tag: "owner" }, snapshot: yield* views.snapshot },
+          (agentId) => executeMutation({ _tag: "owner" }, "stop", { requestId: randomUUID(), agentId }),
+        );
         const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
       });
@@ -495,6 +499,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
       // Lifecycle ownership precedes requests, and requests precede process
       // lanes (including archive members). Runner/recovery paths take only
       // process lanes and short writer transactions, never request lanes.
+      if (name === "client.service.restart") return engineOwned(withLane(log, "service-restart")(settled));
       if (lifecycleCommand) {
         const lifecycle = withLane(log, "project-lifecycle")(settled);
         return projectLifecycleCommand(name) ? engineOwned(lifecycle) : lifecycle;

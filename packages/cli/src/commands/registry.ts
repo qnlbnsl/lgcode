@@ -10,7 +10,7 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
-  "client.service.version": "Read the running version and optionally compare origin HEAD over HTTPS without downloading code.",
+  "client.service.version": "Read the running version and optionally compare the tracked remote branch over HTTPS without downloading code.",
   "client.service.restart": "Confirm sign-out of every page and stop running agents, then restart the service with its original arguments and environment.",
   "client.harness.status": "Read each harness's installed program, path and version.",
   "client.harness.recipe": "Show the exact repository-owned install commands for a harness.",

@@ -58,7 +58,15 @@ test('the executable restarts with the same arguments and environment and invali
     expect(child.exitCode).toBeNull()
     expect(readFileSync(`/proc/${child.pid}/cmdline`, 'utf8')).toContain('--trace-warnings\0')
     expect(readFileSync(`/proc/${child.pid}/environ`, 'utf8').includes('LGTM_RESTART_MARKER=preserved-value\0')).toBe(true)
-    expect((await login()).status).toBe(204)
+    const fresh = await login()
+    expect(fresh.status).toBe(204)
+    const freshCookie = fresh.headers.get('set-cookie')!.split(';')[0]!
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const client = yield* connect(join(rig.stateFolder, 'engine.sock'), ownerBearer(rig.stateFolder))
+      expect(yield* client['client.service.restart']({ requestId: 'restart-process' as RequestId, confirmed: true })).toMatchObject({ restarting: true })
+    })))
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    expect((await fetch(origin + '/api/session', { method: 'POST', headers: { Cookie: freshCookie, Origin: origin } })).status).toBe(204)
     expect((await session()).status).toBe(401)
   } finally {
     if (child && child.exitCode === null) {

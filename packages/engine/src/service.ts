@@ -1,3 +1,4 @@
+import { restartAfterShutdown } from './client/restartLaunch.ts';
 import { installRestarter, captureRunningVersion } from "./client/serviceControl.ts"
 import { lstatSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -222,8 +223,8 @@ if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === imp
   installRestarter(undefined);
   process.removeListener("SIGTERM", stop);
   process.removeListener("SIGINT", stop);
-  if (restarting) process.execve!(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], launchEnvironment);
-  if (Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
+  if (restarting) restartAfterShutdown(() => process.execve!(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], launchEnvironment));
+  if (!restarting && Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
     // Startup failures contain fixed service-owned categories only. Never
     // serialize a cause: the underlying database may quote stored data.
     const allowed = ["state folder is a symbolic link", "state folder mode is not 0700", "state folder is owned by another user", "state folder is not a directory", "socket path exceeds 100 bytes"];

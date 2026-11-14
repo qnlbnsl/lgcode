@@ -1,4 +1,4 @@
-import { serviceControlReads } from "../client/serviceControl.ts"
+import { serviceControlReads, serviceControlPlanners } from "../client/serviceControl.ts"
 import { workflowReads } from "../workflows/commands.ts";
 import {
   CommandsRpcGroup, Event, EventEnvelope, commandAccess, commandGroups, eventGroups, eventVisibility,
@@ -75,7 +75,7 @@ export const engineLists: EngineLists = {
   access: commandAccess,
   // Build these tables on first use after the cyclic modules initialize.
   // Cache the complete maps so every consumer keeps the same registrations.
-  get planners() { return plannerTable ??= { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...creationPlanners, ...gitPlanners, ...mockPlanners, ...setupPlanners, ...designPlanners }; },
+  get planners() { return plannerTable ??= { ...planners, ...serviceControlPlanners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...creationPlanners, ...gitPlanners, ...mockPlanners, ...setupPlanners, ...designPlanners }; },
   get reads() { return readTable ??= { ...reads, ...serviceControlReads, ...workflowReads, ...alertReads, ...boardReads, ...projectReads, ...gitReads, ...mockReads, ...setupReads, ...designReads, "project.placement.preview": previewProjectPlacement }; },
   // The tables and reactors import engine services in this same module graph.
   // Resolve their values when used, after module initialization has completed.

@@ -13038,7 +13038,8 @@ The settings worker changed no Git timeout or implementation beyond the lead's r
 The settings transformer used unchecked string replacements.
 The merged Harnesses screen still matches every patch.
 Every replacement now checks its exact match count and fails the build on a mismatch.
-Two intentional repeated labels and five busy indicators have explicit counts.
+Each individual replacement must match exactly once.
+The existing replacement of all five busy indicators has an explicit count.
 Regression tests remove and duplicate each source fragment.
 
 ## s6-settings-16. Holder stall notices used wording addressed to the stalled agent.
@@ -13071,3 +13072,48 @@ The restart acknowledgement schedules shutdown after a short transport drain.
 A stop signal during this window interrupts the service but leaves the restart flag set.
 The process can therefore start again after that signal.
 This review records the behavior without changing signal semantics in this fix.
+
+## s6-settings-20. Restart lacked a durable owner receipt and checked launch files too late.
+
+Restart is now a mutation with an owner-attributed ServiceRestartRequested event.
+The event and its request identifier receipt commit before any agent stop.
+A replay returns the receipt without restarting again, including after reexecution.
+A distinct request during a pending restart is refused.
+The launch preflight refuses missing files, directories, unreadable files, and a nonexecutable Node.js program before stopping agents.
+An execution failure after teardown writes a fixed recovery line and sets exit status 78.
+Launch-file substitution by the same user remains subject to issue s6-settings-18.
+
+## s6-settings-21. Version checks trusted checkout TLS configuration and assumed the default branch.
+
+A per-URL certificate setting could override the command's general certificate check.
+Network comparison now runs in an empty temporary directory with system and global Git configuration disabled.
+The checkout supplies only its tracked remote URL and branch metadata.
+The temporary directory is removed after comparison, including failure.
+The version check now searches the fixed /usr/bin:/bin path for Git instead of naming one absolute binary.
+The Git service also launches Git by its command name.
+The comparison and displayed update commands use the tracked branch.
+A checkout without tracking receives a fixed explanation and no update commands.
+Credential-bearing URLs are tested independently from executable transport refusal.
+The output and time limits are exercised against real child processes.
+
+## s6-settings-22. Settings regression fixtures needed corrections during review fixes.
+
+The first build-transformer test used an unavailable TypeScript compiler runtime enum.
+It now reads the transformer's literal patch fragments directly.
+The first running-timer fixture bound the same socket twice.
+It now reuses its existing connection.
+The audit test initially named a nonexistent caller_json column.
+The event table stores the caller as a fixed caller key.
+The standalone Harnesses test now supplies the added version-loader dependency when evaluating the built module.
+The version-reply race test already passed before changing the settings reference.
+The existing state object reads settings at reply time rather than holding a settings snapshot.
+The code now explicitly merges the returned version fields into the current store's settings.
+
+## s6-settings-23. The restart continuation needed an explicit recursive effect type.
+
+The first review-fix type check found a cycle between the mutation handler and its stop continuation.
+The handler now has its existing public execute type as an explicit annotation.
+The continuation uses the concrete command and log error types instead of an unconstrained effect.
+The following type check passed for every package and the root.
+The affected suite passed 312 tests.
+The live settings browser journey passed with the folder reset and no-tracking explanation.

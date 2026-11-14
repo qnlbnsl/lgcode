@@ -29,7 +29,8 @@ export function serviceSettingsSource(path: string, source: string): string {
     replace('Agents stop at the end of their turn and resume after the restart. This page reconnects on its own.', 'Every signed-in page is signed out and running agents are stopped. This page checks when the service is back. You must sign in again.')
     replace("if (act.refused()) return; act.setConnection('reconnecting');", "return serviceSettings.restart(); act.setConnection('reconnecting');")
     replace('<${Row} label="Restart the service"', '<${Row} label="Update the service" hint="Run these commands yourself in the checkout shown below. Review local changes and remote commits before merging." top><span class="mono">${set.checkout}</span><pre class="code">${(set.updateCommands || []).join(String.fromCharCode(10))}</pre><button type="button" class="btn" onClick=${refuse}>Update the service</button><//>\n    <${Row} label="Restart the service"')
-    replace('label="Wake it once first"', 'label="Nudge a stalled agent automatically"', 2)
+    replace('<${Row} label="Wake it once first"', '<${Row} label="Nudge a stalled agent automatically"')
+    replace('label="Wake it once first" onChange=', 'label="Nudge a stalled agent automatically" onChange=')
     replace('A stuck agent gets one wake. Ten minutes later its lead is told. A stuck lead goes to the project lead, and a stuck project lead comes to you.', 'A stalled agent receives up to the saved number of nudges. Further stalls go to its lead. Replacement is advice to the lead.')
     replace('<${Row} label="Replace the worker"', '<${Row} label="Automatic nudges" id="sd-n"><${Num} id="sd-n" value=${set.nudgeAttempts} min=${0} max=${9} unit="at most" onChange=${(v) => setS({ nudgeAttempts: v })} /><//>\n      <${Row} label="Replace the worker"')
   }

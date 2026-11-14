@@ -9,14 +9,14 @@ export const checkWorkflows = () => run('settings', async () => {
   toast(`Checked the workflow folder. ${reply.items.filter((w) => w.scope === 'user').length} workflow files found.`);
 });
 
-import { store, engineWrite, update } from '../lib.js';
+import { store, engineWrite } from '../lib.js';
 export { busy } from './board.js';
 export const loadVersion = (check = false) => run('service-version', async () => {
   const state = store.state, connection = engine.connection();
   const reply = await engine.request('client.service.version', { check });
   if (store.state !== state || engine.connection() !== connection || state.session.status !== 'in') return;
-  engineWrite({ settings: { ...state.settings, version: reply.version, commit: reply.commit, dataFolder: reply.dataFolder,
-    versionComparison: reply.comparison, versionReason: reply.reason || '', remoteCommit: reply.remoteCommit || '',
+  engineWrite({ settings: { ...store.state.settings, version: reply.version, commit: reply.commit, dataFolder: reply.dataFolder,
+    versionComparison: reply.comparison, versionReason: reply.reason || '', remoteCommit: reply.remoteCommit || '', trackedBranch: reply.trackedBranch || '',
     updateCommands: reply.updateCommands, checkout: reply.checkout } });
 });
 export const restart = () => run('service-restart', async () => {

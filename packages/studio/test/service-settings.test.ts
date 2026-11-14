@@ -23,3 +23,17 @@ for (const path of ['js/live/git.js', 'js/screens/service.js']) {
     })
   }
 }
+
+test('a version reply preserves settings saved while it was in flight and ignores extra reply settings', async () => {
+  const source = readFileSync('design/mock/js/live/service-settings.js', 'utf8').replace(/^import .*;$/gm, '').replace(/^export \{.*;$/gm, '').replace(/export /g, '')
+  let release!: (value: unknown) => void
+  const held = new Promise((resolve) => { release = resolve })
+  const connection = {}, state = { session: { status: 'in' }, settings: { stallWorker: 10, version: 'old' } }, store = { state }
+  const loadVersion = new Function('store', 'engine', 'engineWrite', 'run', 'toast', `${source}; return loadVersion;`)(
+    store, { request: () => held, connection: () => connection }, (patch: any) => Object.assign(store.state, patch), (_key: string, operation: () => unknown) => operation(), () => {})
+  const loading = loadVersion(true)
+  state.settings = { stallWorker: 31, version: 'old' }
+  release({ version: 'new', commit: 'abc', comparison: 'same', dataFolder: '/state', checkout: '/checkout', updateCommands: [], stallWorker: 999 })
+  await loading
+  expect(state.settings).toMatchObject({ stallWorker: 31, version: 'new', commit: 'abc', versionComparison: 'same' })
+})
