@@ -12661,4 +12661,19 @@ The error says that the Notifications heading was not found.
 The reported source location maps to `studioNotifications.ts:73` instead of the heading assertion.
 The failure therefore does not establish that email credentials were saved or tested.
 The standalone sample journey passed in the full browser run.
-The cause of this email journey failure remains unconfirmed.
+The sample fixture used an inline import map under the engine's strict Content Security Policy.
+That policy blocks the map, so the workflow contract import cannot resolve.
+The fixture now serves the existing generated workflow bundle directly at the sample module path.
+Neither the policy nor the design files change.
+The corrected email journey passed alone in six seconds.
+
+## s6-settings-13. The merged live check matched the known baseline.
+
+The required live check ran again after merging `origin/area/build-loop`.
+It passed 19 stages out of 23.
+The removed-variables, always-allow, and token-scan stages failed.
+Recording was skipped because earlier stages failed.
+Both harnesses passed reload recovery and old-token refusal.
+The final event, reply, and output scan passed.
+The run used private state under `/tmp/lgtm-live-HIveOX`.
+The owner's service was not changed.
