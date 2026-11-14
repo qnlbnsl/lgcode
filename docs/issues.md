@@ -12526,3 +12526,24 @@ This wait is before opening the next review, rather than after opening a review 
 The production background-read fix is unchanged.
 No timeout is raised.
 The failed browser-only run had 52 passes and one failure in 7.6 minutes.
+
+## 757. The terminal parity test read a generated file and hung the full check.
+
+`packages/cli/test/parity.test.ts` read the default workflow from `design/mock/workflows/build-loop.json`.
+The Studio build generates that file, and Git ignored it.
+A fresh checkout on the remote test computer had no such file.
+The test then waited without ending, and the full check on `75e05c8` produced no output for 43 minutes.
+The 60-second test limit did not end the test.
+The test now reads the engine's own file, `packages/engine/src/workflows/build-loop.json`.
+The reason the test limit did not fire is not yet known.
+
+## 758. The mock could not open in a fresh checkout without a Studio build.
+
+`design/mock/js/app.js` imports the "Workflows" screen.
+That screen imports `design/mock/vendor/workflow-contracts.js` and fetches `design/mock/workflows/build-loop.json`.
+The Studio build generates both files, and Git ignored them.
+The mock opened on its own would fail to load until someone ran the build.
+Both files are now committed.
+They can fall behind `packages/contracts/src/workflows.ts` and the engine's default workflow until the build is run again.
+No test yet fails when they fall behind.
+
