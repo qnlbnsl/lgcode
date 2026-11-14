@@ -1,5 +1,16 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "mock revision changed; refresh and retry", "mock revision identity is already recorded",
+  "mock artifact changed; record a new revision", "invalid mock artifact reference", "artifact unavailable",
+  "registered project design is unavailable", "registered design format cannot open in the editor",
+  "registered design needs an unchanged file in a dedicated design folder", "registered design artifacts changed or are unavailable",
+  "registered design workspace is unavailable", "repository design is unavailable to this caller", "a path cannot contain a registered secret",
+  "mock editor design changed; refresh and retry", "mock editor export must be base64 data of at most 512 KiB",
+  "mock editor save requires confirmation", "mock editor export does not match the recorded design format",
+  "Mock editor save outcome is uncertain; refresh the mocks before retrying.",
+  "mock editor export contains private data", "mock editor file changed or its path is unsafe", "mock editor revision exceeds the data budget",
+  "mock screen feedback exceeds the read budget",
+  "mock screen is unavailable", "mock comment must contain between 1 and 4096 characters", "mock screen comment limit reached",
   "project state changed; refresh and retry",
   "Git outcome is uncertain; refresh Git state",
   "Git attempt metadata is unavailable",

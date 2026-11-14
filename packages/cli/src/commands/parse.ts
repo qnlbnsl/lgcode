@@ -9,6 +9,7 @@ export interface Parsed {
   // wait --block: hold this process until the wait settles
   readonly block: boolean
   readonly out?: string
+  readonly file?: string
 }
 
 const takeValue = (args: ReadonlyArray<string>, index: number, flag: string): string => {
@@ -34,6 +35,7 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
   let mode: string | undefined
   let after: string | undefined
   let out: string | undefined
+  let file: string | undefined
   const isWait = command === "wait" || command === "client.wait"
   const members: Array<string> = []
   for (let index = 0; index < args.length; index++) {
@@ -51,6 +53,7 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     else if (isWait && flag === "--mode") mode = value()
     else if (command === "subscribe" && flag === "--after") after = value()
     else if (command === "thread.export" && flag === "--out") out = value()
+    else if (command === "project.mocks.editor.save" && flag === "--file") file = value()
     else if ((isWait || command === "thread.export") && !arg.startsWith("-")) members.push(arg)
     else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see lgtm ${command} --help`)
   }
@@ -63,7 +66,8 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
   const short = block || mode !== undefined || after !== undefined || members.length > 0
   if (input !== undefined && short) throw new UsageError("use either --input or the short options, not both")
   if (input !== undefined) {
-    return { help, block: isWait && input.block === true, payload: { requestId: randomUUID(), ...input } }
+    if (file !== undefined && (file.trim() === "" || input.content !== undefined)) throw new UsageError("use --file with the save identities and confirmation in --input, without content")
+    return { help, block: isWait && input.block === true, ...(file === undefined ? {} : { file }), payload: { requestId: randomUUID(), ...input } }
   }
   if (isWait) {
     if (members.length === 0) throw new UsageError("wait needs --input, or at least one agent id")

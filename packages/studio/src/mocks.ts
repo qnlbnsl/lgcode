@@ -1,20 +1,28 @@
 // Pure translations for recorded mocks, repository designs and local discovery.
-import type { MockRevision, MockApproval, RepositoryDesignResult, Discovery, ProjectSettings } from "@lgtm/contracts"
+import type { MockRevision, MockApproval, MockScreenReview, RepositoryDesignResult, Discovery, ProjectSettings } from "@lgtm/contracts"
 
 type DesignResult = typeof RepositoryDesignResult.Type
 type DiscoveryResult = typeof Discovery.Type
 const author = (row: MockRevision["author"]) => row._tag === "owner" ? "owner" : row.agentId
-export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockApproval) {
+export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockApproval, reviews: ReadonlyArray<MockScreenReview> = []) {
   const head = items.at(-1)
   const approvedAt = head !== undefined && approval?.revisionId === head.revisionId ? approval.at : null
   const names = (ids: ReadonlyArray<string> = []) => ids.map((id) => head?.bundle.screens.find((s) => s.screenId === id)?.name ?? id)
   return {
     revisionId: head?.revisionId ?? null, designRevision: head?.bundle.designRevision ?? null,
-    screens: (head?.bundle.screens ?? []).map((s) => ({ id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
-      status: approvedAt === null ? "draft" : "approved", rev: head!.revisionId, updatedAt: head!.at, comments: [],
-      selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } })),
-    changes: items.slice().reverse().map((r) => ({ id: r.revisionId, screen: null, name: r.bundle.screens.map((s) => s.name).join(", "),
-      from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: null, compare: false })),
+    screens: (head?.bundle.screens ?? []).map((s) => {
+      const review = reviews.find((r) => r.projectId === head!.projectId && r.revisionId === head!.revisionId && r.screenId === s.screenId)
+      return { id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
+        status: (review?.approval?.approved ?? approvedAt !== null) ? "approved" : "draft", rev: head!.revisionId, updatedAt: head!.at,
+        approval: review?.approval ?? null, seen: review?.seen ?? null,
+        comments: reviews.filter((r) => r.projectId === head!.projectId && r.screenId === s.screenId
+          && items.some((item) => item.projectId === r.projectId && item.revisionId === r.revisionId))
+          .flatMap((r) => r.comments.map((c) => ({ id: c.commentId, from: author(c.author), text: c.text, ts: c.at, revisionId: r.revisionId })))
+          .sort((a, b) => a.ts - b.ts),
+        selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } }
+    }),
+    changes: items.slice().reverse().flatMap((r) => r.bundle.screens.map((s) => ({ id: JSON.stringify([r.revisionId, s.screenId]), screen: s.screenId, name: s.name,
+      from: null, to: r.revisionId, by: author(r.author), ts: r.at, text: "", seen: reviews.some((v) => v.projectId === r.projectId && v.revisionId === r.revisionId && v.screenId === s.screenId && v.seen !== undefined), compare: false }))),
     data: (head?.comparisons ?? []).map((c) => ({ field: [c.field.entity, c.field.name].filter(Boolean).join("."),
       schema: c.status, on: names(c.field.screens).join(", "), sample: "", note: c.field.description })),
     components: (head?.bundle.components ?? []).map((c) => ({ name: c.name, real: c.provenance === "shared", on: names(c.screens), uses: null, note: "", demo: null })),

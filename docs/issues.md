@@ -13145,3 +13145,99 @@ The live settings, Harnesses, Notifications, and standalone sample journeys pass
 The credit check passed separately after the failed browser stage skipped its chained invocation.
 The settings worker changed no Git implementation or timeout beyond the required integration merge.
 The lead assigned that Git problem to another builder.
+
+## 826. This Codex session cannot invoke the remote test helper.
+
+The Mocks control assignment requires the `run-remote-test` wrapper.
+Automatic approval review rejects this session's source transfer to the remote test computer.
+The lead will run the requested checks from this worktree and return their output.
+The builder records exact commands in `.foundry/test-request.txt`.
+
+## 827. The first Mocks check found incorrect comment authors and ambiguous test controls.
+
+The comment mapper passed a complete comment to the author mapper.
+It now passes the comment's author.
+The Studio source tests used the browser's URL class for filesystem paths.
+They now use repository-relative paths, as the existing Studio tests do.
+The new browser journey found both the comment Send button and the side panel Send button.
+It now selects the comment form's Send button.
+The combined targeted run exited with status 143 before its terminal parity tests reported a result.
+The next request runs parity separately.
+
+## 828. The public API hid fixed mock refusal reasons.
+
+The second browser run received a generic refusal instead of the engine's stale-revision reason.
+The public reason list omitted that fixed mock reason.
+It also omitted fixed artifact and design reasons used by editor saves.
+The list now includes those fixed sentences without exposing paths or host errors.
+The authenticated screen and editor tests now assert stale-revision reasons across the transport.
+
+## 829. The full check found missing event fixtures and indirect rebuild registration.
+
+The first full Mocks check passed type checking and failed seven tests.
+Four exhaustive fixtures omitted the three new screen review events.
+Those fixtures now cover event tags, owner-only subscriptions, stored identity preservation, and prose redaction.
+The two new engine test files registered their rebuild checks through a shared fixture.
+The discovery guard requires a direct registration in each test file.
+Each test now registers the real rebuild comparison before seeding its engine state.
+The shared fixture no longer registers a duplicate comparison.
+
+## 830. The older Mocks browser journey still expected disconnected controls.
+
+The second full check passed all unit tests and failed two browser journeys.
+The older project journey expected no New badge on an unseen revision.
+It also expected individual approval to show the disconnected notice.
+It now checks the persisted seen action and individual approval and withdrawal.
+The new Mocks journey passed in that full run.
+The email journey separately failed to find its Notifications heading.
+Its reported source line points at a later password assertion, so the exact navigation boundary is not established by this output.
+The next request reruns that unchanged journey in isolation before choosing a fix.
+
+## 831. The email browser fixture served the sample without a usable workflow module.
+
+The isolated email journey again failed to find its Notifications heading.
+The fixture serves the standalone sample through the engine's strict script policy.
+That policy blocks the sample's inline import map.
+The sample workflow module then imports an unavailable TypeScript source path, so the application cannot load.
+The fixture now copies the workflow contracts bundle from its existing Studio build over the sample's source re-export.
+The engine's content policy and the standalone sample sources are unchanged.
+The next isolated email run will verify this fixture correction.
+
+## 832. The third full check failed in the merged Git conflict journey.
+
+The run passed 8459 unit tests and 54 browser tests.
+The Git journey timed out at `packages/web/e2e/support/studioGit.ts:157` while waiting for Use both after recreating a conflict and refreshing.
+The assignment's known intermittent Git failure was named at line 100.
+This output does not establish that the new failure is the same one.
+Both Mocks journeys and the corrected email journey passed.
+The Mocks builder has not changed the Git journey, Git implementation, or its timeout.
+The unchanged journey passed its isolated rerun.
+The fourth full check repeated the same failure while the other 54 browser tests passed.
+The saved browser snapshot contains an enabled Use both control at failure capture.
+The journey's refresh helper waits for the Git mutation aria-busy flag to be false.
+The merged build tracks refreshes under the separate git-read key, so that flag does not prove that refresh has finished.
+This provides a concrete synchronization mismatch for the Git lead to review.
+The Mocks builder leaves the Git implementation and journey unchanged.
+The final review-fix check at `b06bca4` passed 8626 unit tests, with 2 skipped, and 55 of 56 browser tests.
+Its only failure is the same Git journey waiting for Use both after reopening the file, now at `packages/web/e2e/support/studioGit.ts:165`.
+The review-fix assignment explicitly assigns the Git journey to another builder and says that it must not block the Mocks handoff.
+Both Mocks journeys and the standalone sample journey passed.
+
+## 833. The review found Mocks behavior and coverage gaps.
+
+The review found that the feedback loader makes one read per screen version and fails when any engine event arrives during the load.
+Earlier screen comments disappear from the page after a new mock revision.
+A comment does not notify the project's designer or lead.
+The terminal editor-save command cannot carry a large export as one argument.
+Editor saves need explicit stage-reset confirmation, format checks, preserved modes, and recovery after a file replacement whose recording fails.
+The build transformation accepts duplicate matches and silently accepts a missing seen-badge replacement.
+The test fixtures also need a second actual project, a direct saver symbolic-link check, package-relative execution, and oversized contract coverage.
+These findings are the scope of `.foundry/fix-task.md`.
+The builder is adding failing regression tests before changing each implementation.
+
+## 834. Compressed design exports are not inspected for registered secrets.
+
+The editor-save redaction check scans decoded export bytes as text.
+A secret inside a compressed `.fig` export is not detected by that check.
+The review found this limitation and asked that it be recorded for the owner.
+A file signature check does not inspect compressed document contents.

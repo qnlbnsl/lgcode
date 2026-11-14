@@ -3,9 +3,10 @@ import type { Snapshot } from "../commands/internal.ts"
 
 export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undefined => Object.hasOwn(rows, id) ? rows[id] : undefined
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
+export const mockScreenKey = (projectId: string, revisionId: string, screenId: string) => JSON.stringify([projectId, revisionId, screenId])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ gitAttempts: empty(), gitEvidence: empty(), gitReviews: empty(), taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ gitAttempts: empty(), gitEvidence: empty(), gitReviews: empty(), taskNotifications: empty(), setup: { step: "welcome" }, mockScreenReviews: empty(), mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -16,6 +17,32 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
   const at = occurredAt as TaskHistoryEntry["at"]
   const seq = sequence as TaskHistoryEntry["sequence"]
   switch (event._tag) {
+    case "project.MockScreensSeen": {
+      const reviews = { ...view.mockScreenReviews }
+      for (const version of event.versions) {
+        const key = mockScreenKey(event.projectId, version.revisionId, version.screenId)
+        const row = own(reviews, key) ?? { projectId: event.projectId, ...version, comments: [] }
+        reviews[key] = { ...row, seen: { author: event.author, at } }
+      }
+      return { ...view, mockScreenReviews: reviews }
+    }
+    case "project.MockScreenSeen": {
+      const key = mockScreenKey(event.projectId, event.revisionId, event.screenId)
+      const row = own(view.mockScreenReviews, key) ?? { projectId: event.projectId, revisionId: event.revisionId, screenId: event.screenId, comments: [] }
+      return { ...view, mockScreenReviews: { ...view.mockScreenReviews, [key]: { ...row, seen: { author: event.author, at } } } }
+    }
+    case "project.MockScreenApprovalSet": {
+      const key = mockScreenKey(event.projectId, event.revisionId, event.screenId)
+      const row = own(view.mockScreenReviews, key) ?? { projectId: event.projectId, revisionId: event.revisionId, screenId: event.screenId, comments: [] }
+      return { ...view, mockScreenReviews: { ...view.mockScreenReviews, [key]: { ...row,
+        approval: { approved: event.approved, author: event.author, at } } } }
+    }
+    case "project.MockScreenCommented": {
+      const key = mockScreenKey(event.projectId, event.revisionId, event.screenId)
+      const row = own(view.mockScreenReviews, key) ?? { projectId: event.projectId, revisionId: event.revisionId, screenId: event.screenId, comments: [] }
+      return { ...view, mockScreenReviews: { ...view.mockScreenReviews, [key]: { ...row,
+        comments: [...row.comments, { commentId: event.commentId, author: event.author, text: event.text, at }] } } }
+    }
     case "project.GitAttempted": return { ...view, gitAttempts: { ...view.gitAttempts,
       [projectKey(event.attempt.caller._tag === "owner" ? "owner" : `agent:${event.attempt.caller.agentId}`, event.attempt.requestId)]: event.attempt } }
     case "project.GitFinished": {

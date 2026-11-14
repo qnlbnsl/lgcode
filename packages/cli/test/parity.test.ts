@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
 import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgtm/contracts";
 import { afterEach, expect, it } from "vitest";
@@ -8,6 +9,35 @@ import {
 } from "../../testing/test/support/unit7b.ts";
 
 afterEach(cleanupUnit7b);
+
+for (const words of [["project.mocks.editor.save"], ["project", "mocks", "editor", "save"]]) {
+  it(`review item 4: ${words.join(" ")} reads a real export from --file without a large argument`, async () => {
+    const root = prepareRoot(), file = join(root.work, "editor export.pen");
+    const exported = Buffer.from(JSON.stringify({ version: "2.8", children: [], name: "x".repeat(180_000) }));
+    expect(exported.byteLength).toBeGreaterThan(140_000);
+    writeFileSync(file, exported);
+    const engine = await fakeEngine(root, { onRequest: (frame, socket) => succeed(socket, frame, { requestId: frame.payload.requestId, revisionId: "saved" }) });
+    const payload = { requestId: "editor-file", projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true };
+    const args = [...words, "--input", JSON.stringify(payload), "--file", file];
+    expect(args.every((arg) => Buffer.byteLength(arg) < 4096)).toBe(true);
+    const child = startCli(root, args, serviceEnvironment(root));
+    expect(await finishCli(child)).toEqual({ code: 0, signal: null });
+    expect(engine.requests).toHaveLength(1);
+    expect(engine.requests[0]).toMatchObject({ tag: "project.mocks.editor.save", payload: { ...payload, content: exported.toString("base64") } });
+    expect(engine.requests[0]?.payload).not.toHaveProperty("file");
+    assertNoSecrets(child, [token]);
+  });
+}
+
+it("review item 4: rejects a local editor export above 512 KiB before sending an engine request", async () => {
+  const root = prepareRoot(), file = join(root.work, "too-large.pen");
+  writeFileSync(file, Buffer.alloc(512 * 1024 + 1, 65));
+  const engine = await fakeEngine(root);
+  const child = startCli(root, ["project.mocks.editor.save", "--input", JSON.stringify({ projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true }), "--file", file], serviceEnvironment(root));
+  expect((await finishCli(child)).code).not.toBe(0);
+  expect(child.stderr()).toContain("512 KiB");
+  expect(engine.requests).toEqual([]);
+});
 
 const commandWords = (command: string) => command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ");
 const invocations = [...CommandsRpcGroup.requests.keys()].flatMap((command) => [
@@ -120,6 +150,13 @@ for (const { command, words, form } of invocations) {
       "project.conflict": {"worktreeId": "workspace", "projectId": "project", "path": "src/app.ts"},
       "project.setup": {}, "project.setup.discover": {}, "project.setup.advance": { step: "found" }, "project.setup.complete": { projectId: "project" },
       "project.placement.preview": { name: "Console", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "New" } },
+      "project.mocks.comment": { projectId: "project", revisionId: "before", screenId: "home", text: "Use fewer columns." },
+      "project.mocks.screen.approve": { projectId: "project", revisionId: "before", screenId: "home", approved: false },
+      "project.mocks.seen": { projectId: "project", revisionId: "before", screenId: "home" },
+      "project.mocks.seen.batch": { projectId: "project", versions: [{ revisionId: "before", screenId: "home" }] },
+      "project.mocks.reviews.read": { projectId: "project" },
+      "project.mocks.editor.save": { projectId: "project", revisionId: "before", designRevision: "design", worktreeId: "workspace", confirmed: true, content: "ZXhwb3J0" },
+      "project.mocks.screen.read": { projectId: "project", revisionId: "before", screenId: "home" },
       "project.mocks.record": { projectId: "project", expectedRevision: "before", bundle: { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] } },
       "project.mocks.read": { projectId: "project", after: "before", limit: 1 },
       "project.mocks.artifact": { projectId: "project", revisionId: "before", sourceId: "source" },
@@ -228,7 +265,11 @@ for (const { command, words, form } of invocations) {
         "project.setup": { ...base, setup: { step: "found" } },
         "project.setup.discover": { ...base, result: { state: "available", repositories: [], truncated: false, harnesses: [] } },
         "project.placement.preview": { ...base, result: { repositoryPath: root.work, path: root.work, branch: "main", checkout: "main", reserved: false } },
+        "project.mocks.screen.read": { ...base, review: { projectId: "project", revisionId: "before", screenId: "home", comments: [] } },
+        "project.mocks.reviews.read": { ...base, revisionId: "before", reviews: [] },
+        "project.mocks.comment": { ...base, notified: true },
         "project.mocks.record": { ...base, revisionId: "revision" },
+        "project.mocks.editor.save": { ...base, revisionId: "revision" },
         "project.design.record": { ...base, revisionId: "revision" },
         "project.design.read": { ...base, result: { _tag: "unavailable", reason: "repository design is not registered" } },
         "project.mocks.read": { ...base, items: [] },
@@ -295,7 +336,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.mocks.reviews.read", "project.mocks.screen.read", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

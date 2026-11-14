@@ -44,6 +44,8 @@ import { planGitOperation, refreshGitState } from "./gitOperation.ts";
 import { prepareRegistration, registrationPlanners } from "../project/commands.ts";
 import { prepareDesignRecord } from "../project/design.ts";
 import { prepareMock } from "../project/mocks.ts";
+import { finalizeMockEditorSave } from "../project/mockEditor.ts";
+import { settleMockEditorSave, mockEditorUncertainReason } from "../project/mockEditorRecovery.ts";
 import { prepareContextFiles } from "../project/context.ts";
 import { promptPlanner } from "./planners.ts";
 import { postPlanner } from "../board/commands.ts";
@@ -76,7 +78,7 @@ const canonical = (value: unknown): string => {
 const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelopes: ReadonlyArray<EventEnvelope>, settings: ReadonlyArray<HarnessSettings>) => {
   const events = envelopes.map((envelope) => envelope.event);
   if (events.some((event) => event._tag === "project.GitFinished" && event.outcome === "uncertain")) {
-    return { failure: new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" }) };
+    return { failure: new CommandUncertain({ reason: name === "project.mocks.editor.save" ? mockEditorUncertainReason : "Git outcome is uncertain; refresh Git state" }) };
   }
   const gitRefusal = events.find((event) => event._tag === "project.GitFinished" && event.refusal !== undefined);
   if (gitRefusal?._tag === "project.GitFinished" && gitRefusal.refusal !== undefined) return { failure: refused(`Git: ${gitRefusal.refusal}`) };
@@ -335,8 +337,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               const files = yield* prepareContextFiles(input, admitted.payload.context as import("@lgtm/contracts").ContextReference[] | undefined);
               return { finalize: name === "prompt" ? promptPlanner(files) : postPlanner(files) };
             }
-            return yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,
+            const operation = yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,
               admitted.bodyHash, gitPlanners[name as keyof typeof gitPlanners]);
+            return name === "project.mocks.editor.save" && operation.plan !== undefined
+              ? { finalize: finalizeMockEditorSave(input, admitted.payload, operation.plan) } : operation;
           }).pipe(
             Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
             Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
@@ -421,12 +425,12 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
             if (external?.failure !== undefined) return yield* external.failure;
             const plan = external?.plan ?? (yield* (external?.finalize ?? finalizeLifecycle ?? lists.planners[name]!)({ runtime, actor, snapshot }, payload));
-            if (name === "project.review.decline") {
+            if (name === "project.review.decline" || name === "project.mocks.comment") {
               // The named composition appends exactly one project decision after
               // the complete board plan, including unprefixed withdrawals.
               if (plan.afterCommit !== undefined) return yield* refused();
               const decision = plan.events.at(-1);
-              if (decision?._tag !== "project.MainReviewDecided") return yield* refused();
+              if (decision?._tag !== (name === "project.review.decline" ? "project.MainReviewDecided" : "project.MockScreenCommented")) return yield* refused();
               const board = yield* checkPieceBatch("board", snapshot, { events: plan.events.slice(0, -1), deliveries: plan.deliveries, sideRows: plan.sideRows }, actor, lists);
               const project = yield* checkPieceBatch("project", snapshot, { events: [decision] }, actor, lists);
               return { ...plan, events: [...board, ...project] };
@@ -442,7 +446,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (planned._tag === "Failure") {
             if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
             const failure = planned.failure;
-            if (external?.plan !== undefined || failure instanceof CommandUncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" });
+            if (external?.plan !== undefined || failure instanceof CommandUncertain) return yield* new CommandUncertain({ reason: name === "project.mocks.editor.save" ? mockEditorUncertainReason : "Git outcome is uncertain; refresh Git state" });
             const initialMainRefusal = name === "project.create" && failure.reason === checkoutMainReason
               && own(projectView(snapshot).creations, requestId) === undefined;
             yield* append(actor, requestId, bodyHash, [...(external?.finished === undefined ? [] : [external.finished]), { _tag: "CommandRefused", command: name, reason: failure.reason }], {},
@@ -496,17 +500,19 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         Effect.catchTag("LogWriteFailed", (error) => Effect.fail(error instanceof InvalidEvent ? refused(error.reason) : error)),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
       ), (settle) => settle);
+      const recoverable = name === "project.mocks.editor.save" && credential._tag === "owner"
+        ? settled.pipe(Effect.onExit(() => settleMockEditorSave(runtime, rawPayload))) : settled;
       // Lifecycle ownership precedes requests, and requests precede process
       // lanes (including archive members). Runner/recovery paths take only
       // process lanes and short writer transactions, never request lanes.
       if (name === "client.service.restart") return engineOwned(withLane(log, "service-restart")(settled));
       if (lifecycleCommand) {
-        const lifecycle = withLane(log, "project-lifecycle")(settled);
+        const lifecycle = withLane(log, "project-lifecycle")(recoverable);
         return projectLifecycleCommand(name) ? engineOwned(lifecycle) : lifecycle;
       }
       return Object.hasOwn(gitPlanners, name) || name === "project.review.decline"
-        ? withLane(log, `git-operation:${typeof rawPayload === "object" && rawPayload !== null ? String((rawPayload as { worktreeId?: unknown }).worktreeId) : "invalid"}`)(settled)
-        : settled;
+        ? withLane(log, `git-operation:${typeof rawPayload === "object" && rawPayload !== null ? String((rawPayload as { worktreeId?: unknown }).worktreeId) : "invalid"}`)(recoverable)
+        : recoverable;
     });
 
     return CommandHandler.of({

@@ -1,6 +1,8 @@
 import { exerciseStudioSettings } from './support/studioSettings.ts'
 import { exerciseStudioGit } from './support/studioGit.ts'
+import { exerciseStudioMocks } from './support/studioMocks.ts'
 import { exerciseStudioService } from './support/studioService.ts'
+test("studio mocks: owner feedback, approval, seen versions and editor saves", async ({ page }) => exerciseStudioMocks(page))
 // The live website from packages/studio, served by the real engine at /studio/, on a real
 // project log. Only the harness runner is fake. The current page stays at /.
 import { completedSetup } from "./support/completedSetup.ts"
@@ -431,7 +433,10 @@ test("live projects and board: signs in through the engine, shows its real recor
           await page.getByRole("link", { name: /^Changes/ }).click()
           await expect(page.locator(".mk-changes")).toContainText(mockRevision.revisionId)
           await expect(page.locator(".mk-changes")).toContainText("Owner")
-          await expect(page.locator(".mk-changes")).not.toContainText("New")
+          await expect(page.locator(".mk-changes .badge.warn")).toHaveText("New")
+          await page.getByRole("button", { name: "Mark seen", exact: true }).click()
+          await expect(page.locator(".mk-changes .badge.warn")).toHaveCount(0)
+          await expect(page.getByRole("button", { name: "Mark seen", exact: true })).toHaveCount(0)
           await page.getByRole("link", { name: /^Data/ }).click()
           await expect(page.locator(".main .table")).toContainText("request.title")
           await expect(page.locator(".main .table")).toContainText("Engine field description")
@@ -446,7 +451,10 @@ test("live projects and board: signs in through the engine, shows its real recor
           await expect(preview.locator("iframe")).toHaveCount(0)
           expect((await page.request.get(privateMockUrl!)).ok()).toBe(false)
           await page.getByRole("button", { name: "Approve", exact: true }).click()
-          await expect(page.locator(".toasts")).toContainText("not connected to the service yet")
+          await expect(page.getByRole("button", { name: "Withdraw approval", exact: true })).toBeEnabled()
+          await expect(page.locator(".mk-stagebar")).toContainText("Approved")
+          await page.getByRole("button", { name: "Withdraw approval", exact: true }).click()
+          await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
           await expect(page.locator(".mk-stagebar")).toContainText("Draft")
           await page.getByRole("link", { name: "Screens", exact: true }).click()
           await page.getByRole("button", { name: "Request changes", exact: true }).click()
