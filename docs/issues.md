@@ -13340,3 +13340,31 @@ Selecting an unread checkout through the global menu can therefore show cached f
 This path was already present on the assigned baseline.
 The current assignment keeps out of the app source and does not change that global menu.
 The owner can use the Git worktree picker or Refresh Git for a fresh read.
+
+## 845. Opening a project after the "Harnesses" page left the old page on screen
+
+Found: 2026-11-14, while walking the live website on the owner's real data after pull request 44 merged.
+State: fixed in the same change.
+
+The "Harnesses" page rewrote every subscription with an empty machine name.
+The chat composer lists each subscription with the name of its machine.
+It found no machine for the empty name, and it threw `Cannot read properties of undefined (reading 'name')`.
+The error stopped the page from drawing, so every project tab kept showing the "Harnesses" page until a reload.
+The snapshot mapping already put subscriptions on the machine `local`, so the fault appeared only after a visit to "Harnesses".
+`mapAccounts` in `packages/studio/src/git.ts` now puts each account on the machine `local` as well.
+The test in `packages/studio/test/git.test.ts` had pinned the empty machine name, and it now expects `local`.
+No browser journey opens a project chat after the "Harnesses" page, so the journeys did not catch it.
+
+The numbers 843 and 844 are used by entries that another session holds uncommitted in the main checkout.
+
+## 846. The project "Workflow" tab shows phase lengths of thousands of days
+
+Found: 2026-11-14, on the same walk.
+State: open.
+
+On the real project "Connect website engine", the "Workflow" tab shows "Define 2307 days" and "Design and teams 4615 days".
+The project was created on 2026-11-13.
+The live mapping in `packages/studio/src/mapping.ts` sets the project's creation time to nothing, because the engine's snapshot does not carry one.
+`phaseTimes` in `design/mock/js/screens/workflow.js` then spreads the time since zero across the phases with fixed sample weights.
+The phase lengths are therefore invented, not only wrong in size.
+The fix needs the engine to record when a project enters each phase, and the page to show no length until it has one.
