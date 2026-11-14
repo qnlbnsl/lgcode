@@ -52,11 +52,12 @@ A hostile process running as the same user can rewrite a receipt and make a
 changed program pass the "changed since install" check.
 That check guards against accidents and changes by install scripts.
 It does not stop a hostile process running as the same user.
-The installer compares its staged manifests and installed package metadata
-with the repository's pinned files before executing an installed program.
-A file rewritten after extraction can still pass those metadata checks and
-be included in the first receipt.
-The installer does not close that race against a same-user writer.
+Every input the installation verification reads is in a folder that a process running as the same user can write.
+Such a process can restore the staged files and rewrite npm's hidden lockfile before the check, or rewrite the program after extraction.
+It can therefore still have a different program installed, run by the engine, recorded in the receipt, and proposed as the harness.
+The check stops accidents, install scripts, and a swap that is not restored.
+It is not a wall against a hostile process running as the same user.
+The real fix is the planned sandbox for agents.
 
 Agents can also read the web password. Agents run as the owner's user, so an
 agent can read the engine's first environment through `/proc`, even though the

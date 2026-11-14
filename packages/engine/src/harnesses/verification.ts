@@ -16,9 +16,9 @@ export function verifyStagedTree(prefix: string, recipe: RecipeDefinition): void
   }
   const expected = JSON.parse(committed("package-lock.json").toString()).packages
   const actual = JSON.parse(readFileSync(join(prefix, "node_modules/.package-lock.json"), "utf8")).packages
-  const keys = Object.keys(expected).filter((key) => key !== "").sort()
-  if (!actual || JSON.stringify(Object.keys(actual).sort()) !== JSON.stringify(keys)) throw new Error("recipe mismatch")
-  for (const key of keys) {
+  const keys = Object.keys(expected).filter((key) => key !== "")
+  if (!actual || Object.keys(actual).some((key) => !keys.includes(key)) || keys.some((key) => !Object.hasOwn(actual, key) && expected[key].optional !== true)) throw new Error("recipe mismatch")
+  for (const key of Object.keys(actual)) {
     const name = key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length)
     for (const field of ["name", "version", "resolved", "integrity"]) {
       const wanted = expected[key][field] ?? (field === "name" ? name : undefined)

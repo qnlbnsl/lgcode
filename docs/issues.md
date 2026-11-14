@@ -12064,18 +12064,19 @@ An immediate isolated rerun passed without a source change.
 This matter remains open because notifications are outside this builder's assignment.
 The other failure was the permission-picker test location recorded above.
 
-## s5-harnesses-23. Staged installation inputs could be replaced before npm used them.
+## s5-harnesses-23. A same-user process can replace the installed harness despite verification.
 
-The second review replaced both staged manifest files while an installation was running.
-The original receipt then accepted the replacement tree.
-The engine now compares both staged files byte for byte with the committed files before recording a receipt or running any installed program.
-It compares the names, versions, resolved locations and integrity hashes in npm's hidden lockfile with every committed package entry.
-It refuses extra and missing entries.
-The executable must resolve inside the expected package folder.
-Every mismatch removes the prefix and reports a fixed failure reason.
-These checks do not detect a file rewritten after extraction if the package metadata remains unchanged.
-A same-user writer can still make that rewritten file enter the first receipt.
-This remaining limit is also recorded in SECURITY.md.
+This matter is open.
+Every input the installation verification reads is in a folder that a process running as the same user can write.
+Such a process can restore the staged files and rewrite npm's hidden lockfile before the check, or rewrite the program after extraction.
+It can therefore still have a different program installed, run by the engine, recorded in the receipt, and proposed as the harness.
+The check stops accidents, install scripts, and a swap that is not restored.
+It is not a wall against a hostile process running as the same user.
+The real fix is the planned sandbox for agents.
+The check compares staged files with the committed files and installed package metadata with the pinned entries.
+Only optional entries may be absent.
+Every present entry must match its name, version, resolved location and integrity hash.
+An extra entry or an executable outside the expected package folder is refused.
 
 ## s5-harnesses-24. Damaged install intents blocked engine startup.
 
@@ -12154,7 +12155,7 @@ This matter is open.
 No real vendor installation has run during this assignment.
 Gemini CLI has not been verified with install scripts disabled.
 It has not been checked for writes to its own package folder during normal operation.
-The strict hidden-lock comparison can also reject a tree missing a platform-specific optional entry from the committed lockfile.
+The third review fixed the hidden-lock comparison to allow missing optional entries while still requiring all other entries.
 The owner must try a real installation manually before release.
 The automated tests use local fake package trees and never contact a registry.
 
@@ -12164,3 +12165,20 @@ This matter is open.
 The repository records source addresses but does not include snapshots of those pages.
 Their contents can change or become unavailable.
 The recipe's documentation claims therefore cannot be confirmed from this repository alone.
+
+## s5-harnesses-36. Recovery could remove a valid installation or block startup.
+
+The third review found that recovery did not check the managed root for symbolic links.
+A planted pending intent could remove a valid receipted installation.
+A regular file in place of the installation-records folder or a disappearing pending file could stop startup.
+Recovery now refuses a symbolic managed root with a warning and removes nothing.
+It keeps valid receipted trees and removes their stale pending intents.
+It tolerates filesystem failures with fixed warnings instead of blocking startup.
+
+## s5-harnesses-37. The version probe could change a tree before its receipt was replaced.
+
+The second receipt previously hashed the tree again without comparing it with the first receipt.
+A change made during the version probe could therefore become the accepted installation.
+The installer now validates the whole tree against the first receipt after the probe.
+A changed tree is refused and removed.
+Only the version field of a valid receipt is updated.

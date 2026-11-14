@@ -284,9 +284,11 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
           recordManagedInstallation(options.home, id, join(plan.prefix, "node_modules", ".bin", r.executable), undefined, options.stateFolder)
           probes.set(id, { signal: controller.signal, operation, timeoutMs: 30_000 })
           const installed = await inspect(id, undefined, true)
+          validateManagedProgram(options.home, join(plan.prefix, "node_modules", ".bin", r.executable), options.stateFolder)
           if (installed.installed && !installed.version) return result
           if (!installed.installed || !installed.version || installed.version.match(/\b\d+\.\d+\.\d+\b/)?.[0] !== r.version) return result = { ok: false, output: result.output, reason: installed.reason ?? "The installed executable did not report the pinned version." }
-          recordManagedInstallation(options.home, id, installed.path!, r.version!, options.stateFolder)
+          const receiptPath = join(records, id + ".json"), receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as Receipt
+          writeFileSync(receiptPath, JSON.stringify({ ...receipt, version: r.version! }), { mode: 0o600 })
           // Preserve the complete capture for redaction; requests trim it only
           // after redaction. Receipt versions are fixed repository data.
           cache.set(id, installed)
@@ -307,33 +309,54 @@ export function makeHarnessPrograms(options: { home: string; path: string; state
     recover: async () => {
       if (process.platform !== "linux" || !existsSync(records)) return
       const warnings: string[] = []
-      for (const name of readdirSync(records).filter((n) => /\.pending\.json(?:\.tmp)?$/.test(n))) {
+      try {
+        if (lstatSync(root).isSymbolicLink() || realpathSync(root) !== root) return ["Install recovery refused a managed root that uses a symbolic link. No files were removed."]
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") return ["Install recovery could not inspect the managed root. No files were removed."]
+      }
+      let names: string[]
+      try { names = readdirSync(records) }
+      catch { return ["Install recovery could not read the installation records. No files were removed."] }
+      const validReceipt = (id: string) => {
+        try {
+          const receipt = JSON.parse(readFileSync(join(records, id + ".json"), "utf8")) as Receipt
+          if (!inside(join(root, id), resolve(receipt.path))) return false
+          validateManagedProgram(options.home, receipt.path, options.stateFolder)
+          return true
+        } catch { return false }
+      }
+      for (const name of names.filter((n) => /\.pending\.json(?:\.tmp)?$/.test(n))) {
         const pending = join(records, name)
-        let intent: { id?: string; operation?: string; boot?: string; user?: number } | undefined
-        try { intent = JSON.parse(readFileSync(pending, "utf8")) } catch {}
-        if (!intent || typeof intent.id !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(intent.id) || typeof intent.operation !== "string" || typeof intent.boot !== "string" || intent.user !== process.getuid!()) {
-          // A broken intent cannot authorize a signal. Remove only known,
-          // unreceipted partial prefixes and let the event log close its audit.
-          for (const recipe of definitions) if (!existsSync(join(records, recipe.harnessId + ".json"))) await rm(join(root, recipe.harnessId), { recursive: true, force: true })
+        try {
+          let intent: { id?: string; operation?: string; boot?: string; user?: number } | undefined
+          try { intent = JSON.parse(readFileSync(pending, "utf8")) } catch {}
+          if (!intent || typeof intent.id !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(intent.id) || typeof intent.operation !== "string" || typeof intent.boot !== "string" || intent.user !== process.getuid!()) {
+            // A broken intent cannot authorize a signal. Remove only known,
+            // unreceipted partial prefixes and let the event log close its audit.
+            for (const recipe of definitions) if (!validReceipt(recipe.harnessId)) await rm(join(root, recipe.harnessId), { recursive: true, force: true })
+            await rm(pending, { recursive: true, force: true })
+            warnings.push("A damaged install intent was removed. The interrupted install failed; its process identity could not be verified.")
+            continue
+          }
+          if (!find(intent.id)) warnings.push("An install intent for a removed harness was cleaned up and recorded as failed.")
+          if (intent.boot === linuxProcessReader.bootId()) for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
+            let matched = false
+            try {
+              if (statSync(`/proc/${pid}`).uid !== intent.user) continue
+              const beforeText = readFileSync(`/proc/${pid}/stat`, "utf8"), before = beforeText.slice(beforeText.lastIndexOf(")") + 2).split(" ")
+              const env = readFileSync(`/proc/${pid}/environ`).toString().split("\0")
+              if (!env.includes(`LGTM_INSTALL_OPERATION=${intent.operation}`)) continue
+              matched = true
+              const text = readFileSync(`/proc/${pid}/stat`, "utf8"), fields = text.slice(text.lastIndexOf(")") + 2).split(" "), group = Number(fields[2])
+              if (before[19] !== fields[19] || before[2] !== fields[2] || statSync(`/proc/${pid}`).uid !== intent.user) continue
+              if (group > 1 && group !== linuxProcessReader.ownGroupId()) process.kill(-group, "SIGKILL")
+            } catch (error) { if (matched && (error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "ESRCH") throw new Error("A leftover install could not be stopped.") }
+          }
+          if (!validReceipt(intent.id)) {
+            await rm(join(root, intent.id), { recursive: true, force: true }); await rm(join(records, intent.id + ".json"), { force: true })
+          }
           await rm(pending, { recursive: true, force: true })
-          warnings.push("A damaged install intent was removed. The interrupted install failed; its process identity could not be verified.")
-          continue
-        }
-        if (!find(intent.id)) warnings.push("An install intent for a removed harness was cleaned up and recorded as failed.")
-        if (intent.boot === linuxProcessReader.bootId()) for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
-          let matched = false
-          try {
-            if (statSync(`/proc/${pid}`).uid !== intent.user) continue
-            const beforeText = readFileSync(`/proc/${pid}/stat`, "utf8"), before = beforeText.slice(beforeText.lastIndexOf(")") + 2).split(" ")
-            const env = readFileSync(`/proc/${pid}/environ`).toString().split("\0")
-            if (!env.includes(`LGTM_INSTALL_OPERATION=${intent.operation}`)) continue
-            matched = true
-            const text = readFileSync(`/proc/${pid}/stat`, "utf8"), fields = text.slice(text.lastIndexOf(")") + 2).split(" "), group = Number(fields[2])
-            if (before[19] !== fields[19] || before[2] !== fields[2] || statSync(`/proc/${pid}`).uid !== intent.user) continue
-            if (group > 1 && group !== linuxProcessReader.ownGroupId()) process.kill(-group, "SIGKILL")
-          } catch (error) { if (matched && (error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "ESRCH") throw new Error("A leftover install could not be stopped.") }
-        }
-        await rm(join(root, intent.id), { recursive: true, force: true }); await rm(join(records, intent.id + ".json"), { force: true }); await rm(pending)
+        } catch { warnings.push("An interrupted installation could not be fully recovered. Startup will continue.") }
       }
       return warnings
     },
