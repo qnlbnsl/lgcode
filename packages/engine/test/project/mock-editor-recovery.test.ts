@@ -77,7 +77,9 @@ it.live("review item 8: restores original bytes after recording fails and permit
     // restored bytes must remain usable after the ordinary engine restart.
     return { f, requestId }
   }))
-  yield* provideRestart(rig, runner.layer, Effect.gen(function* () {
+  // The helper's optional recovering=false branch retains Restart in its type;
+  // this call uses the default branch, which supplies that service.
+  yield* (provideRestart(rig, runner.layer, Effect.gen(function* () {
     yield* registerRebuildCheck()
     yield* recover
     expect(readFileSync(f.file)).toEqual(original)
@@ -86,7 +88,7 @@ it.live("review item 8: restores original bytes after recording fails and permit
     expect(retry?.reason).not.toContain("Git")
     success(yield* call(owner, "project.mocks.editor.save", f.payload))
     expect(readFileSync(f.file)).toEqual(edited)
-  }), { secrets })
+  }), { secrets }) as Effect.Effect<void, unknown, never>)
 }))
 
 it.live("review item 8: keeps committed edited bytes when only the response is lost", () => Effect.gen(function* () {
