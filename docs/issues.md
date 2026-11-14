@@ -12962,6 +12962,10 @@ The journey's refresh helper waits for the Git mutation aria-busy flag to be fal
 The merged build tracks refreshes under the separate git-read key, so that flag does not prove that refresh has finished.
 This provides a concrete synchronization mismatch for the Git lead to review.
 The Mocks builder leaves the Git implementation and journey unchanged.
+The final review-fix check at `b06bca4` passed 8626 unit tests, with 2 skipped, and 55 of 56 browser tests.
+Its only failure is the same Git journey waiting for Use both after reopening the file, now at `packages/web/e2e/support/studioGit.ts:165`.
+The review-fix assignment explicitly assigns the Git journey to another builder and says that it must not block the Mocks handoff.
+Both Mocks journeys and the standalone sample journey passed.
 
 ## s6-mocks-8. The review found Mocks behavior and coverage gaps.
 
