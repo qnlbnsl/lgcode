@@ -1,4 +1,5 @@
 import { serviceRestartPending } from "../client/serviceControl.ts"
+import { recoverInstalls } from "../harnesses/lifecycle.ts";
 import { acceptCache, type CacheTarget } from "./cache.ts";
 import { randomUUID } from "node:crypto";
 import {
@@ -98,7 +99,7 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   return { reply };
 };
 
-export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults"> & { readonly capacityHoldCondition?: import("../routing/deliveries.ts").CapacityHoldCondition }, lists: EngineLists = engineLists) =>
+export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults" | "harnessPrograms"> & { readonly capacityHoldCondition?: import("../routing/deliveries.ts").CapacityHoldCondition }, lists: EngineLists = engineLists) =>
   Layer.effect(CommandHandler, Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const log = yield* EventLog;
@@ -118,6 +119,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     const runtime: Runtime = { ...configuration, lists, sql, log, runner, secrets, views };
     // Fix round 1, N-1: the first start loads the harness defaults.
     yield* loadFirstDefaults(runtime);
+    yield* recoverInstalls(runtime);
+    if (configuration.harnessPrograms?.close) yield* Effect.addFinalizer(() => Effect.promise(() => configuration.harnessPrograms!.close!()));
     // Issue 88 and row 52: while restart recovery is present and has not
     // finished step 9, no command runs.
     const recovery = yield* Effect.serviceOption(Restart);

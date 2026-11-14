@@ -1113,3 +1113,8 @@ test('workflows: sees default phases, clones, edits and saves across reload with
 })
 
 test("live service settings: timers, nudges, workflow folder, review defaults and upkeep", async ({ page }) => exerciseStudioSettings(page))
+test('live website: Harnesses installs a missing harness with a fake recipe and adds its account', async ({ page }) => {
+  test.setTimeout(90_000)
+  const { exerciseStudioHarnesses } = await import('./support/studioHarnesses.ts')
+  await exerciseStudioHarnesses(page)
+})

@@ -31,6 +31,7 @@ async function mount(route: string, connection?: LiveConnection, records = mapSn
   const calls: string[] = []
   const screenReads: Record<string, unknown> = {
     "project.setup.discover": { result: { state: "available", repositories: [], truncated: false, harnesses: [{ harness: "codex", installed: true, configured: false, accounts: [] }] } },
+    "client.harness.status": { harnesses: [] },
     "client.sequence": { sequence: engineSnapshot.sequence }, "project.mocks.read": { items: [] },
     accounts: { accounts: [] }, harnesses: { harnesses: [] }, "project.settings": { settings: { workspaceFolder: "/srv/repos", shell: "sh" } },
     "roles.settings.get": { settings: {} }, "client.web.settings": { enabled: false, port: 8787, heartbeatSeconds: 25, proxyMode: false },

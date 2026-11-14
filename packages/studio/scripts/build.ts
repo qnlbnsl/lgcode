@@ -1,6 +1,7 @@
 import { serviceSettingsSource } from "./serviceSettings.ts"
 import { gitActionsSource } from "./gitActions.ts"
 import { harnessChoicesSource } from "./harnessChoices.ts"
+import { harnessIntegrationSource } from "./harnessIntegration.ts"
 // Builds the live website into packages/studio/dist, which the engine serves at /studio/.
 //
 // 1. It copies the website from design/mock. The folders that are links there, fonts and
@@ -31,7 +32,6 @@ export function rewriteIndex(html: string): { readonly page: string; readonly th
   const main = '<script type="module" src="js/main.js"></script>'
   if (!html.includes(main)) throw new Error("design/mock/index.html no longer loads js/main.js")
   const page = html
-    .replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, "")
     .replace(inline[0], '<script src="theme.js"></script>')
     .replace(main, '<script type="module" src="live.js"></script>')
     // The policy allows no data: address, and an empty icon is not needed.
@@ -76,7 +76,7 @@ export async function buildStudio(dist = defaultDist): Promise<string> {
   for (const part of parts) cpSync(join(mock, part), join(dist, part), { recursive: true, dereference: true })
   for (const path of ["js/screens/git.js", "js/actions.js", "js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
     const target = join(dist, path)
-    writeFileSync(target, serviceSettingsSource(path, gitActionsSource(path, harnessChoicesSource(path, readFileSync(target, "utf8")))))
+    writeFileSync(target, serviceSettingsSource(path, gitActionsSource(path, harnessIntegrationSource(path, harnessChoicesSource(path, readFileSync(target, "utf8"))))))
   }
 
   writeFileSync(join(dist, "js/workflow-contracts.js"), contracts)

@@ -221,7 +221,7 @@ function Cited({ text }) {
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
 // A command or a folder in a code box. A long one scrolls inside the box, and the button in
 // its corner copies the whole text.
-function CodeBox({ text, label }) {
+export function CodeBox({ text, label }) {
   const [copied, setCopied] = useState(false);
   const copy = () => { navigator.clipboard?.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   return html`<div class="qc-code"><pre class="code" tabindex="0">${text}</pre>

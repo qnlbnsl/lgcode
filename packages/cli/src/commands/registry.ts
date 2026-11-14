@@ -12,6 +12,10 @@ export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.req
 const summaries: Record<CommandName, string> = {
   "client.service.version": "Read the running version and optionally compare origin HEAD over HTTPS without downloading code.",
   "client.service.restart": "Confirm sign-out of every page and stop running agents, then restart the service with its original arguments and environment.",
+  "client.harness.status": "Read each harness's installed program, path and version.",
+  "client.harness.recipe": "Show the exact repository-owned install commands for a harness.",
+  "client.harness.install": "Install a harness using its fixed user-only recipe. Provider sign-in stays in your terminal.",
+  "client.harness.account.check": "Check local sign-in evidence without authenticating with a provider.",
   "project.context.search": "Search readable project tasks and files in a registered local project workspace; returns typed references and truncation state.",
   "project.repository.discover": "Discover bounded local repositories inside the workspace folder.",
   "project.branches": "List actual branches of a registered local repository.",

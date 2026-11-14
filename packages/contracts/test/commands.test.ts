@@ -39,7 +39,8 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
-const clientReads = ["client.harness.choices", "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
+const harnessCommands = ["client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check"]
+const clientReads = [...harnessCommands, "client.harness.choices", "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
@@ -53,7 +54,7 @@ const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedWorkflowCommands = ["client.workflows.list", "client.workflows.read", "client.workflows.clone", "client.workflows.save", "client.workflows.validate", "client.workflows.delete"]
 const expectedServiceCommands = ["client.service.version", "client.service.restart"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands, ...expectedWorkflowCommands, ...expectedServiceCommands]
-const expectedOwnerOnly = ["client.harness.choices", "configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
+const expectedOwnerOnly = [...harnessCommands, "client.harness.choices", "configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
@@ -108,6 +109,7 @@ describe("command lists", () => {
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedRpcCommands))
     for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
+    for (const name of harnessCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
     for (const name of expectedApiCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "release", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
