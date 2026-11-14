@@ -57,7 +57,7 @@ it("review item 2: shows a screen's historical comments oldest first and exclude
   const revision = { projectId: "project", revisionId: "v1", at: 1, author: { _tag: "owner" }, artifacts: [], comparisons: [],
     bundle: { sources: [], screens: [{ screenId: "home", sourceId: "page", name: "Home", route: "/home", scenarioRoutes: [] }], scenarios: [], components: [], draftedFields: [] } } as unknown as MockRevision
   const review = { projectId: "project", revisionId: "v1", screenId: "home", comments: [{ commentId: "old", text: "Earlier feedback", at: 2, author: { _tag: "owner" } }] } as unknown as MockScreenReview
-  const recent = { ...review, revisionId: "v2", comments: [{ ...review.comments[0]!, commentId: "new", text: "Later feedback", at: 5 }] } as MockScreenReview
+  const recent = { ...review, revisionId: "v2", comments: [{ ...review.comments[0]!, commentId: "new", text: "Later feedback", at: 5 }] } as unknown as MockScreenReview
   const mapped = mapMocks([revision, { ...revision, revisionId: "v2", at: 4 } as MockRevision], undefined,
     [recent, { ...review, projectId: "other-project" } as MockScreenReview, { ...review, screenId: "other-screen" } as MockScreenReview, review])
   expect(mapped.screens[0]?.comments.map((c) => ({ id: c.id, revisionId: (c as unknown as { revisionId: string }).revisionId }))).toEqual([

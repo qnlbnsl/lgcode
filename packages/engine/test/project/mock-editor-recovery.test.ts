@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, vi } from "vitest"
 import { LogWriteFailed } from "../../src/log/EventLog.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
+import { provideRestart, recover } from "../support/restartRig.ts"
 import { call, failureOf, freshRequest, makeFakeSecrets, makeRig, ownerCredential as owner, provideRig, readLog, removeRig, success, type Fakes, type Rig } from "../support/handlerRig.ts"
 import { screenBundle, seedScreens } from "./mockScreenFixtures.ts"
 
@@ -54,7 +55,7 @@ it.live("review item 10: refuses a payload above the contract cap before creatin
   }))
 }))
 
-it.live("review item 8: restores original bytes after a post-rename recording failure and permits a new confirmed save", () => Effect.gen(function* () {
+it.live("review item 8: restores original bytes after recording fails and permits a new confirmed save after restart", () => Effect.gen(function* () {
   const runner = yield* makeFakeRunner()
   let armed = false, observedRename = false
   const wrapLog: NonNullable<Fakes["wrapLog"]> = (real) => ({ ...real, transact: (use) => real.transact((append) => use((actor, id, hash, events, rows, receipt) => {
@@ -65,18 +66,27 @@ it.live("review item 8: restores original bytes after a post-rename recording fa
     }
     return append(actor, id, hash, events, rows, receipt)
   })) })
-  yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), wrapLog }, Effect.gen(function* () {
+  const secrets = makeFakeSecrets()
+  const { f, requestId } = yield* provideRig(rig, { runner, secrets, wrapLog }, Effect.gen(function* () {
     const f = yield* seedEditor(), requestId = freshRequest()
     armed = true
     expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, requestId }))).toBeDefined()
     expect(observedRename).toBe(true)
+    expect(readFileSync(f.file)).toEqual(original)
+    // Infrastructure write failures latch this writer for its lifetime. The
+    // restored bytes must remain usable after the ordinary engine restart.
+    return { f, requestId }
+  }))
+  yield* provideRestart(rig, runner.layer, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    yield* recover
     expect(readFileSync(f.file)).toEqual(original)
     const retry = failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, requestId }))
     expect(retry?.reason).toMatch(/mock editor/i)
     expect(retry?.reason).not.toContain("Git")
     success(yield* call(owner, "project.mocks.editor.save", f.payload))
     expect(readFileSync(f.file)).toEqual(edited)
-  }))
+  }), { secrets })
 }))
 
 it.live("review item 8: keeps committed edited bytes when only the response is lost", () => Effect.gen(function* () {
