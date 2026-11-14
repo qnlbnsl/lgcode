@@ -4,12 +4,14 @@ import * as engine from '../engine.js';
 import { run } from './board.js';
 import { loadMocks, loadDesign } from './mocks.js';
 import { busy } from './board.js';
+import { toast, confirm } from '../actions.js';
 export function comment(project, screen, text) {
   return run('mock-comment:' + screen.id, async () => {
-    await engine.request('project.mocks.comment', { projectId: project.id, revisionId: screen.rev, screenId: screen.id, text });
+    const reply = await engine.request('project.mocks.comment', { projectId: project.id, revisionId: screen.rev, screenId: screen.id, text });
     await loadMocks(project.id);
+    toast(reply.notified === false ? 'Comment saved. ' + reply.notificationReason : 'Comment saved', 'info');
     return true;
-  }, 'Comment saved');
+  });
 }
 export function approve(project, screen) {
   return run('mock-approve:' + screen.id, async () => {
@@ -21,14 +23,18 @@ export function approve(project, screen) {
 export function markSeen(project, mocks) {
   return run('mock-seen:' + project.id, async () => {
     try {
-      for (const change of mocks.changes.filter((c) => !c.seen))
-        await engine.request('project.mocks.seen', { projectId: project.id, revisionId: change.to, screenId: change.screen });
+      const versions = mocks.changes.filter((c) => !c.seen).map((c) => ({ revisionId: c.to, screenId: c.screen }));
+      if (versions.length) await engine.request('project.mocks.seen.batch', { projectId: project.id, versions });
       return true;
     } finally { await loadMocks(project.id); }
   }, 'Changes marked seen');
 }
 
-export function saveEditor(project, mocks, file) {
+export function saveEditor(project, mocks, file, confirmed = false) {
+  if (busy('mock-editor:' + project.id)) return;
+  if (!confirmed) return confirm({ title: 'Save changes from editor?', action: 'Save changes', danger: true,
+    body: 'The project returns to Design and its overall approval is withdrawn. Save this editor export?',
+    onConfirm: () => saveEditor(project, mocks, file, true) });
   return run('mock-editor:' + project.id, async () => {
     if (!file || file.size < 1 || file.size > 512 * 1024) throw new Error('Choose an editor export of at most 512 KiB.');
     const reply = await engine.request('project.design.read', { repoId: project.repo, projectId: project.id, revisionId: mocks.designRevision });
@@ -37,7 +43,7 @@ export function saveEditor(project, mocks, file) {
     let binary = '';
     for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
     const saved = await engine.request('project.mocks.editor.save', { projectId: project.id, revisionId: mocks.revisionId,
-      designRevision: mocks.designRevision, worktreeId: reply.result.record.design.worktreeId, content: btoa(binary) });
+      designRevision: mocks.designRevision, worktreeId: reply.result.record.design.worktreeId, confirmed: true, content: btoa(binary) });
     await loadMocks(project.id); await loadDesign(project.repo);
     return saved;
   }, 'Editor changes saved');

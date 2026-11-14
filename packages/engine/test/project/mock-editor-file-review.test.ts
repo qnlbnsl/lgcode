@@ -11,12 +11,12 @@ let root: string
 beforeEach(() => { root = mkdtempSync("/tmp/lgtm-editor-file-review-"); mkdirSync(join(root, "mocks")) })
 afterEach(() => { rmSync(root, { recursive: true, force: true }) })
 
-it("review item 7: preserves the recorded file's mode during atomic replacement", async () => {
+for (const mode of [0o640, 0o750, 0o1750]) it(`review item 7: preserves mode ${mode.toString(8)} during atomic replacement`, async () => {
   const file = join(root, "mocks/layout.pen"), original = Buffer.from("original design")
-  writeFileSync(file, original); chmodSync(file, 0o640)
+  writeFileSync(file, original); chmodSync(file, mode)
   await saveMockEditorFile(root, "mocks/layout.pen", fingerprint(original), Buffer.from("edited design"))
   expect(readFileSync(file, "utf8")).toBe("edited design")
-  expect(statSync(file).mode & 0o777).toBe(0o640)
+  expect(statSync(file).mode & 0o7777).toBe(mode)
 })
 
 it("review item 10: rejects a symbolic link at the actual saver boundary without writing its target", async () => {

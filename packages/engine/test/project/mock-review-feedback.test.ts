@@ -5,9 +5,11 @@ import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { afterEach, beforeEach, expect, vi } from "vitest"
 import { projectView } from "../../src/project/view.ts"
+import { LogWriteFailed } from "../../src/log/EventLog.ts"
 import { provideBoard, snapshot } from "../board/wakeFixtures.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
-import { agentCredential, appendSetup, call, eventOf, failureOf, freshRequest, makeRig, ownerCredential as owner, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
+import { agentCredential, appendSetup, call, eventOf, failureOf, freshRequest, makeFakeSecrets, makeRig, ownerCredential as owner, provideRig, readLog, removeRig, success, type Fakes, type Rig } from "../support/handlerRig.ts"
+import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { screenBundle, seedScreens } from "./mockScreenFixtures.ts"
 
 let rig: Rig
@@ -45,6 +47,21 @@ it.live("review item 1: marks displayed versions with one atomic event and refus
   expect(yield* readLog).toEqual(rows)
 })))
 
+it.live("review item 1: refuses an oversized historical bulk reply instead of returning partial feedback", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* seedScreens(rig)
+  let revisionId = f.revisionId
+  for (let version = 0; version < 3; version++) {
+    yield* appendSetup(Array.from({ length: 32 }, () => eventOf({
+      _tag: "project.MockScreenCommented", projectId: "project", revisionId, screenId: "home",
+      commentId: freshRequest(), author: { _tag: "owner" }, text: "x".repeat(4096)
+    })))
+    revisionId = success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: revisionId, bundle: screenBundle() })).revisionId
+  }
+  for (const caller of [owner, agentCredential(f.designer.token)])
+    expect(failureOf(yield* call(caller, "project.mocks.reviews.read", { projectId: "project" }))?.reason).toBe("mock screen feedback exceeds the read budget")
+})))
+
 it.live("review item 2: the comment limit never suggests discarding feedback by recording a revision", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck()
   const f = yield* seedScreens(rig)
@@ -70,6 +87,20 @@ for (const target of ["designer", "project-lead", null]) it.live(`review item 3:
   success(yield* call(owner, "project.mocks.comment", payload))
   expect(yield* readLog).toEqual(before)
 })))
+
+it.live("review item 3: a failed comment append leaves neither a comment nor a board notice", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner()
+  const wrapLog: NonNullable<Fakes["wrapLog"]> = (real) => ({ ...real, transact: (use) => real.transact((append) => use((actor, id, hash, events, rows, receipt) =>
+    events.some((event) => event._tag === "project.MockScreenCommented")
+      ? Effect.fail(new LogWriteFailed({ reason: "injected atomic comment failure" })) : append(actor, id, hash, events, rows, receipt))) })
+  yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), wrapLog }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    const f = yield* seedScreens(rig), requestId = freshRequest()
+    expect(failureOf(yield* call(owner, "project.mocks.comment", { ...f.selection, requestId, text: "Atomic feedback" }))?._tag).toBe("LogWriteFailed")
+    expect((yield* readLog).filter((row) => row.requestId === requestId)).toEqual([])
+    expect(success(yield* call(owner, "project.mocks.screen.read", f.selection)).review.comments).toEqual([])
+  }))
+}))
 
 it.live("review item 10: a member of a second real project is refused every Mocks read and write", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck()

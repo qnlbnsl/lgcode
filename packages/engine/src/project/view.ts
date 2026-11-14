@@ -17,6 +17,15 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
   const at = occurredAt as TaskHistoryEntry["at"]
   const seq = sequence as TaskHistoryEntry["sequence"]
   switch (event._tag) {
+    case "project.MockScreensSeen": {
+      const reviews = { ...view.mockScreenReviews }
+      for (const version of event.versions) {
+        const key = mockScreenKey(event.projectId, version.revisionId, version.screenId)
+        const row = own(reviews, key) ?? { projectId: event.projectId, ...version, comments: [] }
+        reviews[key] = { ...row, seen: { author: event.author, at } }
+      }
+      return { ...view, mockScreenReviews: reviews }
+    }
     case "project.MockScreenSeen": {
       const key = mockScreenKey(event.projectId, event.revisionId, event.screenId)
       const row = own(view.mockScreenReviews, key) ?? { projectId: event.projectId, revisionId: event.revisionId, screenId: event.screenId, comments: [] }

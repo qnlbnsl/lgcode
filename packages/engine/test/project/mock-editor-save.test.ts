@@ -16,14 +16,16 @@ import { agentCredential, call, failureOf, freshRequest, makeRig, ownerCredentia
 import { screenBundle, seedScreens } from "./mockScreenFixtures.ts"
 
 let rig: Rig
+const original = '{"version":"2.8","children":[]}'
+const edited = '{"version":"2.8","children":[],"name":"Edited design"}'
 beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 const seedEditor = () => Effect.gen(function* () {
   const f = yield* seedScreens(rig)
-  writeFileSync(join(rig.work, "mocks/layout.pen"), "original design")
+  writeFileSync(join(rig.work, "mocks/layout.pen"), original)
   const designRevision = success(yield* call(owner, "project.design.record", { projectId: "project", design: { repoId: f.repoId, worktreeId: "workspace", file: "mocks/layout.pen", components: [] } })).revisionId
   const revisionId = success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: f.revisionId, bundle: { ...screenBundle(), designRevision } })).revisionId
-  return { ...f, revisionId, designRevision, payload: { projectId: "project", worktreeId: "workspace", revisionId, designRevision } }
+  return { ...f, revisionId, designRevision, payload: { projectId: "project", worktreeId: "workspace", revisionId, designRevision, confirmed: true } }
 })
 
 it.live("saves exported bytes through the authenticated owner API and records the replacement design and mock revision", () => provideBoard(rig, Effect.gen(function* () {
@@ -31,15 +33,19 @@ it.live("saves exported bytes through the authenticated owner API and records th
   const f = yield* seedEditor(), bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "editor.sock")
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
   const api = yield* connect(socket, bearer), agent = yield* connect(socket, f.designer.token)
-  const exported = Buffer.from('Edited design; $(touch escaped) `touch escaped` --upload-pack=evil ../../outside <script>data</script>')
+  const exported = Buffer.from(JSON.stringify({ version: "2.8", children: [], name: 'Edited design; $(touch escaped) `touch escaped` --upload-pack=evil ../../outside <script>data</script>' }))
   const payload = { requestId: freshRequest(), ...f.payload, content: exported.toString("base64") } as never
   const refused = yield* agent["project.mocks.editor.save"](payload).pipe(Effect.result)
   expect(refused._tag).toBe("Failure")
   if (refused._tag === "Failure") expect(refused.failure).toMatchObject({ reason: "command refused" })
+  success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: f.revisionId }))
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("plan")
   const saved = yield* api["project.mocks.editor.save"](payload)
   expect(readFileSync(join(rig.work, "mocks/layout.pen"))).toEqual(exported)
   expect(existsSync(join(rig.work, "escaped"))).toBe(false)
   const state = projectView(yield* snapshot)
+  expect(state.projects.project?.stage).toBe("design")
+  expect(Object.values(state.mockApprovals).some((approval) => approval.revisionId === saved.revisionId)).toBe(false)
   expect(state.mockHeads.project).toBe(saved.revisionId)
   expect(Object.values(state.mockRevisions).find((r) => r.revisionId === saved.revisionId)?.bundle.designRevision).toBe(saved.revisionId)
   expect(Object.values(state.designs).find((r) => r.revisionId === saved.revisionId)).toMatchObject({ fileFingerprint: fingerprint(exported), author: { _tag: "owner" } })
@@ -64,9 +70,9 @@ it.live("refuses stale files, noncanonical exports, oversized exports and privat
     [Buffer.alloc(512 * 1024 + 1, 65).toString("base64"), "mock editor export must be base64 data of at most 512 KiB"],
     [Buffer.from("private-editor-token").toString("base64"), "mock editor export contains private data"]
   ]) expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content }))?.reason).toBe(reason)
-  expect(readFileSync(path, "utf8")).toBe("original design")
+  expect(readFileSync(path, "utf8")).toBe(original)
   writeFileSync(path, "external change")
-  expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: Buffer.from("new design").toString("base64") }))?.reason).toBe("registered design needs an unchanged file in a dedicated design folder")
+  expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: Buffer.from(edited).toString("base64") }))?.reason).toBe("registered design needs an unchanged file in a dedicated design folder")
   expect(readFileSync(path, "utf8")).toBe("external change")
   expect(existsSync(join(rig.work, "escaped"))).toBe(false)
 }), ["private-editor-token"]))
@@ -74,12 +80,12 @@ it.live("refuses stale files, noncanonical exports, oversized exports and privat
 it.live("refuses symbolic links and hostile identity strings rather than using them as paths or Git options", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck()
   const f = yield* seedEditor(), path = join(rig.work, "mocks/layout.pen"), outside = join(rig.outside, "layout.pen")
-  writeFileSync(outside, "original design"); unlinkSync(path); symlinkSync(outside, path)
-  expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: Buffer.from("edited").toString("base64") }))?.reason).toBe("registered design needs an unchanged file in a dedicated design folder")
-  expect(readFileSync(outside, "utf8")).toBe("original design")
+  writeFileSync(outside, original); unlinkSync(path); symlinkSync(outside, path)
+  expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: Buffer.from(edited).toString("base64") }))?.reason).toBe("registered design needs an unchanged file in a dedicated design folder")
+  expect(readFileSync(outside, "utf8")).toBe(original)
   for (const field of ["projectId", "worktreeId", "revisionId", "designRevision"]) for (const hostile of ['../../outside', '--upload-pack=evil', '$(touch escaped)', '`touch escaped`'])
-    expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, [field]: hostile, content: Buffer.from("edited").toString("base64") }))).toBeDefined()
-  expect(readFileSync(outside, "utf8")).toBe("original design")
+    expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, [field]: hostile, content: Buffer.from(edited).toString("base64") }))).toBeDefined()
+  expect(readFileSync(outside, "utf8")).toBe(original)
   expect(existsSync(join(rig.work, "escaped"))).toBe(false)
   expect(failureOf(yield* call(agentCredential(f.designer.token), "project.mocks.editor.save", { ...f.payload, content: "ZWRpdGVk" }))?.reason).toBe("command refused")
 })))

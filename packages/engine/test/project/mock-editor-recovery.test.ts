@@ -78,3 +78,26 @@ it.live("review item 8: restores original bytes after a post-rename recording fa
     expect(readFileSync(f.file)).toEqual(edited)
   }))
 }))
+
+it.live("review item 8: keeps committed edited bytes when only the response is lost", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner()
+  let armed = false
+  const wrapLog: NonNullable<Fakes["wrapLog"]> = (real) => ({ ...real, transact: (use) => {
+    let recorded = false
+    return real.transact((append) => use((actor, id, hash, events, rows, receipt) => {
+      if (armed && events.some((event) => event._tag === "project.MockRecorded")) recorded = true
+      return append(actor, id, hash, events, rows, receipt)
+    })).pipe(Effect.flatMap((result) => {
+      if (armed && recorded) { armed = false; return Effect.fail(new LogWriteFailed({ reason: "injected lost response after commit" })) }
+      return Effect.succeed(result)
+    }))
+  } })
+  yield* provideRig(rig, { runner, secrets: makeFakeSecrets(), wrapLog }, Effect.gen(function* () {
+    const f = yield* seedEditor(), requestId = freshRequest()
+    armed = true
+    expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, requestId }))).toBeDefined()
+    expect(readFileSync(f.file)).toEqual(edited)
+    expect(success(yield* call(owner, "project.mocks.editor.save", { ...f.payload, requestId }))).toMatchObject({ revisionId: requestId })
+    expect(readFileSync(f.file)).toEqual(edited)
+  }))
+}))

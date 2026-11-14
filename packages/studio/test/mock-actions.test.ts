@@ -14,8 +14,11 @@ const file = { name: "../../ignored-name.pen", size: 6, arrayBuffer: async () =>
 const cases = [
   ["comment", "project.mocks.comment", "mock-comment:home", () => controls.comment(project, screen, "<script>data</script> $(touch escaped)")],
   ["approval", "project.mocks.screen.approve", "mock-approve:home", () => controls.approve(project, screen)],
-  ["seen", "project.mocks.seen", "mock-seen:project", () => controls.markSeen(project, mocks)],
-  ["editor", "project.mocks.editor.save", "mock-editor:project", () => controls.saveEditor(project, mocks, file)]
+  ["seen", "project.mocks.seen.batch", "mock-seen:project", () => controls.markSeen(project, mocks)],
+  ["editor", "project.mocks.editor.save", "mock-editor:project", () => {
+    controls.saveEditor(project, mocks, file)
+    return lib.store.state.dialog?.onConfirm()
+  }]
 ] as const
 
 for (const [label, command, key, action] of cases) for (const rejected of [false, true]) it(`${label} waits for the engine, exposes pending state and preserves records on ${rejected ? "refusal" : "acknowledgement until read"}`, async () => {
@@ -50,7 +53,7 @@ for (const [label, command, key, action] of cases) for (const rejected of [false
     if (label !== "seen") expect(JSON.stringify(lib.store.state.mocks)).toBe(before)
     expect(lib.store.state.toasts.at(-1)).toMatchObject({ text: "mock revision changed; refresh and retry", tone: "error" })
   } else expect(lib.store.state.mocks.project.persisted).toBe(true)
-  if (label === "editor") expect(request.mock.calls.find(([tag]) => tag === command)?.[1]).toEqual({ projectId: "project", revisionId: "v1", designRevision: "design", worktreeId: "workspace", content: "ZXhwb3J0" })
+  if (label === "editor") expect(request.mock.calls.find(([tag]) => tag === command)?.[1]).toEqual({ projectId: "project", revisionId: "v1", designRevision: "design", worktreeId: "workspace", confirmed: true, content: "ZXhwb3J0" })
 })
 
 it("review item 1: marks all displayed unseen versions with one engine request", async () => {

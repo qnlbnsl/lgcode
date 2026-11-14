@@ -152,7 +152,9 @@ for (const { command, words, form } of invocations) {
       "project.mocks.comment": { projectId: "project", revisionId: "before", screenId: "home", text: "Use fewer columns." },
       "project.mocks.screen.approve": { projectId: "project", revisionId: "before", screenId: "home", approved: false },
       "project.mocks.seen": { projectId: "project", revisionId: "before", screenId: "home" },
-      "project.mocks.editor.save": { projectId: "project", revisionId: "before", designRevision: "design", worktreeId: "workspace", content: "ZXhwb3J0" },
+      "project.mocks.seen.batch": { projectId: "project", versions: [{ revisionId: "before", screenId: "home" }] },
+      "project.mocks.reviews.read": { projectId: "project" },
+      "project.mocks.editor.save": { projectId: "project", revisionId: "before", designRevision: "design", worktreeId: "workspace", confirmed: true, content: "ZXhwb3J0" },
       "project.mocks.screen.read": { projectId: "project", revisionId: "before", screenId: "home" },
       "project.mocks.record": { projectId: "project", expectedRevision: "before", bundle: { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] } },
       "project.mocks.read": { projectId: "project", after: "before", limit: 1 },
@@ -261,6 +263,8 @@ for (const { command, words, form } of invocations) {
         "project.setup.discover": { ...base, result: { state: "available", repositories: [], truncated: false, harnesses: [] } },
         "project.placement.preview": { ...base, result: { repositoryPath: root.work, path: root.work, branch: "main", checkout: "main", reserved: false } },
         "project.mocks.screen.read": { ...base, review: { projectId: "project", revisionId: "before", screenId: "home", comments: [] } },
+        "project.mocks.reviews.read": { ...base, revisionId: "before", reviews: [] },
+        "project.mocks.comment": { ...base, notified: true },
         "project.mocks.record": { ...base, revisionId: "revision" },
         "project.mocks.editor.save": { ...base, revisionId: "revision" },
         "project.design.record": { ...base, revisionId: "revision" },
@@ -329,7 +333,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.mocks.screen.read", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.mocks.reviews.read", "project.mocks.screen.read", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

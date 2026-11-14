@@ -25,10 +25,13 @@ it("connects the copied screen and fails closed when its reference markup change
   expect(() => mockControlsSource("js/screens/mocks.js", source.replace("sc, text.trim()); setText('');", "changed"))).toThrow("no longer matches")
 })
 
-it("loads authenticated feedback before accepting a consistent mock snapshot", () => {
+it("loads one project feedback snapshot and checks its mock head without a global sequence window", () => {
   const source = mockSource("js/live/mocks.js")
   const wired = mockControlsSource("js/live/mocks.js", source)
-  expect(wired.indexOf("project.mocks.screen.read")).toBeLessThan(wired.indexOf("const final ="))
+  expect(wired).toContain("project.mocks.reviews.read")
+  expect(wired).not.toContain("project.mocks.screen.read")
+  expect(wired).not.toContain("client.sequence")
+  expect(wired).toContain("feedback.revisionId !== items.at(-1)?.revisionId")
   expect(wired).toContain("mapMocks(items, approval, reviews)")
 })
 

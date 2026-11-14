@@ -61,6 +61,7 @@ export const eventStructure: RedactionStructure = { taggedFields: {
   "project.MockScreenCommented": { projectId: identity, revisionId: identity, screenId: identity, commentId: identity, author: actor },
   "project.MockScreenApprovalSet": { projectId: identity, revisionId: identity, screenId: identity, author: actor },
   "project.MockScreenSeen": { projectId: identity, revisionId: identity, screenId: identity, author: actor },
+  "project.MockScreensSeen": { projectId: identity, versions: { elements: { fields: { revisionId: identity, screenId: identity } } }, author: actor },
   "project.GitAttempted": { attempt: { fields: { requestId: identity, bodyHash: identity, caller: actor, command: identity, worktreeId: identity } } },
   "project.GitFinished": { caller: actor, operationRequestId: identity, outcome: identity, refusal: identity },
   "project.GitEvidenceReported": { report: gitReport },

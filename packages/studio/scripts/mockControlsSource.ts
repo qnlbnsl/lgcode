@@ -6,19 +6,20 @@ export function mockControlsSource(path: string, source: string): string {
     source = source.replace(from, to)
   }
   if (path === "js/live/mocks.js") {
-    replace("  const final = await engine.request('client.sequence', {});", `  const reviews = [];
-  for (const revision of items) for (const screen of revision.bundle.screens) {
-    const reply = await engine.request('project.mocks.screen.read', { projectId, revisionId: revision.revisionId, screenId: screen.screenId });
-    if (!reply.review) throw new Error('Mock screen feedback is unavailable.');
-    reviews.push(reply.review);
-  }
-  const final = await engine.request('client.sequence', {});`)
+    replace("  const first = await engine.request('client.sequence', {});", "")
+    replace("  const final = await engine.request('client.sequence', {});\n  if (first.sequence !== final.sequence) throw new Error('Mock history changed while loading. Refresh it.');", `  const feedback = await engine.request('project.mocks.reviews.read', { projectId });
+  if (!Array.isArray(feedback.reviews)) throw new Error('Mock screen feedback is unavailable.');
+  if (feedback.revisionId !== items.at(-1)?.revisionId) throw new Error('Mock history changed while loading. Refresh it.');
+  const reviews = feedback.reviews;
+  approval = feedback.approval;`)
     replace("return maps().mapMocks(items, approval);", "return maps().mapMocks(items, approval, reviews);")
   }
   if (path === "js/screens/mocks.js") {
     source = "import * as controls from '../live/mock-controls.js';\n" + source
     replace("${live.on ? html`<${mocks.Display} key=${m.designRevision} title=\"Mock design editor\"", "${live.on ? html`<${controls.SaveEditor} project=${p} mocks=${m} /><${mocks.Display} key=${m.designRevision} title=\"Mock design editor\"")
-    const approveStart = source.indexOf("          ${sc.status !== 'approved' && html`")
+    const approveAnchor = "          ${sc.status !== 'approved' && html`"
+    const approveStart = source.indexOf(approveAnchor)
+    if (approveStart !== source.lastIndexOf(approveAnchor)) throw new Error(`Mock approval integration needs a unique match in ${path}`)
     const approveEnd = source.indexOf("</button>`}", approveStart) + "</button>`}".length
     if (approveStart < 0 || approveEnd < "</button>`}".length) throw new Error(`Mock approval integration no longer matches ${path}`)
     const sampleApprove = source.slice(approveStart, approveEnd).trim()

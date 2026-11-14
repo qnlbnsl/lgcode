@@ -125,6 +125,8 @@ const summaries: Record<CommandName, string> = {
   "project.mocks.comment": "Post a plain text owner comment on the current recorded mock screen.",
   "project.mocks.screen.approve": "Approve or withdraw owner approval of one recorded screen without advancing the project stage.",
   "project.mocks.seen": "Record that the owner has seen exactly one recorded screen version.",
+  "project.mocks.seen.batch": "Record all displayed unseen screen versions atomically as the owner.",
+  "project.mocks.reviews.read": "Read bounded historical screen feedback for your whole project in one reply.",
   "project.mocks.editor.save": "Save an editor export into the exact recorded design file and record a new mock revision as the owner.",
   "project.mocks.screen.read": "Read versioned comments, approval and seen marks on a screen in your project.",
   "project.mocks.record": "Record a project-scoped mock revision with actual artifact references.",
@@ -206,6 +208,9 @@ export const helpText = (command: CommandName): string => {
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",
     "  --help          Show this help."
   ]
+  if (command === "project.mocks.editor.save") options.splice(1, 0,
+    "  --file <path>   Read an editor export of at most 512 KiB on this computer.",
+    "                  Put the recorded identities and confirmed: true in --input; omit content.")
   if (command === "thread.export") return `Usage: lgtm thread export <agent> --out <file>\n\nExport all thread pages to a file on this computer with mode 0600.\n${callers}\nUse the positional agent and --out; --input is not supported.\n`
   if (command === "wait" || command === "client.wait") {
     options.splice(1, 0,

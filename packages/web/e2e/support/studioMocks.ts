@@ -41,7 +41,9 @@ export async function exerciseStudioMocks(page: Page) {
       yield* Effect.scoped(Effect.gen(function* () {
         const f = yield* seedScreens(rig)
         yield* completedSetup("project" as never)
-        writeFileSync(join(rig.work, "mocks/layout.pen"), "Original editor document")
+        const original = JSON.stringify({ version: "2.8", children: [] })
+        const edited = JSON.stringify({ version: "2.8", children: [], name: "Edited document from OpenPencil" })
+        writeFileSync(join(rig.work, "mocks/layout.pen"), original)
         const designRevision = success(yield* call(ownerCredential, "project.design.record", { projectId: "project", design: { repoId: f.repoId, worktreeId: "workspace", file: "mocks/layout.pen", components: [] } })).revisionId
         const revisionId = success(yield* call(ownerCredential, "project.mocks.record", { projectId: "project", expectedRevision: f.revisionId, bundle: { ...screenBundle(), designRevision } })).revisionId
         yield* serve({ password: Redacted.make(password), staticRoot, studioRoot, lists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
@@ -79,9 +81,15 @@ export async function exerciseStudioMocks(page: Page) {
           await expect(page.locator(".mk-changes")).toContainText(revisionId)
           await expect(page.locator(".mk-changes .badge.warn")).toHaveCount(0)
           await page.goto(screen)
-          await page.locator('input[type="file"][aria-label="Editor export"]').setInputFiles({ name: "owner-export.pen", mimeType: "application/octet-stream", buffer: Buffer.from("Edited document from OpenPencil") })
+          await page.locator('input[type="file"][aria-label="Editor export"]').setInputFiles({ name: "owner-export.pen", mimeType: "application/octet-stream", buffer: Buffer.from(edited) })
+          const confirmation = page.getByRole("dialog")
+          await expect(confirmation).toContainText("The project returns to Design and its overall approval is withdrawn.")
+          expect(readFileSync(join(rig.work, "mocks/layout.pen"), "utf8")).toBe(original)
+          await confirmation.getByRole("button", { name: "Save changes", exact: true }).click()
           await expect(page.getByText("Editor changes saved", { exact: true })).toBeVisible()
-          expect(readFileSync(join(rig.work, "mocks/layout.pen"), "utf8")).toBe("Edited document from OpenPencil")
+          expect(readFileSync(join(rig.work, "mocks/layout.pen"), "utf8")).toBe(edited)
+          await expect(page.locator(".mk-comments ol")).toContainText(comment)
+          await expect(page.locator(".mk-comments ol")).toContainText("Revision " + revisionId)
           await expect(page.locator(".mk-stagebar")).not.toContainText(revisionId)
           await page.goto(origin + "#/p/project/mocks/changes")
           await expect(page.locator(".mk-changes .badge.warn")).toHaveCount(1)

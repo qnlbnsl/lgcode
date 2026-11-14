@@ -42,6 +42,7 @@ it.live("roundtrips every project event and receipt identity while keeping works
   const ownerId = `worker-${marker}`
   const needs = [`dependency-${marker}`]
   const events = (text: string) => [
+    { _tag: "project.MockScreensSeen", projectId, versions: [{ revisionId: `revision-${marker}`, screenId: `screen-${marker}` }], author: { _tag: "agent", agentId: leadAgentId } },
     { _tag: "project.MockScreenCommented", projectId, revisionId: `revision-${marker}`, screenId: `screen-${marker}`, commentId: `comment-${marker}`,
       author: { _tag: "agent", agentId: leadAgentId }, text },
     { _tag: "project.MockScreenApprovalSet", projectId, revisionId: `revision-${marker}`, screenId: `screen-${marker}`, approved: false, author: { _tag: "agent", agentId: leadAgentId } },

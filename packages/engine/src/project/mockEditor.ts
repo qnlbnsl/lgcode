@@ -8,11 +8,13 @@ import { designDisplay } from "./display.ts"
 import { verifyDesignEvidence } from "./design.ts"
 import { checkObservedWorkspace, withGit, workspacePath } from "./gitApi.ts"
 import { own, projectKey, projectView } from "./view.ts"
-import { saveMockEditorFile, MockEditorFileError } from "./mockEditorFile.ts"
+import { stageMockEditorFile, mockEditorUncertainReason } from "./mockEditorRecovery.ts"
 import { readable, worklistFor } from "./mocks.ts"
+import { mockEditorFormatMatches } from "./mockEditorFormat.ts"
 
 export const mockEditorSelection = (input: Input, p: Payload<"project.mocks.editor.save">) => Effect.gen(function* () {
   if (input.actor._tag !== "owner") return yield* refused()
+  if (p.confirmed !== true) return yield* refused("mock editor save requires confirmation")
   const view = projectView(input.snapshot), project = own(view.projects, p.projectId)
   if (project === undefined || project.archiving || project.archivedAt !== undefined || !canReadProject(input.snapshot, input.actor, p.projectId)) return yield* refused("project is unavailable to this caller")
   const revision = own(view.mockRevisions, projectKey(p.projectId, p.revisionId))
@@ -37,6 +39,7 @@ export const saveMockEditor: PiecePlanner = (input, raw) => Effect.gen(function*
   }, catch: () => refused("mock editor export must be base64 data of at most 512 KiB") })
   const text = new TextDecoder().decode(bytes)
   if ((yield* input.runtime.log.redactText(text)) !== text) return yield* refused("mock editor export contains private data")
+  if (!mockEditorFormatMatches(selected.design.design.file, bytes)) return yield* refused("mock editor export does not match the recorded design format")
   const display = yield* designDisplay(input, { repoId: selected.project.repoId, projectId: p.projectId, revisionId: p.designRevision })
   yield* verifyDesignEvidence(input, selected.design, p.projectId)
   for (const source of selected.revision.bundle.sources) {
@@ -59,9 +62,7 @@ export const saveMockEditor: PiecePlanner = (input, raw) => Effect.gen(function*
     const current = { ...input, snapshot: yield* input.runtime.views.snapshot }
     yield* checkObservedWorkspace(input, current, workspace, p.projectId)
     yield* mockEditorSelection(current, p)
-    yield* Effect.tryPromise({ try: () => saveMockEditorFile(workspace.path, selected.design.design.file, display.fingerprint, bytes),
-      catch: (error) => error instanceof MockEditorFileError && error.uncertain
-        ? new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" }) : refused("mock editor file changed or its path is unsafe") })
+    yield* stageMockEditorFile(input, p, workspace.path, selected.design.design.file, display.fingerprint, bytes)
     return { events, reply: () => ({ requestId: p.requestId, revisionId: p.requestId }) }
   }))
 })
@@ -75,4 +76,4 @@ export const finalizeMockEditorSave = (observed: Input, raw: Record<string, unkn
   yield* checkObservedWorkspace(observed, current, workspace, p.projectId)
   yield* mockEditorSelection(current, p)
   return plan
-}).pipe(Effect.mapError(() => new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" })))
+}).pipe(Effect.mapError(() => new CommandUncertain({ reason: mockEditorUncertainReason })))

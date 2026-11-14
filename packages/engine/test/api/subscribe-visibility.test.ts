@@ -58,6 +58,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   "project.MockScreenCommented": (_a, n) => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", commentId: `comment-${n}`, author: owner, text: "Private screen feedback" }),
   "project.MockScreenApprovalSet": () => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", approved: false, author: owner }),
   "project.MockScreenSeen": () => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", author: owner }),
+  "project.MockScreensSeen": () => ({ projectId: "project-one", versions: [{ revisionId: "mock-revision", screenId: "home" }], author: owner }),
   "project.SetupAdvanced": () => ({ step: "found" }),
   "project.DesignRecorded": () => ({ projectId: "project-one", revisionId: "design-revision", author: { _tag: "owner" }, fileFingerprint: "a".repeat(64),
     design: { repoId: "project-repo", worktreeId: "workspace", file: "design/actual.fig", components: [] } }),
