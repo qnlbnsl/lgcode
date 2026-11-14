@@ -12583,3 +12583,14 @@ The two new engine test files registered their rebuild checks through a shared f
 The discovery guard requires a direct registration in each test file.
 Each test now registers the real rebuild comparison before seeding its engine state.
 The shared fixture no longer registers a duplicate comparison.
+
+## s6-mocks-5. The older Mocks browser journey still expected disconnected controls.
+
+The second full check passed all unit tests and failed two browser journeys.
+The older project journey expected no New badge on an unseen revision.
+It also expected individual approval to show the disconnected notice.
+It now checks the persisted seen action and individual approval and withdrawal.
+The new Mocks journey passed in that full run.
+The email journey separately failed to find its Notifications heading.
+Its reported source line points at a later password assertion, so the exact navigation boundary is not established by this output.
+The next request reruns that unchanged journey in isolation before choosing a fix.
