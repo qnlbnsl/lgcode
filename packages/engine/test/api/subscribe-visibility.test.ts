@@ -51,6 +51,8 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 // `n` makes its identifiers unique. Terminal events for the subscriber itself
 // are left out (`terminal`), because they would end its own access.
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
+  HarnessInstallStarted: (_a, n) => ({ harnessId: "first", operationRequestId: n }),
+  HarnessInstallFinished: (_a, n) => ({ harnessId: "first", operationRequestId: n, state: "failed", reason: "Fixture install failed." }),
   ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
   "project.MockScreenCommented": (_a, n) => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", commentId: `comment-${n}`, author: owner, text: "Private screen feedback" }),

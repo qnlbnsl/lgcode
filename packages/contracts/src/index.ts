@@ -25,6 +25,7 @@ export * from "./roles/alerts.ts"
 export * from "./project/index.ts"
 export * from "./agentConfiguration.ts"
 export * from "./harnessChoices.ts"
+export * from "./harnessInstallation.ts"
 
 
 export * from "./workflows.ts"

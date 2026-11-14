@@ -83,6 +83,7 @@ export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T)
   Object.fromEntries(tags.map((tag) => [tag, allStates("keep")])) as Record<T[number], Record<StateName, EventEffect>>
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
+  HarnessInstallStarted: allStates("keep"), HarnessInstallFinished: allStates("keep"),
   ...keepInEveryState(boardEventTags),
   ...keepInEveryState(projectEventTags),
   ...keepInEveryState(clientEventTags),

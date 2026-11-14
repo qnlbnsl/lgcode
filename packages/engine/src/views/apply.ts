@@ -136,7 +136,7 @@ export const emptyViews = (views: Readonly<Record<PieceNamespace, PieceView>> = 
 // The agent whose thread an event belongs to. `DeliveryQueued` names its
 // agent only inside the delivery, so the log's agent column misses it
 // (issue 31). Account and harness events belong to no thread.
-const engineTags = new Set(Object.keys(EngineEvent.pipe(Schema.toTaggedUnion("_tag")).cases));
+const engineTags = new Set<string>(EngineEvent.members.map((member) => member.fields._tag.schema.literal));
 export const threadAgent = (event: Event): AgentId | undefined =>
   !engineTags.has(event._tag) ? undefined : event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
 

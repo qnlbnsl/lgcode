@@ -1,5 +1,5 @@
 // Pure mapping for the Git tab and the service pages. Missing engine fields stay empty.
-import type { Account, ClientRequest, ClientSnapshot, HarnessSettings, HarnessChoices, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
+import type { Account, ClientRequest, ClientSnapshot, HarnessSettings, HarnessChoices, HarnessInstallation, HarnessRecipe, ProjectSettings, RolesSettings, Alert, AlertSettings, WebSettings, RoleFile } from "@lgtm/contracts"
 import { mapPermission } from "./mapping.ts"
 
 export function mapHarnesses(rows: ReadonlyArray<HarnessSettings>, reports?: ReadonlyArray<HarnessChoices>) {
@@ -10,6 +10,17 @@ export function mapHarnesses(rows: ReadonlyArray<HarnessSettings>, reports?: Rea
       ...(report ? { reason: report.reason, effortReason: report.effortReason,
         modelLabels: Object.fromEntries(report.models.options.map((o) => [o.id, o.label ?? o.id])),
         effortLabels: Object.fromEntries(report.efforts.options.map((o) => [o.id, o.label ?? o.id])) } : {}) }]
+  }))
+}
+
+export function mapInstalledHarnesses(bases: ReturnType<typeof mapHarnesses>, installations: ReadonlyArray<HarnessInstallation>, recipes: ReadonlyArray<HarnessRecipe | null>) {
+  return Object.fromEntries(installations.map((row) => {
+    const recipe = recipes.find((r) => r?.harnessId === row.harnessId)
+    const base = bases[row.harnessId] ?? { name: row.harnessId, models: [], efforts: [], noEffort: [], runMode: "ACP" }
+    const quote = (words: ReadonlyArray<string>) => words.map((word) => `'${word.replaceAll("'", "'\\''")}'`).join(" ")
+    return [row.harnessId, { ...base, ...row, installationReason: row.reason, reason: "reason" in base ? base.reason : undefined, ...(recipe ? { name: recipe.name, recipe,
+      signInCommand: row.path ? quote([row.path, ...recipe.signInArguments]) : recipe.signInCommand } : {}),
+      defaultModel: row.settings?.defaultModel ?? "", defaultEffort: row.settings?.defaultEffort ?? "" }]
   }))
 }
 

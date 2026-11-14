@@ -1118,3 +1118,9 @@ test('workflows: sees default phases, clones, edits and saves across reload with
     await expect(page.getByRole('button', { name: 'Sample loop', exact: true })).toHaveCount(0)
   } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())) }
 })
+
+test('live website: Harnesses installs a missing harness with a fake recipe and adds its account', async ({ page }) => {
+  test.setTimeout(90_000)
+  const { exerciseStudioHarnesses } = await import('./support/studioHarnesses.ts')
+  await exerciseStudioHarnesses(page)
+})

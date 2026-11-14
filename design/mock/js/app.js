@@ -24,7 +24,7 @@ import { MocksTab, seedMocks } from './screens/mocks.js';
 import { RepoDesign } from './screens/design.js';
 import { MessagesTab, AgentsTab, seedBoard } from './screens/messages.js';
 import { WorkflowTab, seedWorkflow } from './screens/workflow.js';
-import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
+import { Machines, Harnesses, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
 import { emptyWorkflow } from './screens/workflow.js';
 import { emptyMocks } from './screens/mocks.js';
@@ -141,7 +141,7 @@ function Sidebar({ s, route, onNavigate }) {
       <button type="button" class="icon-btn" aria-label="Find project or agent" data-tip="Find project or agent" data-tip-side="right" onClick=${() => act.openDialog({ type: 'switcher' })}><${Icon} name="search" size=${16} /></button>
       <button type="button" class="icon-btn" aria-label="New project" data-tip="New project" data-tip-side="right" onClick=${() => act.openDialog({ type: 'new-project' })}><${Icon} name="plus" size=${16} /></button>
       <span class="spacer"></span>
-      ${rail('/workflows', 'workflow', 'Workflows')}${rail('/machines', 'server', 'Machines')}${rail('/subscriptions', 'key-round', 'Subscriptions')}${rail('/notifications', 'smartphone', 'Notifications', failedNotes > 0)}${rail('/settings', 'settings', 'Service settings')}
+      ${rail('/workflows', 'workflow', 'Workflows')}${rail('/machines', 'server', 'Machines')}${rail('/harnesses', 'key-round', 'Harnesses')}${rail('/notifications', 'smartphone', 'Notifications', failedNotes > 0)}${rail('/settings', 'settings', 'Service settings')}
     </div>
     <div class="side-top">
       ${nav('/home', 'house', 'Home', n > 0 && html`<span class="count warn">${n}</span>`)}
@@ -157,7 +157,7 @@ function Sidebar({ s, route, onNavigate }) {
     </div>
     <div class="side-foot">
       ${nav('/machines', 'server', 'Machines', html`<span class="state faint" style="margin-left:auto;font-size:var(--text-xs)">${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</span>`)}
-      ${nav('/subscriptions', 'key-round', 'Subscriptions')}
+      ${nav('/harnesses', 'key-round', 'Harnesses')}
       ${nav('/notifications', 'smartphone', 'Notifications', failedNotes > 0 && html`<span class="count error">${failedNotes}</span>`)}
       ${nav('/workflows', 'workflow', 'Workflows')}
       ${nav('/settings', 'settings', 'Service settings')}
@@ -210,7 +210,7 @@ function TopBar({ s, route, project, onMenu }) {
     if (route.parts[2] === 'sprint') { const sp = byId(s.sprints, route.parts[3]); if (sp) crumbs.push({ to: route.path, label: sp.label }); }
     if (route.parts[2] === 'task') { const t = byId(s.tasks, route.parts[3]); if (t) crumbs.push({ to: route.path, label: t.label }); }
   } else if (route.parts[0] === 'r') { const r = byId(s.repos, route.parts[1]); crumbs.push({ to: '/r/' + route.parts[1], label: r?.name || 'Repository', cls: 'repo' }); }
-  else crumbs.push({ to: route.path, label: { home: 'Home', projects: 'All projects', machines: 'Machines', subscriptions: 'Subscriptions', notifications: 'Notifications', settings: 'Service settings', workflows: 'Workflows' }[route.parts[0]] || 'Home' });
+  else crumbs.push({ to: route.path, label: { home: 'Home', projects: 'All projects', machines: 'Machines', subscriptions: 'Harnesses', harnesses: 'Harnesses', notifications: 'Notifications', settings: 'Service settings', workflows: 'Workflows' }[route.parts[0]] || 'Home' });
   return html`<header class="topbar">
     <button type="button" class="icon-btn only-phone" aria-label="Open navigation" onClick=${onMenu}><${Icon} name="menu" size=${18} /></button>
     <nav class="crumbs" aria-label="Where you are">
@@ -321,6 +321,7 @@ function App() {
   }, []);
   useEffect(() => {
     if (!route.parts.length) go('/home');
+    if (route.parts[0] === 'subscriptions') go('/harnesses');
     // The old Home tabs keep working: Projects moved to its own page, and Questions and
     // Approvals became the Type filter on Needs attention.
     if (route.path === '/home/projects') go('/projects');
@@ -340,7 +341,7 @@ function App() {
   else if (top === 'r') content = route.parts[2] === 'design' ? html`<${RepoDesign} s=${s} repoId=${route.parts[1]} route=${route} />` : html`<${RepoPage} s=${s} repoId=${route.parts[1]} />`;
   else if (top === 'projects') content = html`<${AllProjects} s=${s} />`;
   else if (top === 'machines') content = html`<${Machines} s=${s} route=${route} />`;
-  else if (top === 'subscriptions') content = html`<${Subscriptions} s=${s} route=${route} />`;
+  else if (top === 'subscriptions' || top === 'harnesses') content = html`<${Harnesses} s=${s} route=${route} />`;
   else if (top === 'notifications') content = html`<${Notifications} s=${s} route=${route} />`;
   else if (top === 'workflows') content = html`<${Workflows} s=${s} />`;
   else if (top === 'settings') content = html`<${ServiceSettings} s=${s} route=${route} />`;

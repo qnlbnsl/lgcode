@@ -1,5 +1,6 @@
 import { WorkflowRpcGroup, workflowAccess, workflowCommandNames } from "../workflowCommands.ts"
 import { HarnessChoices } from "../harnessChoices.ts"
+import { HarnessInstallation, HarnessRecipe, HarnessInstallResult } from "../harnessInstallation.ts"
 import { HarnessId, AccountId } from "../ids.ts"
 import { AgentChoices, AgentConfiguration, ChoiceId, ContextUsage } from "../agentConfiguration.ts"
 import * as Schema from "effect/Schema"
@@ -25,6 +26,15 @@ export const EventReply = Schema.Struct({ ...request, envelope: EventEnvelope })
 // Definitions only. A unit installs its subset into CommandsRpcGroup when it
 // supplies the handlers, so the running service never advertises a stub.
 export const ClientRpcGroup = RpcGroup.make(
+  Rpc.make("harness.status", { payload: { ...request, refresh: Schema.optionalKey(Schema.Boolean) },
+    success: Schema.Struct({ ...request, harnesses: Schema.Array(HarnessInstallation) }), error: Refused }),
+  Rpc.make("harness.recipe", { payload: { ...request, harnessId: HarnessId },
+    success: Schema.Struct({ ...request, recipe: HarnessRecipe }), error: Refused }),
+  Rpc.make("harness.install", { payload: { ...request, harnessId: HarnessId },
+    success: Schema.Struct({ ...request, ...HarnessInstallResult.fields }), error: Refused }),
+  Rpc.make("harness.account.check", { payload: { ...request, accountId: AccountId },
+    success: Schema.Struct({ ...request, accountId: AccountId, state: Schema.Literals(["local-credential", "signed-out", "unavailable", "missing-executable"]),
+      remoteAuthentication: Schema.Literal("not-checked"), signInCommand: Schema.String }), error: Refused }),
   Rpc.make("harness.choices", {
     payload: { ...request, harnessId: HarnessId, accountId: Schema.optionalKey(AccountId), model: Schema.optionalKey(ChoiceId), refresh: Schema.optionalKey(Schema.Boolean) },
     success: Schema.Struct({ ...request, ...HarnessChoices.fields }), error: Refused
@@ -90,6 +100,7 @@ export const ClientRpcGroup = RpcGroup.make(
 ).prefix("client.").merge(WorkflowRpcGroup)
 
 export const clientCommandAccess = {
+  "client.harness.status": ["owner"], "client.harness.recipe": ["owner"], "client.harness.install": ["owner"], "client.harness.account.check": ["owner"],
   "client.harness.choices": ["owner"],
   ...workflowAccess,
   "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
@@ -105,6 +116,7 @@ export const clientCommandAccess = {
 
 // The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
+  "client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check",
   "client.harness.choices",
   ...workflowCommandNames,
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context",

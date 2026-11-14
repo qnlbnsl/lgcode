@@ -150,6 +150,9 @@ const account = { accountId: AccountId }
 // Event payloads only. Sequence, time and caller belong to the log envelope.
 // All text must pass through the engine's redactor before the log writer.
 export const EngineEvent = Schema.Union([
+  Schema.TaggedStruct("HarnessInstallStarted", { harnessId: HarnessId, operationRequestId: RequestId }),
+  Schema.TaggedStruct("HarnessInstallFinished", { harnessId: HarnessId, operationRequestId: RequestId,
+    state: Schema.Literals(["installed", "failed"]), reason: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct("AgentStarted", {
     ...agent,
     name: Schema.NonEmptyString,

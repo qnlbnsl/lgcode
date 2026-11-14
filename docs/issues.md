@@ -12547,6 +12547,348 @@ Both files are now committed.
 They can fall behind `packages/contracts/src/workflows.ts` and the engine's default workflow until the build is run again.
 No test yet fails when they fall behind.
 
+## 759. The sample mock was blank when the engine served it.
+
+`design/mock/index.html` used an inline import map to find the workflow contracts.
+The engine's static server sends a content security policy that allows no inline script.
+The browser ignored the import map, the "Workflows" screen failed to import, and the whole page stayed blank.
+The Notifications journey opens the sample through the engine first, so it failed on `85cf37e`.
+The mock now imports the committed bundle `design/mock/vendor/workflow-contracts.js` directly, with no import map.
+
+## 760. The Git journey failed once at "Use both" under load.
+
+The full check on `85cf37e` failed at `packages/web/e2e/support/studioGit.ts:157`.
+The "Use both" button did not appear within ten seconds after an external merge conflict and a refresh.
+The same journey passed when it ran alone on the same commit.
+The cause is not known.
+
+## 761. Cursor has no compliant automatic recipe.
+
+Cursor's official installation page documents a download piped into a shell.
+The assignment forbids that installation method inside LGTM Studio.
+The recipe therefore exposes the official command for the owner to run manually.
+The Install button stays disabled for Cursor.
+The owner can run the command and use Check again.
+An automatic recipe needs an official method that satisfies these limits.
+The source is https://cursor.com/docs/cli/installation.
+
+## 762. A timed-out installer must stop its descendants.
+
+The first harmless timeout test exposed an orphaned fixture process.
+The initial process helper did not create the process group it tried to kill.
+The helper now uses spawn with a separate process group on Linux.
+A timeout, cancellation, or oversized output kills that group.
+The exact orphaned fixture process from the failed test was removed.
+The literal-argument and process-limit regression now passes.
+
+## 763. A status refresh must preserve a complete harness row.
+
+An asynchronous status read briefly replaced installed rows with incomplete settings rows.
+The Add account dialog could observe that intermediate state.
+The page now finishes its asynchronous reads before replacing the harness map.
+The browser journey checks adding an account after installation and after reload.
+The old service-page test also exposed a host CLI bootstrap shim during version probing.
+Embedded test engines now use an empty host search path unless their constructor supplies one.
+The production service explicitly supplies its real search path.
+Every installer test uses a harmless fixture.
+
+## 764. Concurrent npm installs would share a destination.
+
+The shipped recipes install into one user prefix.
+Separate harness locks alone would permit concurrent writes there.
+The engine now serializes all installer requests for that prefix.
+A second request receives a plain refusal while the first is running.
+The overlap regression checks the same harness and another harness.
+
+## 765. Contract inventories need the new installation surface.
+
+The full check found that the independent command and event inventories did not yet list the installer additions.
+The contract tests now name all four owner-only requests and both installation audit events.
+Their existing request-identifier and event round-trip checks now cover these additions.
+The expected agent tool inventory remains unchanged.
+The command-line parity fixtures now exercise the new commands in their spaced and dotted forms.
+The subscription matrix now includes both events and checks their owner-only visibility.
+
+## 766. Redaction must precede output shortening.
+
+The security review found that shortening a raw version string could leave a partial secret at its end.
+A new harmless regression reproduced that boundary.
+The engine now redacts the complete version capture before selecting its first line and limiting its length.
+Oversized or forcibly interrupted captures are discarded.
+A failure still returns its plain reason.
+This prevents the capture limit from cutting a secret before the redactor can recognize it.
+
+## 767. A Codex sign-in command must name the account's private home.
+
+Additional Codex accounts use the engine's existing private authentication layout.
+Displaying a command for the shared home would sign the owner into a different folder.
+The new read now resolves the same effective home as readiness and launch.
+It does not create that folder or copy credentials.
+A harmless regression writes a synthetic credential to the displayed folder and verifies that the readiness read sees it.
+A login-folder secret reference or conflicting settings receive a plain refusal.
+
+## 768. The installer must resolve its own package manager.
+
+The first installer selected npm and Node.js through a mutable search path.
+A harness executable folder could therefore replace the installer itself.
+The installer now resolves the running Node.js and its adjacent npm to real absolute paths.
+It passes a fixed search path and starts in a new empty temporary folder.
+The hostile-path regression fails against the original implementation.
+
+## 769. Managed executable files need an installation receipt.
+
+The first status read executed any file found in the managed harness folder.
+The installer now records the real executable path and hashes every regular file and executable link in its dependency tree.
+The receipt lives in the engine state folder, outside the installation prefix.
+Status and runner entry points refuse a changed tree before executing it.
+Version reads happen after installation or an explicit owner refresh.
+Ordinary status reads use saved versions.
+This check does not provide an operating-system boundary against another process with full access to the engine user's state and source files.
+A hostile process running as the same user can rewrite the receipt and bless a tampered program.
+The "changed since install" check guards against accidents and changes by install scripts.
+It does not stop a hostile process running as the same user.
+
+## 770. A package version does not pin its dependency tree.
+
+The automatic Codex and Gemini recipes now include npm lockfiles with registry integrity hashes.
+They use npm ci with all lifecycle scripts disabled.
+The current Claude Code npm package needs its postinstall linking script.
+Its separate CLI installer is therefore manual.
+The bundled Claude adapter and native runtime remain available without that separate install.
+Cursor's shell installer remains manual.
+Automatic installation is limited to Linux, where process recovery can identify a leftover process group.
+
+## 771. Interrupted installs need cleanup and recovery.
+
+The original request masked interruption while a detached package manager ran.
+Requests now cancel the complete process group and wait for cleanup before auditing cancellation.
+Engine shutdown closes active installs.
+A durable operation identity lets startup find leftover descendants and remove their partial installation.
+The operation has a ten-minute deadline to accommodate slow downloads.
+Failed and cancelled installs remove their partial prefix.
+
+## 772. An unreadable login file must not break every harness section.
+
+Status now handles a malformed, oversized or unreadable login store per harness.
+It reports that the sign-in state cannot be read.
+Other harness sections remain available.
+A subprocess probe still requires readable credential sources so its output can be redacted safely.
+
+## 773. Cursor's executable name is not a vendor identity.
+
+An arbitrary program named agent on the service search path is no longer probed as Cursor.
+Discovery requires Cursor's installation location and a recognizable version report.
+A failed version read reports an unknown version.
+A found version that differs from a recipe's pin is labelled explicitly.
+
+## 774. Moving the subscriptions page lost existing controls.
+
+The combined page again shows the signed-in and capacity summary.
+Sample account creation refuses an offline machine and a machine without the selected harness.
+The default permission picker is back under Service settings.
+An old subscriptions address is rewritten to the Harnesses address.
+The browser journey covers these restorations.
+
+## 775. Automatic installs do not support inherited proxy settings.
+
+This matter is open.
+The installer deliberately drops proxy variables and npm configuration variables.
+An installation behind a required proxy can fail.
+A future proxy setting needs an explicit owner-controlled design that preserves the fixed recipe and redaction rules.
+
+## 776. npm has a built-in configuration beside its program.
+
+This matter is open.
+The installer disables user and global npm configuration and uses an empty working folder.
+npm still reads its own built-in configuration.
+For this to alter the installer, another process would need to change the trusted Node.js and npm installation or its built-in configuration.
+The installer does not claim to protect a compromised toolchain.
+
+## 777. npm rejects one file used as both user and global configuration.
+
+The original environment named /dev/null for both configuration roles.
+Current npm refuses to load the same configuration file twice.
+The user configuration now names a repository-owned empty file.
+The global configuration still names /dev/null.
+The command-plan and child-environment regressions cover the fixed environment without installing a vendor package.
+
+## 778. The full browser check can time out in the existing Git journey.
+
+The full check of the original feature passed its type checks and unit tests.
+It passed 51 browser journeys.
+The Git journey timed out while clicking its existing integration control.
+The Harnesses journey passed in that run.
+This matter remains open because the Git journey is outside this builder's assignment.
+
+## 779. The web transform requires an explicit relative lockfile URL.
+
+The full review check found that Vite treated the dynamic lockfile URL as an asset glob.
+A relative glob must begin with a dot and a slash.
+The engine now uses that explicit relative URL.
+Nine web test suites failed during import before this correction.
+The focused follow-up runs every affected suite.
+
+## 780. New engine tests must register the rebuild hook.
+
+The repository-wide guard found three new test files without their rebuild registration.
+The files that open an event log now register a scoped rebuild comparison.
+The process-only and filesystem-only files register the no-log form.
+The follow-up includes the repository guard and the harness tests.
+
+## 781. The service journey still looked for permission settings on Harnesses.
+
+The review restored the default permission picker to Service settings.
+The existing browser helper still looked for it on Harnesses.
+The helper now verifies model persistence on Harnesses before checking permission persistence in Service settings.
+The separate Harnesses journey also verifies the restored location.
+
+## 782. The admin browser journey intermittently misses token clearing.
+
+The full browser run passed 50 journeys and failed two journeys.
+The admin journey failed while waiting for its token-cleared label.
+An immediate isolated rerun passed without a source change.
+This matter remains open because notifications are outside this builder's assignment.
+The other failure was the permission-picker test location recorded above.
+
+## 783. A same-user process can replace the installed harness despite verification.
+
+This matter is open.
+Every input the installation verification reads is in a folder that a process running as the same user can write.
+Such a process can restore the staged files and rewrite npm's hidden lockfile before the check, or rewrite the program after extraction.
+It can therefore still have a different program installed, run by the engine, recorded in the receipt, and proposed as the harness.
+The check stops accidents, install scripts, and a swap that is not restored.
+It is not a wall against a hostile process running as the same user.
+The real fix is the planned sandbox for agents.
+The check compares staged files with the committed files and installed package metadata with the pinned entries.
+Only optional entries may be absent.
+Every present entry must match its name, version, resolved location and integrity hash.
+An extra entry or an executable outside the expected package folder is refused.
+
+## 784. Damaged install intents blocked engine startup.
+
+Pending intents are now published by writing a temporary file and renaming it.
+Recovery removes malformed and unreadable intents and known unreceipted partial prefixes.
+It also cleans an intent for a harness whose recipe has been removed.
+The event log records interrupted operations as failed while the engine starts.
+A damaged intent cannot authorize a process signal without a verified identity.
+Recovery logs that identity limit instead of claiming that such a process was stopped.
+
+## 785. The separate Codex installation was unused by its adapter.
+
+The engine uses its bundled Codex adapter and vendor runtime.
+The separate automatic Codex recipe and its lockfile have been removed.
+The page describes Codex as bundled with nothing to install.
+
+## 786. A slow version probe deleted a verified installation.
+
+The probe immediately after installation now has a fixed thirty-second limit.
+A timeout keeps the verified tree and reports that it is installed with an unknown version.
+The saved receipt retains that state across an engine restart.
+An explicit refresh that times out also keeps a previously verified installation available.
+An ordinary explicit refresh retains its two-second limit.
+
+## 787. A recognized program looked missing until its version was checked.
+
+A program found through the service search path now reports that it was found with its version not checked yet.
+It allows account creation without offering another installation.
+Package identity uses the nearest exact package boundary in the real path.
+A nested dependency cannot inherit the identity of a package higher in its path.
+A program on the service search path is trusted to the same degree that the runner already trusts that path.
+This trust does not protect against a same-user process changing that program.
+
+## 788. An embedded engine implicitly enabled real installations.
+
+An embedded engine now defaults to a read-only file check and refuses installation.
+Only the production service explicitly supplies the real installer.
+A test can opt in by injecting a harmless installer dependency.
+
+## 789. A sample account could no longer simulate signing in.
+
+The sample Sign in control now updates the sample account again.
+The live control still displays the owner's provider command without running it.
+The browser journey adds a sample account and signs it in.
+
+## 790. Whole-tree receipt checks can block the engine.
+
+This matter is open.
+The engine hashes the whole managed tree synchronously on every status read and agent launch.
+Large installations can therefore delay other work on the engine's event loop.
+
+## 791. The page has no control to cancel an installation.
+
+This matter is open.
+The installation can run for ten minutes.
+The owner cannot cancel it from the page.
+Engine shutdown and request interruption still stop its process group.
+
+## 792. A symbolic link in the home path refuses automatic installation.
+
+This matter is open.
+The managed root must equal its absolute real path.
+A home folder reached through a symbolic link therefore refuses automatic installation.
+
+## 793. npm can read configuration from the managed prefix.
+
+This matter is open.
+A project .npmrc placed in the managed prefix can affect npm or break an installation.
+The npm cache is also inside the agent-writable managed root.
+The post-install checks reject changed manifests or package metadata before executing the installed program.
+Those checks do not create a boundary against another process running as the same user.
+
+## 794. Gemini's real installation still needs an owner trial.
+
+This matter is open.
+No real vendor installation has run during this assignment.
+Gemini CLI has not been verified with install scripts disabled.
+It has not been checked for writes to its own package folder during normal operation.
+The third review fixed the hidden-lock comparison to allow missing optional entries while still requiring all other entries.
+The owner must try a real installation manually before release.
+The automated tests use local fake package trees and never contact a registry.
+
+## 795. Recipe citations cannot be verified from this repository alone.
+
+This matter is open.
+The repository records source addresses but does not include snapshots of those pages.
+Their contents can change or become unavailable.
+The recipe's documentation claims therefore cannot be confirmed from this repository alone.
+
+## 796. Recovery could remove a valid installation or block startup.
+
+The third review found that recovery did not check the managed root for symbolic links.
+A planted pending intent could remove a valid receipted installation.
+A regular file in place of the installation-records folder or a disappearing pending file could stop startup.
+Recovery now refuses a symbolic managed root with a warning and removes nothing.
+It keeps valid receipted trees and removes their stale pending intents.
+It tolerates filesystem failures with fixed warnings instead of blocking startup.
+
+## 797. The version probe could change a tree before its receipt was replaced.
+
+The second receipt previously hashed the tree again without comparing it with the first receipt.
+A change made during the version probe could therefore become the accepted installation.
+The installer now validates the whole tree against the first receipt after the probe.
+A changed tree is refused and removed.
+Only the version field of a valid receipt is updated.
+
+## 798. Model-choice replies erased harness installation details after the merge.
+
+The merged website first read installation status and recipes correctly.
+A later model-choice reply replaced the entire harness entry with its model fields.
+This removed the installed flag and made Add account request a recipe for an already installed custom harness.
+It also replaced the recipe's display name with the harness identifier.
+The live build now combines each model update with the current choices, installation status and recipes.
+A regression executes the built website's actions with delayed model replies.
+It checks both the installed flag and the recipe's display name after the replies arrive.
+
+## 799. The explicit defaults bookmark lost its harness model editor after the merge.
+
+The Harnesses page owns the shared defaults editor.
+The existing explicit /settings?section=defaults bookmark still has callers that edit harness defaults.
+After the merge, that address showed only the remaining service defaults.
+The live copy now includes the shared harness defaults editor for that explicit bookmark.
+The ordinary Service settings address and the standalone sample keep their current layouts.
+The editor uses the same asynchronous model reports on both addresses.
+The browser journey is unchanged.
+
 
 ## s6-mocks-1. This Codex session cannot invoke the remote test helper.
 

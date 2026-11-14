@@ -45,6 +45,8 @@ const draftFields = { elements: { fields: { sourceId: identity, screens: { eleme
 const mockComparisons = { elements: { fields: { field: draftFields.elements } } };
 const mockWorklist = { fields: { screens: { elements: identity }, drafts: { elements: identity }, schemaChanges, draftedFields: draftFields } };
 export const eventStructure: RedactionStructure = { taggedFields: {
+  HarnessInstallStarted: { harnessId: identity, operationRequestId: identity },
+  HarnessInstallFinished: { harnessId: identity, operationRequestId: identity, state: identity },
   QuestionAsked: requestLinks, PermissionRequested: requestLinks,
   "project.OwnerTaskNotificationPlanned": { notificationId: identity, projectId: identity, taskId: identity, targetAgentId: identity },
   "project.DesignRecorded": { projectId: identity, revisionId: identity, fileFingerprint: identity, tokensFingerprint: identity,
