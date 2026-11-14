@@ -12308,3 +12308,11 @@ The new browser journey found both the comment Send button and the side panel Se
 It now selects the comment form's Send button.
 The combined targeted run exited with status 143 before its terminal parity tests reported a result.
 The next request runs parity separately.
+
+## s6-mocks-3. The public API hid fixed mock refusal reasons.
+
+The second browser run received a generic refusal instead of the engine's stale-revision reason.
+The public reason list omitted that fixed mock reason.
+It also omitted fixed artifact and design reasons used by editor saves.
+The list now includes those fixed sentences without exposing paths or host errors.
+The authenticated screen and editor tests now assert stale-revision reasons across the transport.

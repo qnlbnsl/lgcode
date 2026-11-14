@@ -64,6 +64,13 @@ it.live("returns exact public reasons through the authenticated screen API", () 
   yield* api["project.mocks.comment"](payload)
   const read = yield* api["project.mocks.screen.read"]({ requestId: freshRequest(), ...f.selection } as never)
   expect(read).toMatchObject({ review: { comments: [{ text: "owner feedback" }] } })
+  success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: f.revisionId, bundle: screenBundle() }))
+  const staleComment = yield* api["project.mocks.comment"]({ ...f.selection, requestId: freshRequest(), text: "stale comment" } as never).pipe(Effect.result)
+  expect(staleComment._tag).toBe("Failure")
+  if (staleComment._tag === "Failure") expect(staleComment.failure).toMatchObject({ reason: "mock revision changed; refresh and retry" })
+  const staleApproval = yield* api["project.mocks.screen.approve"]({ ...f.selection, requestId: freshRequest(), approved: true } as never).pipe(Effect.result)
+  expect(staleApproval._tag).toBe("Failure")
+  if (staleApproval._tag === "Failure") expect(staleApproval.failure).toMatchObject({ reason: "mock revision changed; refresh and retry" })
 })))
 
 it.live("approves and withdraws one screen as the owner without moving the stage or granting agents approval authority", () => provideBoard(rig, Effect.gen(function* () {

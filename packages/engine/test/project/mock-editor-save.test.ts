@@ -48,6 +48,9 @@ it.live("saves exported bytes through the authenticated owner API and records th
   expect(yield* api["project.mocks.editor.save"](payload)).toEqual(saved)
   expect(yield* readLog).toEqual(rows)
   expect(failureOf(yield* call(owner, "project.mocks.editor.save", { ...f.payload, content: exported.toString("base64") }))?.reason).toBe("mock revision changed; refresh and retry")
+  const stale = yield* api["project.mocks.editor.save"]({ ...f.payload, requestId: freshRequest(), content: exported.toString("base64") } as never).pipe(Effect.result)
+  expect(stale._tag).toBe("Failure")
+  if (stale._tag === "Failure") expect(stale.failure).toMatchObject({ reason: "mock revision changed; refresh and retry" })
   expect(readdirSync(join(rig.work, "mocks")).some((name) => name.startsWith(".lgtm-editor-"))).toBe(false)
 })))
 
