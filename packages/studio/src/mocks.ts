@@ -15,7 +15,7 @@ export function mapMocks(items: ReadonlyArray<MockRevision>, approval?: MockAppr
       return { id: s.screenId, name: s.name, note: s.summary ?? "", kind: null,
         status: (review?.approval?.approved ?? approvedAt !== null) ? "approved" : "draft", rev: head!.revisionId, updatedAt: head!.at,
         approval: review?.approval ?? null, seen: review?.seen ?? null,
-        comments: (review?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c), text: c.text, ts: c.at })),
+        comments: (review?.comments ?? []).map((c) => ({ id: c.commentId, from: author(c.author), text: c.text, ts: c.at })),
         selection: { _tag: "mock", projectId: head!.projectId, revisionId: head!.revisionId, screenId: s.screenId } }
     }),
     changes: items.slice().reverse().flatMap((r) => r.bundle.screens.map((s) => ({ id: JSON.stringify([r.revisionId, s.screenId]), screen: s.screenId, name: s.name,

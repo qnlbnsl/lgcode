@@ -12297,3 +12297,14 @@ The Mocks control assignment requires the `run-remote-test` wrapper.
 Automatic approval review rejects this session's source transfer to the remote test computer.
 The lead will run the requested checks from this worktree and return their output.
 The builder records exact commands in `.foundry/test-request.txt`.
+
+## s6-mocks-2. The first Mocks check found incorrect comment authors and ambiguous test controls.
+
+The comment mapper passed a complete comment to the author mapper.
+It now passes the comment's author.
+The Studio source tests used the browser's URL class for filesystem paths.
+They now use repository-relative paths, as the existing Studio tests do.
+The new browser journey found both the comment Send button and the side panel Send button.
+It now selects the comment form's Send button.
+The combined targeted run exited with status 143 before its terminal parity tests reported a result.
+The next request runs parity separately.

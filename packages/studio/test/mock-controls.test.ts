@@ -13,7 +13,7 @@ it("maps persisted screen comments as plain text from the exact revision", () =>
 })
 
 it("connects the copied screen and fails closed when its reference markup changes", () => {
-  const source = readFileSync(new URL("../../../design/mock/js/screens/mocks.js", import.meta.url), "utf8")
+  const source = readFileSync("design/mock/js/screens/mocks.js", "utf8")
   const wired = mockControlsSource("js/screens/mocks.js", source)
   expect(wired).toContain("controls.comment(p, sc, text)")
   expect(wired).toContain("'Sending…'")
@@ -22,7 +22,7 @@ it("connects the copied screen and fails closed when its reference markup change
 })
 
 it("loads authenticated feedback before accepting a consistent mock snapshot", () => {
-  const source = readFileSync(new URL("../../../design/mock/js/live/mocks.js", import.meta.url), "utf8")
+  const source = readFileSync("design/mock/js/live/mocks.js", "utf8")
   const wired = mockControlsSource("js/live/mocks.js", source)
   expect(wired.indexOf("project.mocks.screen.read")).toBeLessThan(wired.indexOf("const final ="))
   expect(wired).toContain("mapMocks(items, approval, reviews)")

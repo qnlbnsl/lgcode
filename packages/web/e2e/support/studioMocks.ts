@@ -53,7 +53,7 @@ export async function exerciseStudioMocks(page: Page) {
           await page.goto(screen)
           const comment = '<script>plain owner comment</script> $(touch escaped) ../../outside'
           await page.getByRole("textbox", { name: "Comment", exact: true }).fill(comment)
-          await page.getByRole("button", { name: "Send", exact: true }).click()
+          await page.locator(".mk-say").getByRole("button", { name: "Send", exact: true }).click()
           await expect(page.getByRole("button", { name: "Sending…", exact: true })).toBeDisabled()
           await expect(page.locator(".mk-comments ol")).not.toContainText(comment)
           releaseComment()
@@ -63,7 +63,7 @@ export async function exerciseStudioMocks(page: Page) {
           await expect(page.locator(".mk-comments ol")).toContainText(comment)
           rejectComment = true
           await page.getByRole("textbox", { name: "Comment", exact: true }).fill("Refused comment")
-          await page.getByRole("button", { name: "Send", exact: true }).click()
+          await page.locator(".mk-say").getByRole("button", { name: "Send", exact: true }).click()
           await expect(page.getByText("mock revision changed; refresh and retry", { exact: true })).toBeVisible()
           await expect(page.locator(".mk-comments ol")).not.toContainText("Refused comment")
           await expect(page.getByRole("textbox", { name: "Comment", exact: true })).toHaveValue("Refused comment")
