@@ -81,8 +81,7 @@ export async function exerciseStudioGit(page: Page) {
           await expect(fileButton('Discard changes to discard.txt')).toBeEnabled()
           await fileClick('Discard changes to discard.txt')
           await page.getByRole('dialog').getByRole('button', { name: 'Discard', exact: true }).click()
-          // A removed row is published before the discard's complete readback.
-          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
+          await expect(page.getByRole('dialog')).toHaveCount(0)
           await expect(page.getByRole('button', { name: 'Stage discard.txt', exact: true })).toHaveCount(0)
           await fileClick('Stage file.txt')
           await page.getByRole('textbox', { name: 'Commit message', exact: true }).fill('Browser committed change')
@@ -121,8 +120,6 @@ export async function exerciseStudioGit(page: Page) {
           await page.getByRole('textbox', { name: 'What should change?', exact: true }).fill('Please verify the builder changes.')
           await page.getByRole('dialog').locator('form').getByRole('button', { name: 'Send back', exact: true }).click()
           await expect(page.getByRole('dialog')).toHaveCount(0)
-          // Closing the dialog precedes the send-back action's workspace readback.
-          await expect(page.locator('.git')).toHaveAttribute('aria-busy', 'false')
           expect(git(rig.work, 'log', '-1', '--format=%s')).toBe('Initial')
           await page.getByRole('button', { name: 'Open merge review', exact: true }).click()
           await page.getByRole('button', { name: 'Approve without evidence', exact: true }).click()
@@ -162,6 +159,8 @@ export async function exerciseStudioGit(page: Page) {
           await page.getByRole('tablist', { name: 'Git views' }).getByRole('button', { name: /^Conflicts/ }).click()
           await page.getByRole('button', { name: 'Reopen', exact: true }).click()
           await page.getByRole('dialog').getByRole('button', { name: 'Reopen file', exact: true }).click()
+          // The owner sees Reopening until the conflict selection is ready.
+          await expect(page.getByRole('dialog')).toHaveCount(0)
           await page.getByRole('button', { name: 'Use both', exact: true }).click()
           await page.getByRole('button', { name: 'Mark resolved', exact: true }).click()
           await expect(page.getByRole('button', { name: 'Stage all', exact: true })).toBeEnabled()

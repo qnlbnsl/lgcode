@@ -13241,3 +13241,102 @@ The editor-save redaction check scans decoded export bytes as text.
 A secret inside a compressed `.fig` export is not detected by that check.
 The review found this limitation and asked that it be recorded for the owner.
 A file signature check does not inspect compressed document contents.
+
+## 835. An explicit Git refresh could be dropped behind an automatic read.
+
+The Refresh Git button and automatic refreshes used the same git-read pending key.
+A click during an older read returned false without starting a fresh read.
+The page's owner-action busy state also remained false during that explicit refresh.
+An external merge can therefore be absent from the page when the owner expects the refresh to have completed.
+A full browser run with the old refresh and corrected owner dialogs reproduced Use both after an external merge and refresh.
+That run had 54 passes and one failure in 9.2 minutes.
+The snapshot had Conflicts selected and eventually contained the choice buttons without an owner Working state.
+The read could outlast the click budget while the journey already saw the owner-action state as idle.
+The gated regression separately proves the dropped-refresh case.
+Explicit refresh now uses the owner-action key and advances the read generation.
+An older automatic reply cannot overwrite its newer conflict state.
+Automatic reads retain their separate key and do not disable approval.
+A gated regression verifies that a held older read cannot discard the explicit refresh or replace its result.
+
+## 836. The conflict view hid an unfinished selection read.
+
+The baseline full browser run failed at Use both after reopening a resolved file.
+Its captured page had the Conflicts view open and the owner action still marked Working.
+The conflicted file said Ready while its body contained no choices.
+The page had published the conflict file list before reading the selected file's conflict parts.
+The view now says Loading conflicts while that selection is unread.
+The file list also says Loading instead of Ready.
+Choices remain disabled until their selection is loaded.
+A rendered regression holds this state and verifies the visible status and disabled resolution control.
+
+## 837. Git dialogs closed before their owner action finished.
+
+Issues 755 and 756 were worked around by journey waits after discard and send-back.
+Discard now uses the existing confirmation dialog's pending mode through its complete readback.
+Abort and reopen use that same pending mode.
+Their dialogs show Discarding, Aborting, or Reopening until completion.
+Send-back keeps its dialog open and shows Sending back until its readback and pending state finish.
+Its Cancel controls are disabled and its close callback is guarded while the action is pending.
+The two workaround waits were removed.
+The discard journey observes the visible confirmation closing instead.
+Unit regressions hold readback and verify that the dialogs remain open.
+No timeout was raised.
+
+## 838. The baseline admin journey lost its changed heartbeat value once.
+
+The unmodified d34b903 full browser run failed in admin-pages.spec.ts at its heartbeat assertion.
+The input showed 25 after the test filled 30, blurred the input, and clicked Refresh settings.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+This page is outside the current Git assignment and was not changed.
+
+## 839. The baseline thread journey observed no permission answer once.
+
+The unmodified d34b903 full browser run failed in thread-browser.spec.ts after its permission clicks.
+The fake runner had zero answerPermission calls instead of one within five seconds.
+The snapshot still showed the open permission request.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+The Git page changes do not change this thread implementation.
+This finding remains outside the current Git assignment.
+
+
+## 840. The Git journey clicked past the visible reopening confirmation.
+
+The first full browser validation with the page fixes passed the external-merge refresh boundary.
+It later attempted Use both immediately after confirming Reopen.
+That step still had only its ten-second click budget while the owner was being shown a retained confirmation and a loading conflict view.
+The end snapshot contains the Reopen confirmation and Loading conflicts.
+It also contains a socket-unavailable toast after the failed test began shutting down its service.
+The complete output had 54 passes and one failure in 10.1 minutes.
+The journey now observes the reopening confirmation closing before choosing lines.
+An owner sees that same progress and waits for the dialog to finish.
+This wait uses the existing expectation budget and raises no timeout.
+The page fix itself is unchanged.
+
+
+## 841. Git action readback reread every unrelated worktree in sequence.
+
+The first complete validation on 7c37033 passed all 55 browser cases in 10.5 minutes.
+Its Git journey took 5.8 minutes.
+The second run passed the external-merge and reopening steps but exceeded the whole journey's unchanged six-minute limit during final approval.
+The end snapshot showed that final review with current passed evidence and an owner readback still marked Working.
+That run had 54 passes and one failure in 10.6 minutes.
+Each mutation had reread the project, its teams, its builders, and its base even when only one checkout changed.
+Stage, unstage, discard, resolution, reopening, and send-back now read back their selected checkout.
+Operations that can move a branch head retain the complete project readback because sibling parent-relative counts can change.
+The Git worktree picker refreshes the chosen checkout before its owner controls become available.
+Other checkouts retain their cache across index-only changes.
+Explicit and automatic project refreshes retain their complete workspace reads.
+Regressions hold an unrelated checkout during staging, retain all sibling reads after integration, and require fresh Git state through the Git picker.
+No engine gate, authorization check, Git command, or timeout is changed.
+
+
+## 842. The global inspection selector does not call the Git detail reader.
+
+The global inspection menu in the copied app updates the selected branch directly.
+The Git worktree picker calls the Git selection action and refreshes its records.
+Selecting an unread checkout through the global menu can therefore show cached file rows without loading their details.
+This path was already present on the assigned baseline.
+The current assignment keeps out of the app source and does not change that global menu.
+The owner can use the Git worktree picker or Refresh Git for a fresh read.
