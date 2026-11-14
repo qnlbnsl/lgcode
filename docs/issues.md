@@ -12868,3 +12868,23 @@ A change made during the version probe could therefore become the accepted insta
 The installer now validates the whole tree against the first receipt after the probe.
 A changed tree is refused and removed.
 Only the version field of a valid receipt is updated.
+
+## 798. Model-choice replies erased harness installation details after the merge.
+
+The merged website first read installation status and recipes correctly.
+A later model-choice reply replaced the entire harness entry with its model fields.
+This removed the installed flag and made Add account request a recipe for an already installed custom harness.
+It also replaced the recipe's display name with the harness identifier.
+The live build now combines each model update with the current choices, installation status and recipes.
+A regression executes the built website's actions with delayed model replies.
+It checks both the installed flag and the recipe's display name after the replies arrive.
+
+## 799. The explicit defaults bookmark lost its harness model editor after the merge.
+
+The Harnesses page owns the shared defaults editor.
+The existing explicit /settings?section=defaults bookmark still has callers that edit harness defaults.
+After the merge, that address showed only the remaining service defaults.
+The live copy now includes the shared harness defaults editor for that explicit bookmark.
+The ordinary Service settings address and the standalone sample keep their current layouts.
+The editor uses the same asynchronous model reports on both addresses.
+The browser journey is unchanged.

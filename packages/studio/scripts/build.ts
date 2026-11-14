@@ -1,5 +1,6 @@
 import { gitActionsSource } from "./gitActions.ts"
 import { harnessChoicesSource } from "./harnessChoices.ts"
+import { harnessIntegrationSource } from "./harnessIntegration.ts"
 // Builds the live website into packages/studio/dist, which the engine serves at /studio/.
 //
 // 1. It copies the website from design/mock. The folders that are links there, fonts and
@@ -74,7 +75,7 @@ export async function buildStudio(dist = defaultDist): Promise<string> {
   for (const part of parts) cpSync(join(mock, part), join(dist, part), { recursive: true, dereference: true })
   for (const path of ["js/screens/git.js", "js/actions.js", "js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
     const target = join(dist, path)
-    writeFileSync(target, gitActionsSource(path, harnessChoicesSource(path, readFileSync(target, "utf8"))))
+    writeFileSync(target, gitActionsSource(path, harnessIntegrationSource(path, harnessChoicesSource(path, readFileSync(target, "utf8")))))
   }
 
   writeFileSync(join(dist, "js/workflow-contracts.js"), contracts)
