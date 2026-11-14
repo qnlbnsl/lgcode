@@ -61,7 +61,8 @@ export const planGitOperation = (input: Input, name: string, payload: Record<str
     const observed = yield* withGit(input, (git) => Effect.gen(function* () {
       const source = yield* workspacePath(input, payload, git)
       const before = yield* gitCall(git.mutationIdentity(source.path))
-      const destination = payload.destinationId === undefined ? undefined : yield* workspacePath(input, { ...payload, worktreeId: payload.destinationId }, git)
+      // Unscoped destinations are safe here only while these Git mutations are owner-only.
+      const destination = payload.destinationId === undefined ? undefined : yield* workspacePath(input, { worktreeId: payload.destinationId }, git)
       return { before, ...(destination === undefined ? {} : { destination: yield* gitCall(git.mutationIdentity(destination.path)) }) }
     }))
     const attempt: GitAttempt = { requestId: payload.requestId as GitAttempt["requestId"], bodyHash,

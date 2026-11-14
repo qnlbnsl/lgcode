@@ -14,7 +14,7 @@ export const GitChange = Schema.Struct({ path: text, originalPath: nullable, ind
 export const GitDiff = Schema.Struct({ patch: text, additions: count, deletions: count, binary: Schema.Boolean, truncated: Schema.Boolean })
 export const GitCommit = Schema.Struct({ head: text, parents: Schema.Array(text), author: text, at: text, title: text })
 export const GitCommitFile = Schema.Struct({ path: text, originalPath: nullable, status: text })
-export const GitState = Schema.Struct({ head: nullable, branch: nullable, upstream: nullable, mergeHead: nullable, ahead: count, behind: count, pending: count, pendingSince: nullable })
+export const GitState = Schema.Struct({ head: nullable, branch: nullable, upstream: nullable, mergeHead: nullable, ahead: count, behind: count, behindParent: Schema.optionalKey(count), pending: count, pendingSince: nullable })
 export const GitChoice = Schema.Literals(["ours", "theirs", "both"])
 export const GitSelection = Schema.Struct({ path: ProjectPath, fingerprint: ProjectName, head: ProjectName, choices: Schema.Array(Schema.NullOr(GitChoice)).check(Schema.isMaxLength(8192)) })
 export const GitConflict = Schema.Struct({ ...GitSelection.fields, ours: text, base: text, theirs: text,
@@ -41,7 +41,7 @@ export const GitApprovalDecision = Schema.Literals(["approve", "approve_without_
 export const GitMainReview = Schema.Struct({ reviewId: RequestId, projectId: ProjectId, worktreeId: WorkspaceId,
   destinationId: WorkspaceId, head: ProjectName, baseHead: ProjectName, branch: ProjectName, base: ProjectName,
   evidence: GitEvidenceSet, openedAt: EpochMilliseconds,
-  decision: Schema.NullOr(GitApprovalDecision), outcome: Schema.Literals(["open", "merged", "refused"]),
+  decision: Schema.NullOr(GitApprovalDecision), outcome: Schema.Literals(["open", "merged", "refused", "sent_back"]),
   mergeHead: nullable, reason: nullable, decidedAt: Schema.NullOr(EpochMilliseconds) })
 export type GitMainReview = typeof GitMainReview.Type
 // Durable evidence of an admitted operation, before external Git can change.
@@ -80,6 +80,10 @@ export const ProjectGitRpcGroup = RpcGroup.make(
   Rpc.make("pull", { payload: workspace, success: ack, error }),
   Rpc.make("push", { payload: workspace, success: ack, error }),
   Rpc.make("integrate", { payload: { ...workspace, destinationId: WorkspaceId, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text })), error }),
+  Rpc.make("update", { payload: { ...workspace, destinationId: WorkspaceId, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text })), error }),
+  Rpc.make("merge.abort", { payload: { ...workspace, expectedHead: ProjectName, expectedMergeHead: ProjectName, confirmed: Schema.Boolean }, success: ack, error }),
+  Rpc.make("conflict.resolved", { payload: workspace, success: reply(items(Schema.Struct({ path: ProjectPath, fingerprint: ProjectName }))), error }),
+  Rpc.make("conflict.reopen", { payload: { ...workspace, path: ProjectPath, expectedHead: ProjectName, expectedMergeHead: ProjectName, fingerprint: ProjectName, confirmed: Schema.Boolean }, success: ack, error }),
   Rpc.make("review", { payload: { ...workspace, base: ProjectName }, success: readReply(GitReview), error }),
   Rpc.make("review.report", { payload: { ...workspace, projectId: ProjectId, head: ProjectName, kind: GitEvidenceKind,
     status: GitEvidenceStatus, summary: ProjectText, threadAgentId: AgentId, threadSequence: EventSequence }, success: ack, error }),
@@ -90,6 +94,7 @@ export const ProjectGitRpcGroup = RpcGroup.make(
   Rpc.make("review.approve", { payload: { ...workspace, projectId: ProjectId, reviewId: RequestId,
     expectedHead: ProjectName, expectedBaseHead: ProjectName, confirmed: Schema.Boolean, decision: GitApprovalDecision },
     success: reply(GitMainReview), error }),
+  Rpc.make("review.decline", { payload: { ...workspace, projectId: ProjectId, reviewId: RequestId, expectedHead: ProjectName, expectedBaseHead: ProjectName, reason: ProjectText }, success: reply(GitMainReview), error }),
   Rpc.make("conflict", { payload: { ...workspace, path: ProjectPath }, success: readReply(GitConflict), error }),
   Rpc.make("conflict.choose", { payload: { ...workspace, selection: GitSelection, hunk: count, choice: GitChoice }, success: reply(GitConflict), error }),
   Rpc.make("conflict.resolve", { payload: { ...workspace, selection: GitSelection }, success: ack, error })
@@ -100,6 +105,7 @@ export const projectGitAccess = {
   "project.repository.discover": owner, "project.branches": owner, "project.checkouts": owner,
   "project.changes": member, "project.diff": member, "project.history": member, "project.commit.files": member, "project.git.state": member,
   "project.stage": owner, "project.unstage": owner, "project.stage.all": owner, "project.unstage.all": owner, "project.discard.plan": owner, "project.discard": owner,
+  "project.update": owner, "project.merge.abort": owner, "project.conflict.resolved": owner, "project.conflict.reopen": owner, "project.review.decline": owner,
   "project.commit": owner, "project.fetch": owner, "project.pull": owner, "project.push": owner, "project.integrate": owner, "project.review": member,
   "project.conflict": member, "project.conflict.choose": owner, "project.conflict.resolve": owner,
   "project.review.report": member, "project.review.prepare": owner, "project.review.status": member, "project.review.approve": owner

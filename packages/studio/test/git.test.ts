@@ -140,3 +140,15 @@ it('maps held notifications ahead of a failed carrier result', () => {
   const alert = { alertId: 'held', kind: 'question', status: 'open', raisedAt: 1, held: true, deliveries: [{ carrier: 'email', status: 'failed', generation: 2, attempt: 1, reason: 'carrier delivery failed', final: false }] } as unknown as Alert
   expect(mapAlerts([alert], [])[0]).toMatchObject({ delivery: 'quiet', carrier: 'email', generation: 2, attempt: 1 })
 })
+
+
+it('s4-git2: maps a registered builder checkout to its team and preserves parent lag', () => {
+  const base = { worktreeId: 'base', repoId: 'repo', branch: 'main', checkout: 'main' } as import('@lgtm/contracts').Workspace;
+  const source = { worktreeId: 'source', repoId: 'repo', branch: 'project', checkout: 'worktree', parentId: 'base' } as import('@lgtm/contracts').Workspace;
+  const team = { worktreeId: 'team', repoId: 'repo', branch: 'build', parentId: 'source' } as import('@lgtm/contracts').Workspace;
+  const builder = { worktreeId: 'builder', repoId: 'repo', branch: 'builder', parentId: 'team' } as import('@lgtm/contracts').Workspace;
+  const projects = [{ projectId: 'project', worktreeId: 'source' }] as import('@lgtm/contracts').Project[];
+  const teams = [{ projectId: 'project', teamId: 'build', worktreeId: 'team' }] as import('@lgtm/contracts').Team[];
+  expect(workspaceIdentity(builder, [base, source, team, builder], projects, teams)).toMatchObject({ kind: 'agent', project: 'project', team: 'build', parentId: 'team', parent: 'build' });
+  expect(mapGitState({ pending: 2, behindParent: 3, ahead: 0, behind: 0 } as unknown as typeof GitState.Type, 'main')).toMatchObject({ ahead: 2, behind: 3 });
+});

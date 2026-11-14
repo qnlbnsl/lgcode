@@ -12291,6 +12291,263 @@ The page now waits for the live connection before its first list request.
 It preserves an already loaded draft when the connection recovers.
 A deterministic Studio unit test covers startup and reconnection.
 
+
+## 734. Merge abort and conflict reopening were not connected.
+
+The live Git page refused both controls.
+The engine now exposes owner-only requests for the expected active merge.
+Abort uses Git's merge abort command after checking both heads and explicit confirmation.
+Reopening uses Git's resolve-undo index extension and restores the canonical three-way conflict.
+The resolved file list survives a page reload and service reconstruction.
+An inactive merge, a stale head, and an unsafe file path are refused.
+Unsupported conflict kinds retain the terminal workflow.
+
+## 735. Parent updates and builder integrations were missing.
+
+The Git page did not report how many commits a workspace was behind its parent.
+The state reply now carries that count separately from the remote count.
+A parent update uses the registered workspace relationship and the existing bounded integration operation.
+A registered worktree whose parent is a registered team can integrate into that team.
+The page maps that checkout as an agent worktree.
+Optional project, team, and owner text does not establish the integration relationship.
+Dirty source or destination workspaces still refuse the merge.
+A conflict remains available in the ordinary conflict view.
+
+## 736. Sending a main review back lost the owner's reason.
+
+The review had no sent-back state or connected action.
+The owner can now decline the exact open review with a nonblank reason.
+The decision and the addressed board post are stored in one writer transaction.
+The board planner retains its own namespace and access checks.
+An identical retry returns the original receipt without another post.
+The built merge dialog reuses the existing send-back control and reason form styles.
+The design reference is unchanged.
+
+## 737. Git message generation has no configured execution boundary.
+
+ProjectSettings has no Git text-model or account selection.
+The live service mapping's gitModel value is an empty placeholder.
+The runner has a temporary discovery operation, but it sends no prompt and returns only choices.
+Ordinary prompts require a registered agent, an incarnation, a delivery, and durable thread routing.
+There is no bounded short task that returns generated Git text with an owner-selected account and model.
+Commit and pull request generation therefore retain their existing refusal.
+This assignment adds no implicit account selection and sends no repository content to a model.
+
+## 738. Hosted pull request editing has no stored provider record.
+
+GitMainReview is a local approval record for a reviewed pair of heads.
+It has no hosted pull request number, provider identity, title, or body.
+The Git service can read local review evidence and merge it with owner approval.
+It does not create a hosted pull request.
+No authenticated provider update operation exists in the engine.
+The title and body controls therefore retain their refusal.
+A hosted record and a bounded authenticated provider action are prerequisites for connecting them.
+
+
+## 739. The required local live check passed sixteen of twenty-three steps.
+
+The run used private service state under `/tmp/lgtm-live-b15F6M`.
+It did not use the owner's service on port 8787.
+The removed-variables, state-read, always-allow, permission-kinds, reload, and token-scan checks failed.
+The recording step was skipped because earlier checks failed.
+The final comparison of rebuilt views and secret scanning of events, replies, and output passed.
+The token-scan check separately reported an agent token in a harness session file or process arguments.
+These harness findings are outside this Git assignment.
+The complete bounded output is retained in the worker's result logs.
+The assignment's earlier reference count was nineteen of twenty-three.
+
+
+## 740. Competing review decisions need one workspace operation lane.
+
+The first send-back implementation used the writer transaction alone.
+A regression held an owner merge open and showed that a decline could record sent-back before that merge finished.
+The decline now acquires the same workspace operation lane as prepare and approve.
+It rechecks the stored review after the earlier operation ends.
+A completed approval makes the queued decline refuse without posting a reason.
+
+
+## 741. The Git journey clicked approval during a background refresh.
+
+Opening a main review finishes the comparison and evidence reads before recording an open review.
+The engine has no later transition that makes that review ready.
+The resulting project snapshot schedules the page's Git refresh after one hundred milliseconds.
+That refresh reads the project's workspaces and the selected file details through the same pending key as mutations.
+The merge dialog disables approval while that key is pending.
+The dialog can therefore be visible while its approval button remains disabled for the duration of those reads.
+A loaded computer can exhaust the journey's ten-second click budget in that state.
+A gated page regression reproduces an open review with a pending background read.
+The Git journey now waits for the existing aria-busy state to become false after opening each merge review.
+It uses the existing assertion budget and does not raise a timeout.
+No separate engine readiness delay was found.
+
+## 742. The builder mapping initially lost legacy team display metadata.
+
+The broader regression run found that callers without the optional team list displayed a team workspace as a project workspace.
+The mapping now retains the existing workspace team identifier as a display fallback.
+A registered builder parent still takes precedence in the page mapping.
+The engine continues to require the registered parent relationship for integration authority.
+
+## 743. The first send-back composition dropped board withdrawals.
+
+Review of df9e486 found that tag-prefix filtering discarded an unprefixed DeliveryWithdrawn event.
+The named composition now checks the complete board plan before appending its final project decision.
+It retains the board planner's event order and deliveries.
+It rejects an afterCommit hook and side rows outside the board namespace through the ordinary checks.
+A regression replaces an earlier queued lead wake and verifies its withdrawal in the same decision transaction.
+Separate malformed planner tests verify both boundary refusals.
+
+## 744. A sent-back review did not wake an idle lead.
+
+The original addressed notice required no reply and created no independent wake duty.
+The post now requires a reply from the recorded project lead.
+A regression verifies a queued board delivery containing the reason without any earlier duty.
+A stopped, missing, crashed, or unavailable interrupted lead makes the decision refuse.
+The fixed reason says that the project lead is unavailable and the review was not sent back.
+The stored review remains open in that case.
+This refusal policy is an implementation choice for the owner to review.
+
+## 745. Parent updates incorrectly required a clean parent checkout.
+
+The parent supplies only a committed object and is not mutated by an update.
+The dedicated update operation now shares the integration implementation without its source cleanliness requirement.
+The child must still be clean.
+The expected parent head and the common repository must still match.
+Tests retain uncommitted and untracked parent files while integrating its committed changes.
+The existing builder and team integrations retain their source cleanliness checks.
+
+## 746. Reopening a conflict could discard an edit made after resolution.
+
+The resolved file read now returns a bounded content fingerprint with each path.
+The reopening request requires that observation and explicit confirmation.
+The page captures the observation before asking for confirmation.
+The confirmation says that the current file contents are replaced.
+An edit since that observation returns the fixed stale-state refusal and preserves the edit.
+The ordinary filesystem race limit documented in issue 49 still applies.
+
+## 747. An unsafe resolved path could hide the rest of a merge.
+
+A resolved file can later become a directory, a symbolic link, or a member of a nested checkout.
+The resolved file read now skips such paths and returns the other safe files.
+Unreadable and oversized individual files are also omitted from the bounded list.
+The reopening operation continues to validate its requested path independently.
+Regressions cover each unsafe kind while retaining another resolved file.
+
+## 748. Background Git reads disabled owner controls.
+
+Review rejected the idle-state wait introduced in 741 because its debounce remained racy.
+The built page now tracks automatic refreshes under a separate Git read key.
+Only an owner action in flight sets the pending key used to disable its controls.
+The owner action invalidates earlier background reads before writing fresh state.
+The extra merge-review idle waits were removed from the browser journey.
+A rendered merge dialog regression holds a background read and verifies that approval stays enabled.
+It then starts an owner action and verifies that approval becomes disabled.
+The design reference is unchanged and the build-time replacement fails on a mismatch.
+The original full check also reproduced issue 689 at Stage file.txt after a discard.
+That run passed 8230 unit tests and 52 browser tests before this browser failure.
+
+## 749. A blocked merge abort was reported as uncertain.
+
+Git can refuse an abort when a working edit overlaps an index entry that the abort must replace.
+The service recognizes that bounded refusal only when both heads and the index entries remain unchanged.
+It returns the fixed abort_blocked reason.
+Other failed mutations retain uncertainty when their outcome is not proved.
+A wire test verifies that the refusal is replayable and leaves no pending attempt.
+The abort confirmation now says that files added during the merge are removed.
+A changed-index test verifies that Git removes a newly staged file and restores the original clean state.
+
+## 750. Builder Git reads currently have project-wide access.
+
+The workspace mapping added in df9e486 widened the existing project Git read scope to builder worktrees under registered teams.
+Every authenticated agent assigned to that project can read those builder worktrees through changes, diff, history, commit.files, git.state, review, and conflict.
+This includes a project agent in another team.
+An outsider cannot read them by supplying the project identifier.
+A project agent cannot use those requests to read the repository base checkout.
+The owner can read registered local workspaces independently of project membership.
+A wire regression pins these cases across all seven read requests.
+The policy is recorded for the owner to rule on and is not changed by this review fix.
+
+## 751. Unscoped Git destination lookup relies on owner-only access.
+
+Integration, parent update, and durable attempt admission resolve their registered destination without inheriting the source project's scope.
+That lookup is safe only while these mutations remain owner-only.
+Comments now state this dependency at each lookup.
+The requests still validate the registered relationship and repository identity.
+The authenticated agent refusal regression pins the new owner-only requests.
+A future access change must review the destination lookup as well.
+
+## 752. Builder integration holds the source workspace operation lane.
+
+Builder-into-team integration mutates the team checkout while holding the builder's operation lane.
+The shared Git gate bounds individual external operations but does not make the team lane its operation owner.
+This can matter when another command targets the team during the integration.
+The review explicitly requested recording this issue without changing the lane.
+The source lane is retained for the owner's ruling.
+
+## 753. The live-check difference matches the documented Codex-seat context.
+
+The three additional failures compared with the nineteen-of-twenty-three reference are state-read, permission-kinds, and reload.
+The reference failures were removed-variables, always-allow, and token-scan.
+Issue 526 records the same sixteen-of-twenty-three outcome inside a Codex seat at unchanged application code.
+The new run reports that Claude did not attempt the requested state command or expose permission options.
+It also reports that Claude ended the hold turn without the exact restart command.
+These Git changes do not alter the live-check probes, runner, or permission implementation.
+Those probes do not call the new Git requests.
+The available evidence attributes these extra failures to the already documented harness execution context rather than the Git change.
+The sixteen-of-twenty-three run remains evidence from this worker and is not substituted for the manager's baseline.
+
+## 754. New fixed Git refusals were hidden by the public reason allowlist.
+
+Exact wire assertions found that the blank reason, unavailable lead, invalid parent, and inactive merge cases reached the client as command refused.
+The public allowlist now includes their fixed messages and abort_blocked.
+No caller text, filesystem path, or subprocess diagnostic is exposed by these additions.
+
+
+## 755. The Git journey staged a file before its preceding discard completed.
+
+The review's final full check again reproduced issue 689 at Stage file.txt.
+All 8256 unit tests and the other 52 browser tests passed.
+The five consecutive isolated Git journeys had also passed.
+Discard publishes the selected project's changed file list before finishing its reads of the other workspaces.
+The journey waited only for the discarded row to disappear.
+It could therefore attempt its next owner action while the preceding discard still held the owner's pending key.
+The journey now waits for that preceding action's existing aria-busy state to become false after confirmation.
+This is separate from the removed merge-review background-read wait.
+No timeout is raised and automatic reads still do not disable owner controls.
+The final full-check failure is retained in the handoff.
+
+
+## 756. The Git journey reopened review before send-back completed.
+
+The browser-only rerun passed the corrected discard boundary and failed at the second Open merge review action.
+The send-back operation closes its dialog before completing its workspace readback.
+The journey treated the closed dialog as completion and could start another action while send-back still held the owner's pending key.
+The journey now waits for that preceding owner action's existing aria-busy state to become false.
+This wait is before opening the next review, rather than after opening a review during an automatic refresh.
+The production background-read fix is unchanged.
+No timeout is raised.
+The failed browser-only run had 52 passes and one failure in 7.6 minutes.
+
+## 757. The terminal parity test read a generated file and hung the full check.
+
+`packages/cli/test/parity.test.ts` read the default workflow from `design/mock/workflows/build-loop.json`.
+The Studio build generates that file, and Git ignored it.
+A fresh checkout on the remote test computer had no such file.
+The test then waited without ending, and the full check on `75e05c8` produced no output for 43 minutes.
+The 60-second test limit did not end the test.
+The test now reads the engine's own file, `packages/engine/src/workflows/build-loop.json`.
+The reason the test limit did not fire is not yet known.
+
+## 758. The mock could not open in a fresh checkout without a Studio build.
+
+`design/mock/js/app.js` imports the "Workflows" screen.
+That screen imports `design/mock/vendor/workflow-contracts.js` and fetches `design/mock/workflows/build-loop.json`.
+The Studio build generates both files, and Git ignored them.
+The mock opened on its own would fail to load until someone ran the build.
+Both files are now committed.
+They can fall behind `packages/contracts/src/workflows.ts` and the engine's default workflow until the build is run again.
+No test yet fails when they fall behind.
+
+
 ## s6-settings-1. Service updates remain manual.
 
 The service settings page does not download or execute an update.
@@ -12384,3 +12641,24 @@ The fixture passed an empty snapshot to the workflow handlers.
 Reading the saved workflow folder now requires the normal project view.
 The fixture now supplies an empty project view and its private state folder.
 Its real redactor and secret assertions remain unchanged.
+
+## s6-settings-11. The heartbeat save race recurred in the settings full check.
+
+The settings full check passed all 552 unit files and 8,303 tests.
+Two unit tests were skipped.
+The browser run passed 53 journeys and failed two.
+The existing service-settings journey failed at `studioService.ts:74` after saving a 31-second heartbeat.
+This is the same unsaved-state failure recorded in issue 727.
+The unchanged journey passed in the targeted retry.
+The new settings journey passed both times.
+The full check remains a failed run.
+
+## s6-settings-12. The existing email journey could not find its Notifications heading.
+
+The settings full browser run failed the existing email journey.
+The targeted retry reproduced the failure.
+The error says that the Notifications heading was not found.
+The reported source location maps to `studioNotifications.ts:73` instead of the heading assertion.
+The failure therefore does not establish that email credentials were saved or tested.
+The standalone sample journey passed in the full browser run.
+The cause of this email journey failure remains unconfirmed.

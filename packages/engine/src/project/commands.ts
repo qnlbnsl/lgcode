@@ -1,4 +1,5 @@
 import { validateWorkflowFolder, workflowFolderReason } from "../workflows/folder.ts"
+import { declineMainReview } from "./gitReview.ts"
 import { randomUUID } from "node:crypto"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
@@ -331,6 +332,7 @@ const taskHistory: ReadHandler = (input, raw) => Effect.gen(function* () {
 })
 export const projectPlanners = {
   "project.settings.set": settingsSet, "project.repository.add": repositoryAdd(), "project.repository.locate": repositoryLocate(),
+  "project.review.decline": declineMainReview,
   "project.workspace.register": workspaceRegister(), "project.rename": rename, "project.place": place,
   "project.goal.set": goalSet, "project.restore": restore, "project.preferences.set": preferencesSet, "project.stage.set": stageSet, "project.team.create": teamCreate,
   "project.sprint.create": sprintCreate, "project.sprint.update": sprintUpdate, "project.sprint.complete": sprintComplete,

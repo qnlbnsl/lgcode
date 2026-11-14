@@ -96,7 +96,7 @@ export function mapCommitFiles(files: ReadonlyArray<typeof GitCommitFile.Type>) 
 }
 export function mapGitState(state: typeof GitState.Type, parent: string | null) {
   return { head: state.head, upstream: state.upstream, remoteAhead: state.ahead, remoteBehind: state.behind,
-    ahead: parent ? state.pending : state.ahead, behind: null, mergeHead: state.mergeHead, pendingSince: state.pendingSince }
+    ahead: parent ? state.pending : state.ahead, behind: parent ? state.behindParent ?? null : null, mergeHead: state.mergeHead, pendingSince: state.pendingSince }
 }
 export function mapConflict(conflict: typeof GitConflict.Type) {
   let hunk = 0
@@ -109,7 +109,7 @@ export function mapMainReview(review: GitMainReview, comparison: typeof GitRevie
     sub: slot.report?.summary ?? '', agent: slot.report?.reportedBy._tag === 'agent' ? slot.report.reportedBy.agentId : null })
   return { id: review.reviewId, kind: 'merge', project: review.projectId, agent: lead, worktreeId: review.worktreeId, destinationId: review.destinationId,
     title: `Merge ${review.branch} into ${review.base}`, source: review.branch, target: review.base, head: review.head, baseHead: review.baseHead,
-    status: review.outcome === 'open' ? 'open' : 'answered', outcome: review.outcome, answer: review.outcome === 'merged' ? 'Merged' : review.reason ?? '',
+    status: review.outcome === 'open' ? 'open' : 'answered', outcome: review.outcome, answer: review.outcome === 'merged' ? 'Merged' : review.outcome === 'sent_back' ? 'Sent back: ' + (review.reason ?? '') : review.reason ?? '',
     answeredAt: review.decidedAt, createdAt: review.openedAt, brief: '', body: '', notice: '',
     evidence: { tests: evidence(review.evidence.tests), review: evidence(review.evidence.review), commits: comparison?.commits.items.length ?? null,
       files: comparison?.files.items.length ?? null, add: comparison?.diff.additions, del: comparison?.diff.deletions, conflicts: null },
@@ -121,9 +121,10 @@ import type { Workspace, Project, Team } from '@lgtm/contracts'
 // need not carry projectId or teamId, especially when registered by the owner.
 export function workspaceIdentity(row: Workspace, workspaces: ReadonlyArray<Workspace>, projects: ReadonlyArray<Project>, teams: ReadonlyArray<Team>) {
   const team = teams.find((t) => t.worktreeId === row.worktreeId && projects.find((p) => p.projectId === t.projectId)?.worktreeId !== row.worktreeId)
-  const project = projects.find((p) => p.worktreeId === row.worktreeId || p.projectId === (row.projectId ?? team?.projectId))
-  const kind = row.checkout === 'main' ? 'base' : team || row.teamId ? 'team' : project ? 'project' : 'base'
+  const builderTeam = teams.find((t) => t.worktreeId === row.parentId && workspaces.find((w) => w.worktreeId === row.parentId)?.repoId === row.repoId)
+  const project = projects.find((p) => p.worktreeId === row.worktreeId || p.projectId === (team?.projectId ?? builderTeam?.projectId ?? row.projectId))
+  const kind = row.checkout === 'main' ? 'base' : team ? 'team' : builderTeam ? 'agent' : row.teamId ? 'team' : project ? 'project' : 'base'
   const parent = workspaces.find((w) => w.worktreeId === row.parentId) ?? (kind === 'project' ? workspaces.find((w) => w.repoId === row.repoId && w.checkout === 'main') : undefined)
-  return { kind, project: kind === 'base' ? null : project?.projectId ?? null, team: team?.teamId ?? row.teamId ?? null,
+  return { kind, project: kind === 'base' ? null : project?.projectId ?? null, team: team?.teamId ?? builderTeam?.teamId ?? row.teamId ?? null,
     owner: row.owner ?? (kind === 'project' ? project?.leadAgentId : undefined) ?? null, parent: parent?.branch ?? null, parentId: parent?.worktreeId ?? null } as const
 }
