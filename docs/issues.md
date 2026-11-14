@@ -12677,3 +12677,16 @@ Both harnesses passed reload recovery and old-token refusal.
 The final event, reply, and output scan passed.
 The run used private state under `/tmp/lgtm-live-HIveOX`.
 The owner's service was not changed.
+
+## s6-settings-14. The merged full check failed while waiting for Use both.
+
+The merged full check passed all 554 unit files.
+It passed 8,392 unit tests and skipped two.
+The browser run passed 54 journeys and failed the Git journey.
+The failure was a ten-second click timeout at `studioGit.ts:157` while waiting for Use both.
+This is a different location from the task's known intermittent failure at line 100.
+The unchanged Git journey passed alone in 3.1 minutes.
+The credit check passed after that retry.
+The service-settings, email, new settings, and standalone sample journeys passed in the full run.
+The full check remains a failed run.
+The settings worker changed no Git timeout or implementation beyond the lead's required integration merge.
