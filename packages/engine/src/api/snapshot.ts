@@ -56,7 +56,8 @@ export const snapshot = (caller: Caller, lists: EngineLists = engineLists) => Ef
     questionsWithoutDisplay: questionRows.filter((row) => row.display === undefined).length,
     ...(caller._tag !== "agent" ? {
       accounts: Object.values(view.accounts).map((row) => ({
-        id: row.id, status: row.status, enabled: row.enabled,
+        // An account added without the flag is enabled, as account picking treats it.
+        id: row.id, status: row.status, enabled: row.enabled !== false,
         environment: Object.entries(row.environment ?? {}).map(([name, value]) => ({ name, secret: value.startsWith("secret:") })),
       })),
       waitState: {

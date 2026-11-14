@@ -1,5 +1,5 @@
 import { extname } from "node:path"
-import { DesignRegistration, DesignTokens, type RepositoryDesign, type RepositoryDesignResult } from "@lgtm/contracts"
+import { DesignRegistration, DesignTokens, type RepositoryDesign, type RepositoryDesignResult, type Workspace } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"
@@ -12,20 +12,23 @@ import { cleanName } from "./names.ts"
 import { own, projectKey, projectView } from "./view.ts"
 
 const unavailable = { _tag: "unavailable", reason: "artifact unavailable" } as const
-const bytes = (input: Input, design: RepositoryDesign["design"], projectId: string | undefined, path: string, maximum: number) => Effect.gen(function* () {
+const checkedBytes = (input: Input, workspace: Workspace, path: string, maximum: number) => Effect.gen(function* () {
   if (!validArtifactPath(path)) return yield* refused("invalid design artifact reference")
   yield* safePath(input, path)
-  return yield* withGit(input, (git) => Effect.gen(function* () {
-    const workspace = yield* designWorkspacePath(input, { repoId: design.repoId, worktreeId: design.worktreeId, ...(projectId === undefined ? {} : { projectId }) }, git)
-    return yield* Effect.tryPromise({ try: async () => {
-      const value = await smallFile(await filePath(workspace.path, path), maximum)
-      return { value, fingerprint: fingerprint(value) }
-    }, catch: () => refused("artifact unavailable") })
-  }))
+  return yield* Effect.tryPromise({ try: async () => {
+    const value = await smallFile(await filePath(workspace.path, path), maximum)
+    return { value, fingerprint: fingerprint(value) }
+  }, catch: () => refused("artifact unavailable") })
 })
-const tokens = (input: Input, design: RepositoryDesign["design"], projectId: string | undefined) => Effect.gen(function* () {
+const bytes = (input: Input, design: RepositoryDesign["design"], projectId: string | undefined, path: string, maximum: number) => withGit(input, (git) => Effect.gen(function* () {
+  const workspace = yield* designWorkspacePath(input, { repoId: design.repoId, worktreeId: design.worktreeId, ...(projectId === undefined ? {} : { projectId }) }, git)
+  return yield* checkedBytes(input, workspace, path, maximum)
+}))
+type ReadBytes = (path: string, maximum: number) => ReturnType<typeof checkedBytes>
+const tokens = (input: Input, design: RepositoryDesign["design"], projectId: string | undefined,
+  read: ReadBytes = (path, maximum) => bytes(input, design, projectId, path, maximum)) => Effect.gen(function* () {
   if (design.tokensPath === undefined || extname(design.tokensPath).toLowerCase() !== ".json") return yield* refused("artifact unavailable")
-  const artifact = yield* bytes(input, design, projectId, design.tokensPath, 8192)
+  const artifact = yield* read(design.tokensPath, 8192)
   const document = yield* Effect.try({ try: () => Schema.decodeUnknownSync(DesignTokens)(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(artifact.value))), catch: () => refused("artifact unavailable") })
   const clean = { tokens: yield* Effect.forEach(document.tokens, (token) => Effect.gen(function* () {
     return { name: yield* cleanName(input, token.name), value: yield* input.runtime.log.redactText(token.value) }
@@ -33,11 +36,12 @@ const tokens = (input: Input, design: RepositoryDesign["design"], projectId: str
   if (!Schema.is(DesignTokens)(clean) || new Set(clean.tokens.map((row) => row.name)).size !== clean.tokens.length) return yield* refused("artifact unavailable")
   return { _tag: "available" as const, ...clean, fingerprint: artifact.fingerprint }
 })
-const evidence = (input: Input, record: RepositoryDesign, projectId?: string) => Effect.gen(function* () {
-  const file = yield* bytes(input, record.design, projectId, record.design.file, 1024 * 1024).pipe(Effect.result)
-  const tokenData = yield* tokens(input, record.design, projectId).pipe(Effect.result)
+const evidence = (input: Input, record: RepositoryDesign, projectId?: string,
+  read: ReadBytes = (path, maximum) => bytes(input, record.design, projectId, path, maximum)) => Effect.gen(function* () {
+  const file = yield* read(record.design.file, 1024 * 1024).pipe(Effect.result)
+  const tokenData = yield* tokens(input, record.design, projectId, read).pipe(Effect.result)
   const components = yield* Effect.forEach(record.design.components, (component) => Effect.gen(function* () {
-    const actual = yield* bytes(input, record.design, projectId, component.reference, 64 * 1024).pipe(Effect.result)
+    const actual = yield* read(component.reference, 64 * 1024).pipe(Effect.result)
     return { ...component, provenance: "shared" as const, availability: actual._tag === "Success" && actual.success.fingerprint === component.fingerprint
       ? { _tag: "available" as const, fingerprint: actual.success.fingerprint } : unavailable }
   }))
@@ -50,6 +54,17 @@ export const verifyDesignEvidence = (input: Input, record: RepositoryDesign, pro
   if (actual.file._tag !== "available" || record.design.tokensPath !== undefined && actual.tokens._tag !== "available"
     || actual.components.some((row) => row.availability._tag !== "available")) return yield* refused("registered design artifacts changed or are unavailable")
 })
+// A display request validates this exact workspace once while holding the Git
+// gate. Every artifact still receives its own bounded path, byte and fingerprint
+// checks. Nothing is retained for the next document or asset request.
+export const withVerifiedDesignEvidence = <A, E, R>(input: Input, record: RepositoryDesign, projectId: string,
+  use: (workspace: Workspace) => Effect.Effect<A, E, R>) => withGit(input, (git) => Effect.gen(function* () {
+  const workspace = yield* designWorkspacePath(input, { repoId: record.design.repoId, worktreeId: record.design.worktreeId, projectId }, git)
+  const actual = yield* evidence(input, record, projectId, (path, maximum) => checkedBytes(input, workspace, path, maximum))
+  if (actual.file._tag !== "available" || record.design.tokensPath !== undefined && actual.tokens._tag !== "available"
+    || actual.components.some((row) => row.availability._tag !== "available")) return yield* refused("registered design artifacts changed or are unavailable")
+  return yield* use(workspace)
+}))
 type RecordBytes = { readonly fileFingerprint: string; readonly tokensFingerprint?: string }
 type RecordObservation = { readonly input: Input; readonly result: import("effect/Result").Result<RecordBytes, ReturnType<typeof refused>> }
 const record = (observation?: RecordObservation): PiecePlanner => (input, raw) => Effect.gen(function* () {

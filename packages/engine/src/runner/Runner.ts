@@ -132,6 +132,8 @@ interface Spawn {
 // refuses with `RunnerRejected` when that is not its live process's
 // incarnation, so a send reserved for an earlier run never reaches a later one.
 export class Runner extends Context.Service<Runner, {
+  // Opens only a temporary session and closes its process before returning.
+  readonly discover: (input: Spawn) => Effect.Effect<AgentChoices, RunnerRejected>;
   readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;

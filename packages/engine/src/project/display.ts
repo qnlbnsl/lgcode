@@ -101,11 +101,9 @@ export const componentDisplay = (input: Input, selection: ComponentDisplaySelect
     || component === undefined || !validArtifactPath(component.reference)
     || ![".html", ".svg"].includes(extname(component.reference).toLowerCase())) return yield* refused("registered component preview is unavailable")
   // Resolve after module initialization; design readers also register API reads.
-  const { verifyDesignEvidence } = yield* Effect.promise(() => import("./design.ts"))
-  yield* verifyDesignEvidence(input, record, project.projectId)
+  const { withVerifiedDesignEvidence } = yield* Effect.promise(() => import("./design.ts"))
   yield* safePath(input, component.reference)
-  return yield* withGit(input, (git) => Effect.gen(function* () {
-    const workspace = yield* designWorkspacePath(input, { repoId: selection.repoId, worktreeId: record.design.worktreeId, projectId: project.projectId }, git)
+  return yield* withVerifiedDesignEvidence(input, record, project.projectId, (workspace) => Effect.gen(function* () {
     const artifact = yield* Effect.tryPromise({ try: async () => {
       const root = await realpath(workspace.path), file = await filePath(root, component.reference), folder = await realpath(dirname(file))
       if (folder === root || !inside(root, folder)) throw new Error()

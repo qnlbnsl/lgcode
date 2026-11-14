@@ -1,10 +1,11 @@
 // The repository's Design page: the whole design file on a near full-screen canvas under
 // one thin bar. The two menus follow the Design lead's proposed standard, saved as
 // design/mock/feedback/2026-11-10-design-categories.md. The owner has not approved it.
-import { html, useState, useEffect, useLayoutEffect, useRef, Icon, cx, update, go, href, ago, useNow, plural, clamp, FRAMED } from '../lib.js';
+import { html, useState, useEffect, useLayoutEffect, useRef, Icon, cx, update, go, href, ago, useNow, plural, clamp, FRAMED, live, refuse } from '../lib.js';
 import { ICONS } from '../icons.js';
 import { byId, agentOf, projectOf, routeForAgent } from '../data.js';
 import * as act from '../actions.js';
+import * as mocks from '../live/mocks.js';
 import { Menu, Avatar } from '../ui.js';
 
 // ---- the canvas ------------------------------------------------------------------------
@@ -65,7 +66,7 @@ const FLOWS = [
   ['Conversations', [F('Chat', null, '/p/console/chat'), F('Chat', 'Another agent', '/p/console/chat/shell-lead'), F('Messages', null, '/p/console/messages'), F('Messages', 'Waiting for a reply', '/p/console/messages/waiting'), F('Agents', null, '/p/console/agents')]],
   ['Code', [F('Terminal', null, '/p/console/terminal'), F('Git', 'Changes', '/p/console/git'), F('Git', 'History', null), F('Git', 'Conflicts', null), F('Merge review', null, null)]],
   ['Repository', [F('Repository', null, '/r/lgtm'), F('Repository design', null, '/r/lgtm/design/palette/colour')]],
-  ['Service', [F('Machines', null, '/machines'), F('Pair machine', null, null), F('Add repository', null, null), F('Subscriptions', null, '/subscriptions'), F('Add subscription', null, null), F('Phone notifications', null, '/notifications'), F('Service settings', null, '/settings')]],
+  ['Service', [F('Machines', null, '/machines'), F('Pair machine', null, null), F('Add repository', null, null), F('Subscriptions', null, '/subscriptions'), F('Add subscription', null, null), F('Notifications', null, '/notifications'), F('Service settings', null, '/settings')]],
 ];
 // Components by group. "file" marks the components that are in design/lgtm.fig today,
 // with their variants as rows by columns.
@@ -246,7 +247,8 @@ function PaletteSheet({ item, t, hasFile }) {
 }
 
 // ---- the page ----------------------------------------------------------------------------
-function itemsOf(cat, hasFile, t) {
+function itemsOf(cat, hasFile, t, design) {
+  if (live.on) return [{ name: cat === 'Screens' ? 'No flows yet' : 'Overview', n: cat === 'Components' ? design?.components.length || 0 : cat === 'Palette' ? design?.tokens.length || 0 : 0 }];
   if (cat === 'Screens') return hasFile ? FLOWS.map(([name, fr]) => ({ name, n: fr.length })) : [{ name: 'No flows yet', n: 0 }];
   if (cat === 'Components') return [{ name: 'Overview', n: hasFile ? GROUPS.reduce((a, [, cs]) => a + cs.length, 0) : 0 }, ...GROUPS.map(([g, cs]) => ({ name: g, n: hasFile ? cs.length : 0 }))];
   const f = (hasFile && t) ? t.field : {}; const count = (re) => Object.keys(f).filter((k) => re.test(k)).length;
@@ -261,34 +263,36 @@ function PickMenu({ label, value, items, onPick, unit }) {
     items=${items.map((x) => ({ label: x.name, sub: x.n == null ? '' : unit ? plural(x.n, unit) : String(x.n), checked: x.name === value, onSelect: () => onPick(x.name) }))} />`;
 }
 export function RepoDesign({ s, repoId, route }) {
+  useEffect(() => { if (live.on) void mocks.loadDesign(repoId); }, [repoId, s.boardRevision]);
   const r = byId(s.repos, repoId); const now = useNow(); const t = useTokens();
   s.design = s.design || {}; const d = r && s.design[r.id]; const hasFile = !!d;
   const catSlug = route?.parts[3]; const itemSlug = route?.parts[4];
   const cat = CATS.find((x) => slug(x) === catSlug) || 'Screens';
-  const items = itemsOf(cat, hasFile, t);
+  const items = itemsOf(cat, hasFile, t, d);
   const item = (items.find((x) => slug(x.name) === itemSlug) || items[0]).name;
   const to = (c, i) => go(`/r/${r.id}/design/${slug(c)}/${slug(i)}`);
   const ps = r ? s.projects.filter((p) => p.repo === r.id && !p.archived) : [];
   if (!r) return html`<div class="view-body"><div class="page"><p class="muted">This repository is not known.</p></div></div>`;
-  const create = () => { update(() => { s.design[r.id] = { file: `design/${r.name}.fig`, size: '12 kilobytes', pages: 1, frames: 0, changedAt: Date.now(), changedBy: null, commit: null }; r.design = true; }); act.toast(`Created design/${r.name}.fig`); };
+  const create = () => { if (live.on) { refuse(); return; } update(() => { s.design[r.id] = { file: `design/${r.name}.fig`, size: '12 kilobytes', pages: 1, frames: 0, changedAt: Date.now(), changedBy: null, commit: null }; r.design = true; }); act.toast(`Created design/${r.name}.fig`); };
   const by = d && agentOf(s, d.changedBy);
   const page = cat === 'Palette' ? (item === 'Icons' ? 'Palette / Icons' : `Variables · ${item}`) : cat === 'Screens' && item === 'No flows yet' ? 'Screens / Onboarding' : `${cat} / ${item}`;
   const flow = cat === 'Screens' ? (FLOWS.find(([n]) => n === item)?.[1] || []) : null;
-  return html`<div class="view dz">
+  return html`<div class="view dz" aria-busy=${live.on && mocks.busy('read-design:' + repoId)}>
     <div class="tabrow dz-bar" role="tablist">
       <a class="tab" role="tab" aria-selected="false" href=${href('/r/' + r.id)}>Projects<span class="count">${ps.length}</span></a>
       <a class="tab" role="tab" aria-selected="true" href=${href(`/r/${r.id}/design`)}>Design</a>
       <span class="dz-sep"></span>
-      <${PickMenu} label="Category" value=${cat} items=${CATS.map((c) => ({ name: c, n: null }))} onPick=${(c) => to(c, itemsOf(c, hasFile, t)[0].name)} />
+      <${PickMenu} label="Category" value=${cat} items=${CATS.map((c) => ({ name: c, n: null }))} onPick=${(c) => to(c, itemsOf(c, hasFile, t, d)[0].name)} />
       <${Icon} name="chevron-right" size=${13} class="faint" />
       <${PickMenu} label=${cat} value=${item} items=${items} unit=${UNIT[cat]} onPick=${(i) => to(cat, i)} />
       <span class="grow"></span>
-      ${d && html`<span class="dz-file muted not-phone" title=${d.file}><span class="mono">${d.file}</span> · ${ago(d.changedAt, now) === 'now' ? 'just now' : ago(d.changedAt, now) + ' ago'}${by ? ` · ${by.name}` : ''}</span>`}
+      ${d && html`<span class="dz-file muted not-phone" title=${d.file}><span class="mono">${d.file}</span> · ${ago(d.changedAt, now) === 'now' ? 'just now' : ago(d.changedAt, now) + ' ago'}${by ? ` · ${by.name}` : live.on && d.changedBy ? ` · ${d.changedBy === 'owner' ? 'Owner' : d.changedBy}` : ''}</span>`}
+      ${live.on && html`<button type="button" class="icon-btn sm" aria-label="Refresh design" disabled=${mocks.busy('read-design:' + repoId)} onClick=${() => mocks.loadDesign(repoId)}><${Icon} name="refresh-cw" size=${13} /></button>`}
       <${DesignCanvasControls} key=${cat + item} />
-      ${d ? html`<button type="button" class="btn sm primary" onClick=${() => act.toast(`Opening ${page} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${13} /><span class="not-phone">Open in OpenPencil</span></button>`
-        : html`<button type="button" class="btn sm primary" onClick=${create}><${Icon} name="plus" size=${13} />Create design file</button>`}
+      ${d ? html`<button type="button" class="btn sm primary" disabled=${live.on && (!d.available || mocks.busy('read-design:' + r.id))} onClick=${() => live.on ? mocks.openDisplay({ _tag: 'editor', repoId: r.id, projectId: d.projectId, revisionId: d.revisionId }, 'Repository design editor') : act.toast(`Opening ${page} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${13} /><span class="not-phone">Open in OpenPencil</span></button>`
+        : html`<button type="button" class="btn sm primary" disabled=${live.on && mocks.busy('read-design:' + r.id)} onClick=${create}><${Icon} name="plus" size=${13} />Create design file</button>`}
     </div>
-    <${DesignCanvas} key=${cat + item + (t ? 't' : '')} cat=${cat} item=${item} page=${page} flow=${flow} t=${t} hasFile=${hasFile} />
+    <${DesignCanvas} key=${cat + item + (t ? 't' : '')} cat=${cat} item=${item} page=${page} flow=${flow} t=${t} hasFile=${hasFile} design=${d} repoId=${repoId} />
   </div>`;
 }
 // The zoom controls sit in the bar, and the canvas sits under it. They share one canvas
@@ -299,15 +303,30 @@ function DesignCanvasControls() {
   useEffect(() => { const f = () => force((n) => n + 1); channel.listeners.add(f); return () => channel.listeners.delete(f); }, []);
   return channel.c ? html`<${ZoomControls} c=${channel.c} />` : null;
 }
-function DesignCanvas({ cat, item, page, flow, t, hasFile }) {
+function DesignCanvas({ cat, item, page, flow, t, hasFile, design, repoId }) {
   const c = useCanvas({ initial: cat === 'Screens' ? 0.2 : 1 });
   channel.c = c;
   useEffect(() => { for (const f of channel.listeners) f(); });
   useEffect(() => () => { if (channel.c === c) channel.c = null; }, []);
-  const label = html`<b>${page}</b>${cat === 'Screens' && hasFile && html`<${Only} />`}`;
+  const label = html`<b>${page}</b>${cat === 'Screens' && hasFile && !live.on && html`<${Only} />`}`;
   return html`<${Canvas} c=${c} label=${label} empty=${!hasFile}>
-    ${cat === 'Screens' ? html`<${FlowSheet} frames=${hasFile ? flow : []} c=${c} page=${page} />`
+    ${live.on ? html`<${RecordedDesign} cat=${cat} design=${design} repoId=${repoId} />` : cat === 'Screens' ? html`<${FlowSheet} frames=${hasFile ? flow : []} c=${c} page=${page} />`
       : cat === 'Components' ? html`<${ComponentSheet} items=${hasFile ? (GROUPS.find(([g]) => g === item)?.[1] || []) : []} overview=${hasFile && item === 'Overview'} group=${item} />`
       : html`<${PaletteSheet} item=${item} t=${t} hasFile=${hasFile} />`}
   <//>`;
+}
+
+// Registered design records have no flow grid, token modes or component groups.
+// Keep the canvas and tables, with only the evidence the service returned.
+function RecordedDesign({ cat, design, repoId }) {
+  if (cat === 'Screens') return html`<p class="muted" data-empty>No flows</p>`;
+  if (cat === 'Components') return html`<div class="table-wrap"><table class="table"><thead><tr><th>Component</th><th>Reference</th><th>Variants</th><th>Current evidence</th><th>Preview</th></tr></thead><tbody>
+    ${(design?.components || []).map((c) => html`<tr key=${c.id}><td>${c.name}</td><td class="mono">${c.reference}</td><td>${c.variants}</td><td>${c.available ? 'Matches recorded fingerprint' : 'Unavailable or changed'}</td>
+      <td>${c.preview && html`<button type="button" class="btn sm" disabled=${!design.available || !c.available} onClick=${() => mocks.openDisplay({ _tag: 'component', repoId, revisionId: design.revisionId, componentId: c.id }, c.name + ' preview')}>View component</button>`}</td></tr>`)}
+    ${!design?.components.length && html`<tr><td colspan="5" class="muted" data-empty>No components</td></tr>`}
+  </tbody></table></div>`;
+  return html`<div class="table-wrap"><table class="table"><thead><tr><th>Token</th><th>Value</th></tr></thead><tbody>
+    ${(design?.tokens || []).map((t) => html`<tr key=${t.name}><td class="mono">${t.name}</td><td class="mono">${t.value}</td></tr>`)}
+    ${!design?.tokens.length && html`<tr><td colspan="2" class="muted" data-empty>No tokens</td></tr>`}
+  </tbody></table></div>`;
 }

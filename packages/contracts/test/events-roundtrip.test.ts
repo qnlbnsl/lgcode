@@ -16,6 +16,8 @@ import { LifecycleState } from "../src/stateMachine.ts"
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
 const expectedEngineTags = [
+  "HarnessInstallStarted",
+  "HarnessInstallFinished",
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",
@@ -66,10 +68,11 @@ const expectedEngineTags = [
 // The shared union has the engine inventory plus these client declarations.
 // Keep the expected list independent of the production event-tag inventory.
 const expectedClientTags = [
+  "client.AlertDestinationChanged", "client.AlertDestinationTokenSet", "client.AlertDestinationTokenCleared", "client.AlertCarrierEnabled", "client.AlertQuietChanged",
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
   "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
-  "client.WebServerDown", "client.WebServerUp"
+  "client.ServiceRestartRequested", "client.WebServerDown", "client.WebServerUp"
 ]
 const expectedBoardTags = [
   "board.ChannelOpened",
@@ -89,6 +92,7 @@ const expectedRolesTags = [
   "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"
 ]
 const expectedProjectTags = [
+  "project.MockScreensSeen", "project.MockScreenSeen", "project.MockScreenApprovalSet", "project.MockScreenCommented",
   "project.SetupAdvanced", "project.SetupCompleted", "project.MockRecorded", "project.MockApproved", "project.DesignRecorded",
   "project.GitAttempted", "project.GitFinished", "project.GitEvidenceReported", "project.MainReviewOpened", "project.MainReviewDecided",
   "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored",

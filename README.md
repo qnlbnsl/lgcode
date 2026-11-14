@@ -95,6 +95,12 @@ Set `LGTM_HOME` on the service and command processes to use another folder.
 The service continues running after the launching terminal closes.
 The terminal thread viewer is available through `./bin/lgtm view`.
 
+The rebuilt website, made from the mock in `design/mock/`, is served at `/studio/`.
+Build it once from the repository root with `pnpm --filter @lgtm/studio build`.
+Then open `http://127.0.0.1:8787/studio/` and sign in with the same web password.
+It shows the engine's real records, but its actions are not connected to the engine yet.
+See [design/mock/README.md](design/mock/README.md) for what it does and does not do.
+
 The service command also works without a web password.
 In that case, the authenticated Unix socket is available and the web server
 stays off.
@@ -108,6 +114,7 @@ An installer, startup at login, and loading project configuration from
 - [SECURITY.md](SECURITY.md): how to report a vulnerability, and the security
   rules the design must keep.
 - [docs/features.md](docs/features.md): the feature list.
+- [docs/notifications.md](docs/notifications.md): email, ntfy, quiet hours, and notification API actions.
 - [docs/issues.md](docs/issues.md): the running list of problems found.
 - [docs/specs/2026-11-01-engine-design.md](docs/specs/2026-11-01-engine-design.md):
   the design of the engine, the first of LGTM Studio's four pieces.

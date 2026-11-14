@@ -13,12 +13,12 @@ import { evaluateStall } from "./stall.ts";
 const completeHolderNotices = ({ snapshot, lists }: RuleContext) => Effect.gen(function* () {
   const roles = snapshot.roles as RolesView;
   for (const clock of Object.values(roles.stalls)) {
-    if (clock.occurrence !== 2) continue;
+    if (clock.occurrence < 2 || clock.occurrence >= (roles.settings.replaceAfter ?? 3)) continue;
     const nudge = roles.actions.findLast((row) => row._tag === "roles.StallSeen" && row.stalledPostId === clock.postId
-      && row.agentId === clock.agentId && row.noticeRecipient === clock.agentId && row.occurrence === 2);
+      && row.agentId === clock.agentId && row.noticeRecipient === clock.agentId && row.occurrence === clock.occurrence);
     if (nudge?._tag !== "roles.StallSeen" || roles.actions.some((row) => row._tag === "roles.StallSeen"
       && row.stalledPostId === clock.postId && row.agentId === clock.agentId && row.triggerSequence === nudge.triggerSequence
-      && row.occurrence === 2 && row.noticeRecipient !== clock.agentId)) continue;
+      && row.occurrence === clock.occurrence && row.noticeRecipient !== clock.agentId)) continue;
     const { sequence: _sequence, noticeRead: _read, notice: _notice, postId: _postId, ...action } = nudge;
     yield* sendNotice({ ...action, noticeRecipient: noticeRecipient(snapshot, clock.agentId) }, "stall", lists);
   }
@@ -41,7 +41,7 @@ export const stallRule: StallWatchRule = {
     const roles = snapshot.roles as RolesView;
     return Object.values(roles.stalls).flatMap((clock) => {
       const limit = input.snapshot.agents[clock.agentId]?.stallMinutes;
-      return clock.originSequence === undefined || clock.occurrence >= 3 || limit === undefined ? [] : [{
+      return clock.originSequence === undefined || clock.occurrence >= (roles.settings.replaceAfter ?? 3) || limit === undefined ? [] : [{
         key: stallKey(clock.postId, clock.agentId), rule: "stall" as const,
         originSequence: clock.originSequence, delayMillis: limit * 60_000,
       }];

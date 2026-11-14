@@ -28,6 +28,8 @@ function blank(p) {
     settings: { fullRun: 'pnpm check', check: 'pnpm test --related', maxRounds: 6, stuckPoints: 12, autoMergeFix: true, nightly: true },
   };
 }
+// The live website gives every project an empty record until the engine holds one.
+export const emptyWorkflow = () => blank();
 // A project made while the page is open gets an empty record.
 function ensure(s, p) { s.workflow = s.workflow || {}; return s.workflow[p.id] || (s.workflow[p.id] = blank(p)); }
 
@@ -484,7 +486,7 @@ function Runs({ s, p, w }) {
   const sel = runs.find((r) => r.id === rid) || runs[0];
   const full = w.runs.filter((r) => r.kind !== 'Check' && !r.skippedRun).sort((a, b) => b.ts - a.ts)[0];
   const busy = w.runs.some((r) => r.running);
-  const start = () => { const id = uid('run'); update(() => { w.runs.push({ id, kind: 'Full run', why: 'Started by you', commit: (full && full.commit) || 'HEAD', branch: p.branch, ts: Date.now(), dur: '—', passed: 0, failed: 0, skipped: 0, failures: [], running: true, by: null }); }); setRid(id);
+  const start = () => { if (act.refused()) return; const id = uid('run'); update(() => { w.runs.push({ id, kind: 'Full run', why: 'Started by you', commit: (full && full.commit) || 'HEAD', branch: p.branch, ts: Date.now(), dur: '—', passed: 0, failed: 0, skipped: 0, failures: [], running: true, by: null }); }); setRid(id);
     setTimeout(() => update(() => { const r = byId(w.runs, id); r.running = false; r.passed = full ? full.passed + full.failed : 1240; r.skipped = full ? full.skipped : 0; r.dur = full ? full.dur : '3 min 2 s'; r.ts = Date.now(); act.toast('Full run passed'); }), 3200); };
   return html`<div class="wf-body wf-wide">
     <div class="wf-bar">

@@ -13,6 +13,7 @@ export const AgentConfiguration = Schema.Struct({
 })
 export type AgentConfiguration = typeof AgentConfiguration.Type
 export const ChoiceList = Schema.Struct({
+  reason: Schema.optionalKey(Schema.NonEmptyString),
   source: Schema.Literals(["configured", "negotiated", "unavailable"]),
   options: Schema.Array(Schema.Struct({ id: ChoiceId, label: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(256))) })).check(Schema.isMaxLength(128))
 })

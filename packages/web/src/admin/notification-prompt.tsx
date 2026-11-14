@@ -42,8 +42,8 @@ export function NotificationPrompt({ onSessionExpired }: { readonly onSessionExp
     }
   }
   return <aside className="admin-page admin-notification-prompt" aria-label="Phone notification offer">
-    <p>A request is waiting for you. Would you like phone notifications?</p>
-    <div className="admin-actions"><a href={`${shellHref({ page: "service", service: "settings" })}?focus=carrier`}>Set up phone notifications</a>
+    <p>A request is waiting for you. Would you like notifications?</p>
+    <div className="admin-actions"><a href={`${shellHref({ page: "service", service: "settings" })}?focus=carrier`}>Set up notifications</a>
       <button disabled={busy || offline} onClick={() => { void dismiss() }}>{dismissal.current === undefined ? "Not now" : "Retry dismissal"}</button></div>
     {message && <p role="status">{message}</p>}
   </aside>

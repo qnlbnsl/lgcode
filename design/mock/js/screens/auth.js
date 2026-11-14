@@ -1,8 +1,9 @@
 // The login page and the three first-run pages. LGTM Studio has one user and one password,
 // so there is no user name, no account and no pairing here.
-import { html, useState, useEffect, useRef, Icon, cx, update, go, href, parseRoute } from '../lib.js';
+import { html, useState, useEffect, useRef, Icon, cx, update, go, href, parseRoute, live, refuse } from '../lib.js';
 import { HARNESSES, machineOf } from '../data.js';
 import * as act from '../actions.js';
+import * as board from '../live/board.js';
 
 const LOOPBACK = /^(localhost|127(\.\d+){3}|\[::1\])$/;
 // The service accepts sign-in only over HTTPS or from the computer it runs on.
@@ -26,7 +27,9 @@ export function Login({ s }) {
   const [caps, setCaps] = useState(false);
   const field = useRef(null);
   const insecure = insecureOrigin();
+  // The live website knows no machine until it is signed in, so it names the page's own address.
   const master = s.machines.find((m) => m.role === 'master') || s.machines[0];
+  const address = master ? master.address : location.host;
   const down = status === 'unavailable';
   const blocked = insecure || down;
   useEffect(() => { if (!blocked) field.current?.focus(); }, [status, blocked]);
@@ -36,24 +39,24 @@ export function Login({ s }) {
     if (blocked || busy) return;
     if (!pw) { setEmpty(true); field.current?.focus(); return; }
     setBusy(true);
-    setTimeout(() => {
+    act.signIn(pw).then((next) => {
       setBusy(false);
-      if (pw.trim().toLowerCase() === 'wrong') { setPw(''); act.setSession('rejected'); return; }
-      act.setSession('in');
-      go(s.session.firstRun ? '/setup' : '/home');
-    }, 700);
+      if (next === 'rejected') { setPw(''); return; }
+      if (next === 'in') go(s.session.firstRun ? '/setup' : '/home');
+    });
   };
-  const retry = () => { setRetrying(true); setTimeout(() => { setRetrying(false); act.setSession('out'); act.toast('The service is answering again'); }, 1200); };
+  const retry = () => { setRetrying(true); act.retryService().then(() => setRetrying(false)); };
   const typed = (e) => { setPw(e.target.value); setEmpty(false); if (status === 'rejected') act.setSession('out'); };
   const error = empty ? 'Enter the password.' : status === 'rejected' ? 'That password is wrong. Nothing was signed in.' : null;
 
   return html`<main class="auth">
     <div class="auth-card">
-      <${Brand} sub=${`Sign in to the service on ${master.name}`} />
+      <${Brand} sub=${master ? `Sign in to the service on ${master.name}` : 'Sign in to the service'} />
 
+      ${status === 'logout-unconfirmed' && html`<div class="callout error" role="alert"><span><b>Session revocation was not confirmed.</b> Records were removed from this browser. The service may still accept this session. Sign in and try logging out again when the service is reachable.</span></div>`}
       ${status === 'expired' && !insecure && html`<div class="callout info" role="status"><${Icon} name="clock" size=${14} /><span>You were signed out because the session expired. Sign in again and you return to where you were.</span></div>`}
       ${down && !insecure && html`<div class="callout error" role="alert"><${Icon} name="wifi-off" size=${14} />
-        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${master.address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
+        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
       ${insecure && html`<div class="callout warn" role="alert"><${Icon} name="shield-alert" size=${14} />
         <span><b>This page is not on a secure connection.</b> LGTM Studio accepts the password only over HTTPS, or from the computer the service runs on. Open the HTTPS address, or forward the port and open <span class="mono">127.0.0.1</span>.</span></div>`}
 
@@ -77,7 +80,7 @@ export function Login({ s }) {
 
       <div class="auth-foot">
         <span class="auth-conn"><i class=${cx('dot', down ? 'failed' : insecure ? 'waiting' : 'working')}></i>${down ? 'Service unreachable' : insecure ? 'Sign-in is blocked on this connection' : 'Service reachable'}</span>
-        <span class="mono">${insecure ? location.host : master.address}</span>
+        <span class="mono">${insecure ? location.host : address}</span>
       </div>
     </div>
   </main>`;
@@ -111,6 +114,7 @@ function checkPath(raw, s) {
 }
 
 export function FirstRun({ s }) {
+  if (live.on) return html`<${LiveFirstRun} s=${s} />`;
   const master = s.machines.find((m) => m.role === 'master') || s.machines[0];
   const [step, setStep] = useState(0);
   const [reach, setReach] = useState(0);
@@ -249,3 +253,75 @@ export function FirstRun({ s }) {
 }
 
 export function seedAuth() {}
+
+// The saved engine steps use this same three-step layout. Discovery is a read, and
+// registering a folder is the only operation that establishes whether it is a repository.
+function LiveFirstRun({ s }) {
+  const data = s.setupData;
+  const [view, setView] = useState(null), [path, setPath] = useState(''), [found, setFound] = useState(null);
+  const [goal, setGoal] = useState(''), [workspace, setWorkspace] = useState(''), [shell, setShell] = useState(''), [owner, setOwner] = useState('');
+  useEffect(() => { void board.loadSetup(); }, []);
+  useEffect(() => { if (data) { setWorkspace(data.workspace); setShell(data.shell); setOwner(data.ownerName); } }, [data?.workspace, data?.shell, data?.ownerName]);
+  const step = view == null ? data?.step || 0 : view;
+  useEffect(() => { if (data?.completed) go('/home'); }, [data?.completed]);
+  const reach = data?.step || 0;
+  const working = ['read-setup', 'setup', 'setup-settings', 'setup-repository', 'create-project'].some(board.busy);
+  const change = async (next) => {
+    if (working) return;
+    if (next <= reach) { setView(next); return; }
+    const reply = await board.advanceSetup(next);
+    if (reply) setView(next);
+  };
+  const next = async (event) => {
+    event.preventDefault(); if (working) return;
+    if (step === 0) {
+      if (!workspace.trim() || !shell.trim()) return;
+      const reply = await board.saveSetupSettings({ workspaceFolder: workspace.trim(), shell: shell.trim(), ...(owner.trim() ? { displayName: owner.trim() } : {}) });
+      if (reply) await change(1);
+    } else if (step === 1) {
+      const reply = found || await board.registerSetupRepository(path);
+      if (reply) { setFound(reply); await change(2); }
+    } else if (goal.trim() && found) {
+      const created = s.ui.setupCreated;
+      if (created) {
+        const completed = await board.run('setup', () => import('../engine.js').then((engine) => engine.request('project.setup.complete', { projectId: created })));
+        if (completed) go(`/p/${created}/board`);
+      } else await board.createProject({ repo: found.repo, goal: goal.trim() }, { setup: true });
+    }
+  };
+  return html`<main class="auth setup">
+    <header class="auth-top"><${Brand} /><button type="button" class="btn ghost" onClick=${refuse}>Skip setup</button></header>
+    <form class="auth-card wide" onSubmit=${next} novalidate aria-busy=${working}>
+      <${Steps} step=${step} reach=${reach} go=${change} />
+      <div class="auth-step" key=${step}>
+        ${!data ? html`<p class="muted" role="status">Loading setup…</p><button type="button" class="btn" disabled=${working} onClick=${() => board.loadSetup()}>Retry</button>`
+          : step === 0 ? html`<h2>Connect a subscription</h2>
+            <p class="auth-lede">The service discovers harnesses and credentials on this computer.</p>
+            <div class="auth-options" role="radiogroup" aria-label="Harness">${data.harnesses.map((h) => html`<div class="auth-option" key=${h.harness}>
+              <div class="auth-option-head"><span class="grow"><b>${h.harness}</b><small>${h.installed ? 'Installed' : 'Not installed'} · ${h.configured ? 'Configured' : 'Not configured'}</small></span></div>
+              <div class="auth-option-body">${h.accounts.map((a) => html`<p key=${a.accountId}>${a.accountId} · ${a.state}</p>`)}
+                <button type="button" class="btn" onClick=${refuse}>Sign in with ${h.harness}</button></div>
+            </div>`)}</div>
+            ${!data.available && html`<p class="error-text" role="alert">${data.reason}</p>`}
+            <div class="field"><label for="setup-workspace">Workspace folder</label><input id="setup-workspace" class="input mono" value=${workspace} disabled=${working} onInput=${(e) => setWorkspace(e.target.value)} /></div>
+            <div class="field"><label for="setup-shell">Shell</label><input id="setup-shell" class="input" value=${shell} disabled=${working} onInput=${(e) => setShell(e.target.value)} /></div>
+            <div class="field"><label for="setup-owner">Your name</label><input id="setup-owner" class="input" value=${owner} disabled=${working} onInput=${(e) => setOwner(e.target.value)} /></div>
+            <button type="button" class="btn" disabled=${working} onClick=${() => board.loadSetup()}>Refresh discovery</button>`
+          : step === 1 ? html`<h2>Add a repository</h2>
+            <p class="auth-lede">Point LGTM Studio at a Git repository on local.</p>
+            <div class="field"><label for="setup-path">Repository folder</label><input id="setup-path" class="input lg mono" value=${path} disabled=${working} onInput=${(e) => { setPath(e.target.value); setFound(null); }} /></div>
+            <div class="auth-check" aria-live="polite">${found ? html`<span class="success-text">Repository registered: ${found.path}</span>` : ''}</div>
+            <div class="auth-suggest"><span class="label">Found in <span class="mono">${data.workspace}</span></span>
+              <ul>${data.repositories.map((r) => html`<li key=${r.path}><button type="button" class="auth-pick" onClick=${() => { setPath(r.path); setFound(null); }}><${Icon} name="folder-git-2" size=${14} /><span class="mono">${r.path}</span></button></li>`)}</ul></div>`
+          : html`<h2>Start the first project</h2>
+            <div class="field"><label for="setup-goal">Goal</label><textarea id="setup-goal" class="textarea" rows="4" value=${goal} disabled=${working} onInput=${(e) => setGoal(e.target.value)}></textarea></div>
+            <div class="field"><label for="setup-git">Model for commit and pull request messages</label><select id="setup-git" class="select" onChange=${refuse}><option value=""></option></select></div>
+            <dl class="dl auth-summary"><dt>Repository</dt><dd>${found?.path || html`<button type="button" class="link" onClick=${() => change(1)}>Add a repository first</button>`}</dd>
+              <dt>Project lead</dt><dd>${data.lead ? `${data.lead.harness} · ${data.lead.account._tag === 'named' ? data.lead.account.accountId : 'Any ready account'}${data.lead.model ? ' · ' + data.lead.model : ''}${data.lead.effort ? ' · ' + data.lead.effort : ''}` : ''}</dd><dt>Machine</dt><dd>local</dd></dl>
+            ${s.ui.setupCreated && html`<p class="muted">The project exists. Retry to finish setup after its lead is ready.</p>`}`}
+      </div>
+      <div class="auth-actions">${step > 0 && html`<button type="button" class="btn lg" disabled=${working} onClick=${() => change(step - 1)}>Back</button>`}<span class="grow"></span>
+        <button type="submit" class="btn primary lg" disabled=${working || !data || (step === 0 && (!workspace.trim() || !shell.trim())) || (step === 1 && !path.trim()) || (step === 2 && (!goal.trim() || !found))}>${working ? 'Working…' : step === 2 ? s.ui.setupCreated ? 'Finish setup' : 'Create project' : 'Continue'}</button></div>
+    </form><p class="auth-under">Step ${step + 1} of 3</p>
+  </main>`;
+}

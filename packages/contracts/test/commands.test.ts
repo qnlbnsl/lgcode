@@ -39,23 +39,27 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
-const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
+const harnessCommands = ["client.harness.status", "client.harness.recipe", "client.harness.install", "client.harness.account.check"]
+const clientReads = [...harnessCommands, "client.harness.choices", "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
-const projectOwnerCommands = ["project.setup", "project.setup.advance", "project.setup.complete", "project.setup.discover", "project.mocks.approve", "project.placement.preview", "project.repository.discover", "project.branches", "project.checkouts", "project.stage", "project.unstage", "project.stage.all", "project.unstage.all", "project.discard.plan", "project.discard", "project.commit", "project.fetch", "project.pull", "project.push", "project.integrate", "project.conflict.choose", "project.conflict.resolve", "project.settings", "project.settings.set", "project.repository.add", "project.repository.locate", "project.repositories", "project.workspace.register", "project.workspaces", "project.create", "project.rename", "project.place", "project.preferences.set", "project.creations", "project.creation.abandon", "project.goal.set", "project.archive", "project.restore", "project.review.prepare", "project.review.approve"]
-const projectTools = ["project.context.search", "project.changes", "project.diff", "project.history", "project.commit.files", "project.git.state", "project.review", "project.conflict", "project.stage.set", "project.read", "project.requests", "project.team.create", "project.sprint.create", "project.sprint.update", "project.sprint.complete", "project.task.create", "project.task.update", "project.task.note", "project.task.history", "project.design.record", "project.design.read", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.review.report", "project.review.status"]
+const projectOwnerCommands = ["project.update", "project.merge.abort", "project.conflict.resolved", "project.conflict.reopen", "project.review.decline", "project.mocks.comment", "project.mocks.screen.approve", "project.mocks.seen", "project.mocks.seen.batch", "project.mocks.editor.save", "project.setup", "project.setup.advance", "project.setup.complete", "project.setup.discover", "project.mocks.approve", "project.placement.preview", "project.repository.discover", "project.branches", "project.checkouts", "project.stage", "project.unstage", "project.stage.all", "project.unstage.all", "project.discard.plan", "project.discard", "project.commit", "project.fetch", "project.pull", "project.push", "project.integrate", "project.conflict.choose", "project.conflict.resolve", "project.settings", "project.settings.set", "project.repository.add", "project.repository.locate", "project.repositories", "project.workspace.register", "project.workspaces", "project.create", "project.rename", "project.place", "project.preferences.set", "project.creations", "project.creation.abandon", "project.goal.set", "project.archive", "project.restore", "project.review.prepare", "project.review.approve"]
+const projectTools = ["project.context.search", "project.changes", "project.diff", "project.history", "project.commit.files", "project.git.state", "project.review", "project.conflict", "project.stage.set", "project.read", "project.requests", "project.team.create", "project.sprint.create", "project.sprint.update", "project.sprint.complete", "project.task.create", "project.task.update", "project.task.note", "project.task.history", "project.design.record", "project.design.read", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.mocks.reviews.read", "project.mocks.screen.read", "project.review.report", "project.review.status"]
 const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
-const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
-const expectedOwnerOnly = ["configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
+const expectedWorkflowCommands = ["client.workflows.list", "client.workflows.read", "client.workflows.clone", "client.workflows.save", "client.workflows.validate", "client.workflows.delete"]
+const expectedServiceCommands = ["client.service.version", "client.service.restart"]
+const expectedApiCommands = [...expectedCommands, ...expectedWebCommands, ...expectedWorkflowCommands, ...expectedServiceCommands]
+const expectedOwnerOnly = [...harnessCommands, "client.harness.choices", "configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
+  "client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
-  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands, ...projectOwnerCommands]
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands, ...expectedWorkflowCommands, ...expectedServiceCommands, ...projectOwnerCommands]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.peek", "board.channels", "board.status", "board.flush"]
@@ -64,7 +68,7 @@ const boardTools = boardCommands.filter((name) => name !== "board.flush" && name
 const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
 const rolesTools = ["roles.orient", "roles.handoff"]
 const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
-const alertCommands = ["client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+const alertCommands = ["client.alerts.quiet.set", "client.alerts.carrier.enabled.set", "client.alerts.carrier.remove", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"]
 const testedCommands = [...expectedApiCommands, ...alertCommands, ...projectCommands]
 const expectedRpcCommands = [...testedCommands, ...boardCommands, ...clientReads, ...rolesCommands]
@@ -105,6 +109,7 @@ describe("command lists", () => {
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedRpcCommands))
     for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
+    for (const name of harnessCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
     for (const name of expectedApiCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "release", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])

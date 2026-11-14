@@ -7,11 +7,12 @@ import { checkObservedWorkspace, gitCall, withGit, workspacePath, workspaceRefer
 import { withLane } from "../routing/lanes.ts"
 import { admitMainReview } from "../project/gitReview.ts"
 import { own, projectKey, projectView } from "../project/view.ts"
+import { mockEditorUncertainReason } from "../project/mockEditorRecovery.ts"
 
 // Only external mutations require durable attempts. Read-backed review/report
 // planners still run outside the writer, without an invented mutation marker.
 export const gitMutationCommand = (name: string) => !["project.review.prepare", "project.review.report"].includes(name)
-export const gitUncertain = () => new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" })
+export const gitUncertain = (command?: string) => new CommandUncertain({ reason: command === "project.mocks.editor.save" ? mockEditorUncertainReason : "Git outcome is uncertain; refresh Git state" })
 
 // Only a read that observes a pending attempt owns the mutation interval. It
 // cannot finish a live effect; ordinary reads retain the existing Git gate
@@ -54,14 +55,15 @@ export const planGitOperation = (input: Input, name: string, payload: Record<str
   if (prior !== undefined && (prior.bodyHash !== bodyHash || prior.command !== name)) return yield* refused("request id reused")
   // An existing possible effect never becomes executable again, even before
   // refresh. The read later records only terminal uncertainty.
-  if (prior !== undefined) return yield* gitUncertain()
+  if (prior !== undefined) return yield* gitUncertain(name)
   if (!gitMutationCommand(name)) return { plan: yield* planner(input, payload) }
   if (prior === undefined) {
     if (name === "project.review.approve") yield* admitMainReview(input, payload)
     const observed = yield* withGit(input, (git) => Effect.gen(function* () {
       const source = yield* workspacePath(input, payload, git)
       const before = yield* gitCall(git.mutationIdentity(source.path))
-      const destination = payload.destinationId === undefined ? undefined : yield* workspacePath(input, { ...payload, worktreeId: payload.destinationId }, git)
+      // Unscoped destinations are safe here only while these Git mutations are owner-only.
+      const destination = payload.destinationId === undefined ? undefined : yield* workspacePath(input, { worktreeId: payload.destinationId }, git)
       return { before, ...(destination === undefined ? {} : { destination: yield* gitCall(git.mutationIdentity(destination.path)) }) }
     }))
     const attempt: GitAttempt = { requestId: payload.requestId as GitAttempt["requestId"], bodyHash,
@@ -81,7 +83,7 @@ export const planGitOperation = (input: Input, name: string, payload: Record<str
     // A prior possible effect outranks any later failed precondition. It must
     // never be converted into a refusal receipt after restart or disconnect.
     if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure
-    if (planned.failure instanceof CommandUncertain) return yield* gitUncertain()
+    if (planned.failure instanceof CommandUncertain) return yield* gitUncertain(name)
     // This bounded enum records only fresh, determinate fixed Git outcomes.
     // Arbitrary refusal prose still takes the ordinary text redaction path.
     const refusal = (["conflicts", "push_rejected", "pull_diverged", "network_failed", "authentication_required"] as const)

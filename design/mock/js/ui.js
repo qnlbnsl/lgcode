@@ -1,3 +1,5 @@
+import * as chatLive from './live/chat.js';
+import { live as liveMode, refuse } from './lib.js';
 // Shared parts: avatars, menus, dialogs, the request block, the thread and the composer.
 // These are built by hand, because the mock has no build step and so no component library.
 import {
@@ -138,9 +140,17 @@ export function Dialog({ title, onClose, children, foot, size, onSubmit }) {
 const dialogTypes = {};
 export function registerDialog(type, component) { dialogTypes[type] = component; }
 function ConfirmDialog({ d }) {
-  return html`<${Dialog} title=${d.title} size="narrow" onClose=${act.closeDialog}
-    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
-      <button type="button" class=${cx('btn', d.danger ? 'danger' : 'primary')} onClick=${() => { act.closeDialog(); d.onConfirm?.(); }}>${d.action}</button>`}>
+  const [pending, setPending] = useState(false);
+  const close = () => { if (!pending) act.closeDialog(); };
+  const confirm = async () => {
+    if (pending) return;
+    if (!d.waitForReply) { act.closeDialog(); d.onConfirm?.(); return; }
+    setPending(true);
+    try { if (await d.onConfirm?.()) act.closeDialog(); } finally { setPending(false); }
+  };
+  return html`<${Dialog} title=${d.title} size="narrow" onClose=${close}
+    foot=${html`<button type="button" class="btn" disabled=${pending} onClick=${close}>Cancel</button>
+      <button type="button" class=${cx('btn', d.danger ? 'danger' : 'primary')} aria-busy=${pending} disabled=${pending} onClick=${confirm}>${pending ? d.pendingLabel || 'Working…' : d.action}</button>`}>
     ${d.body && html`<p style="line-height:1.55">${d.body}</p>`}
     ${d.lost?.length > 0 && html`<ul class="col" style="gap:4px">${d.lost.map((l) => html`<li class="row"><${Icon} name="triangle-alert" size=${14} class="warn-text" /><span>${l}</span></li>`)}</ul>`}
   <//>`;
@@ -148,9 +158,17 @@ function ConfirmDialog({ d }) {
 function RenameDialog({ d }) {
   const [v, setV] = useState(d.value); const taken = d.taken?.includes(v.trim()) && v.trim() !== d.value;
   const bad = !v.trim() ? 'A name is needed.' : taken ? 'That name is already in use.' : null;
-  return html`<${Dialog} title=${d.title || 'Rename'} size="narrow" onClose=${act.closeDialog} onSubmit=${() => { if (!bad) { act.closeDialog(); d.onRename(v.trim()); } }}
-    foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!bad}>Rename</button>`}>
-    <div class="field"><label for="rename-field">Name</label><input id="rename-field" class="input" value=${v} onInput=${(e) => setV(e.target.value)} autofocus />
+  const [pending, setPending] = useState(false);
+  const close = () => { if (!pending) act.closeDialog(); };
+  const rename = async () => {
+    if (bad || pending) return;
+    if (!d.waitForReply) { act.closeDialog(); d.onRename(v.trim()); return; }
+    setPending(true);
+    try { if (await d.onRename(v.trim())) act.closeDialog(); } finally { setPending(false); }
+  };
+  return html`<${Dialog} title=${d.title || 'Rename'} size="narrow" onClose=${close} onSubmit=${rename}
+    foot=${html`<button type="button" class="btn" disabled=${pending} onClick=${close}>Cancel</button><button type="submit" class="btn primary" disabled=${!!bad || pending} aria-busy=${pending}>${pending ? 'Renaming…' : 'Rename'}</button>`}>
+    <div class="field"><label for="rename-field">Name</label><input id="rename-field" class="input" disabled=${pending} value=${v} onInput=${(e) => setV(e.target.value)} autofocus />
       ${bad && v !== d.value && html`<span class="error">${bad}</span>`}</div>
     ${d.note && html`<p class="muted" style="font-size:var(--text-sm)">${d.note}</p>`}
   <//>`;
@@ -201,12 +219,34 @@ function Cited({ text }) {
     : /^`/.test(t) ? html`<code key=${i}>${t.slice(1, -1)}</code>` : t.replace(/ $/, ' '));
 }
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
+// A command or a folder in a code box. A long one scrolls inside the box, and the button in
+// its corner copies the whole text.
+export function CodeBox({ text, label }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => { navigator.clipboard?.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return html`<div class="qc-code"><pre class="code" tabindex="0">${text}</pre>
+    <button type="button" class="qc-copy" aria-label=${(copied ? 'Copied the ' : 'Copy the ') + label} title=${copied ? 'Copied' : 'Copy'} onClick=${copy}><${Icon} name=${copied ? 'check' : 'copy'} size=${14} /></button></div>`;
+}
+// What an answered card says about its answer: a short label, and the owner's words when the
+// answer was typed.
+export function requestOutcome(r, rec, shown) {
+  const a = (r.answer || '').trim();
+  if (r.status === 'cancelled') return { label: 'Cancelled', text: a && a !== 'Cancelled' ? a : '', icon: 'x', tone: 'off' };
+  if (r.kind !== 'question') {
+    const byKind = { allow_once: 'Allowed', allow_always: 'Allowed, always', reject_once: 'Denied', reject_always: 'Denied, always' }[r.answerKind];
+    const label = byKind || a || 'Answered'; const no = /^(denied|sent back)/i.test(label);
+    return { label, text: '', icon: no ? 'x' : 'check', tone: no ? 'no' : 'yes' };
+  }
+  // The accepted answer is named when the card does not already show the same words.
+  if (rec && a === rec.label) return { label: 'Accepted', text: a === (shown || '').trim() ? '' : a, icon: 'check', tone: 'yes' };
+  return { label: 'You answered', text: a, typed: true, icon: 'check', tone: 'yes' };
+}
 function BriefCard({ s, r, openThread, who }) {
   const now = useNow(); const a = agentOf(s, r.agent); const isQ = r.kind === 'question';
   const [open, setOpen] = useState(() => s.ui.panelReq === r.id);
   const [declined, setDeclined] = useState(false);
   const [text, setText] = useState(''); const own = useRef(null);
-  const live = r.status === 'open'; const waited = now - r.createdAt;
+  const live = r.status === 'open' && !r.heldBy; const waited = now - r.createdAt;
   const opts = r.options || [];
   const rec = isQ ? opts.find((o) => o.primary) || null : null;
   const brief = r.brief || r.title; const summary = r.summary || (isQ ? r.body : null);
@@ -222,39 +262,65 @@ function BriefCard({ s, r, openThread, who }) {
     <${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
       items=${[{ label: always, why, onSelect: () => answer(o === 'deny' ? 'never' : 'always') }]} width=${280} /></span>`;
   const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
-  if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
-    <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
-    <p class="qc-answer">${r.answer}</p></section>`;
+  // The live website answers with the options the harness sent. The one-time answer is the
+  // button. A standing answer sits in its menu, with the harness's own wording as the note.
+  const liveSplit = (label, icon, always, onceKind, alwaysKind) => {
+    const once = opts.find((o) => o.kind === onceKind); if (!once) return null;
+    const standing = opts.filter((o) => o.kind === alwaysKind); const busy = chatLive.requestBusy(r);
+    return html`<span class="split">
+      <button type="button" class="btn" disabled=${busy} title=${once.label} onClick=${() => answer(once.id)}><${Icon} name=${icon} size=${14} />${label}</button>
+      ${standing.length > 0 && html`<${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
+        items=${standing.map((o) => ({ label: always, why: o.label, disabled: busy, onSelect: () => answer(o.id) }))} width=${320} />`}</span>`;
+  };
+  if (liveMode.on && r.status === 'open' && r.heldBy) return html`<section class="req qc" id=${'req-' + r.id}><b>${r.title}</b><p>${r.body}</p><p class="muted">Waiting on ${agentOf(s, r.heldBy).name}</p></section>`;
+  // An answered card keeps everything it showed. The answer buttons leave, and one line says
+  // what the answer was.
+  const done = r.status !== 'open';
+  if (!live && !done) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Held: ' + brief}>
+    <div class="qc-top"><b class="qc-q">${brief}</b></div></section>`;
+  const outcome = done ? requestOutcome(r, rec, null) : null;
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
-  return html`<section class=${cx('req qc', r.kind, open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${(isQ ? 'Question: ' : 'Approval: ') + brief}>
-    <div class="qc-top"><b class="qc-q">${brief}</b><span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span></div>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req qc', r.kind, open && 'open', done && 'done')} id=${'req-' + r.id} tabindex="-1" aria-label=${(done ? 'Answered: ' : isQ ? 'Question: ' : 'Approval: ') + brief}>
+    <div class="qc-top"><b class="qc-q">${brief}</b>${done ? html`<span class="qc-age">${clock(r.answeredAt)}</span>` : html`<span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span>`}</div>
     ${summary && html`<p class="qc-sum">${summary}</p>`}
-    ${recShort && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
+    ${recShort && !done && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
     ${open && html`<div class="qc-report" id=${id}>
       <p class="qc-meta">${who && html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} /><span>Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span>Blocks ${r.blocks}</span>`}${!isQ && r.tool && html`<span>Tool ${r.tool}</span>`}</p>
       ${isQ && html`<section class="qc-part q"><h5>The question</h5><${Paras} list=${r.body || r.title} /></section>`}
-      ${!isQ && html`<section class="qc-part"><h5>Command</h5>${r.command ? html`<pre class="qc-pre">${r.command}</pre>` : html`<p class="flat">Hidden by the harness. You cannot see this tool's input.</p>`}
-        <h5 class="qc-sub">Folder</h5><pre class="qc-pre">${r.folder}</pre></section>`}
+      ${!isQ && html`<section class="qc-part"><h5>Command</h5>${r.command ? html`<${CodeBox} text=${r.command} label="command" />` : html`<p class="flat">Hidden by the harness. You cannot see this tool's input.</p>`}
+        <h5 class="qc-sub">Folder</h5><${CodeBox} text=${r.folder} label="folder" /></section>`}
       ${r.what && html`<section class="qc-part"><h5>What it is about</h5><${Paras} list=${r.what} /></section>`}
       ${(r.whyText || r.why) && html`<section class="qc-part why"><h5>Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
       ${r.recWhy && html`<section class="qc-part reco"><h5><${Icon} name="sparkles" size=${13} />Why this answer</h5><${Paras} list=${r.recWhy} /></section>`}
-      ${(others.length > 0 || isQ) && html`<section class="qc-part"><h5>Other answers</h5>
+      ${(others.length > 0 || (isQ && !done)) && html`<section class="qc-part"><h5>Other answers</h5>
         <ul class="qc-opts">
           ${others.map((o) => html`<li key=${o.id}><div><b>${o.label}</b>${o.note && html`<p>${o.note}</p>`}</div>
-            <button type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button></li>`)}
-          ${isQ && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+            ${!done && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button>`}</li>`)}
+          ${isQ && !done && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
             <input ref=${own} class="input" placeholder="Your own answer" aria-label="Your own answer" value=${text} onInput=${(e) => setText(e.target.value)} />
-            <button type="submit" class="btn sm" disabled=${!text.trim()}>Send</button></form></li>`}
+            <button type="submit" class="btn sm" disabled=${!text.trim() || (liveMode.on && chatLive.requestBusy(r))}>Send</button></form></li>`}
         </ul></section>`}
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
     </div>`}
     <div class="req-actions qc-actions">
-      ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
+      ${done && html`
+      ${(!isQ || rec) && html`<button type="button" disabled class=${cx('btn', outcome.tone === 'yes' && !outcome.typed && 'chosen yes')}><${Icon} name=${isQ ? 'sparkles' : 'check'} size=${14} />${outcome.tone === 'yes' && !outcome.typed ? outcome.label : isQ ? 'Accept' : 'Allow'}</button>`}
+      ${(!isQ || rec) && html`<button type="button" disabled class=${cx('btn', outcome.tone === 'no' && 'chosen no')}><${Icon} name="x" size=${14} />${outcome.tone === 'no' ? outcome.label : 'Deny'}</button>`}
+      ${(outcome.text || outcome.tone === 'off' || (isQ && !rec)) && html`<span class=${cx('qc-outcome', outcome.tone)}>${(outcome.typed || outcome.tone === 'off' || !rec) && html`<b>${outcome.label}</b>`}${outcome.text && html`<span>${outcome.text}</span>`}</span>`}
+      `}
+      ${!done && html`
+      ${!isQ && liveMode.on && liveSplit('Allow', 'check', 'Always allow', 'allow_once', 'allow_always')}
+      ${!isQ && liveMode.on && liveSplit('Deny', 'x', 'Always deny', 'reject_once', 'reject_always')}
+      ${!isQ && liveMode.on && opts.filter((o) => !['allow_once', 'allow_always', 'reject_once', 'reject_always'].includes(o.kind)
+        || (o.kind === 'allow_always' && !opts.some((x) => x.kind === 'allow_once')) || (o.kind === 'reject_always' && !opts.some((x) => x.kind === 'reject_once')))
+        .map((o) => html`<button key=${o.id} disabled=${chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => answer(o.id)}>${o.label}</button>`)}
+      ${rec && !declined && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
-      ${!isQ && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
-      ${!isQ && split('Deny', 'x', 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
+      ${!isQ && !liveMode.on && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
+      ${!isQ && !liveMode.on && split('Deny', 'x', 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
+      `}
       <button type="button" class="btn" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
       ${thread}
     </div>
@@ -278,12 +344,12 @@ export function MergeFacts({ s, r }) {
 }
 function MergeBrief({ s, r, openThread }) {
   const [back, setBack] = useState(false); const [why, setWhy] = useState(''); const box = useRef(null);
-  const live = r.status === 'open';
+  const live = r.status === 'open' && !r.heldBy;
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
   const send = (e) => { e.preventDefault(); if (why.trim()) act.answerRequest(r.id, 'decline', why.trim()); };
-  return html`<section class=${cx('req mg', !live && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Merge: ' + r.title}>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req mg', !live && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Merge: ' + r.title}>
     <p class="mg-brief">${r.brief || r.body}</p>
     ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
     <${MergeFacts} s=${s} r=${r} />
@@ -306,17 +372,17 @@ export function RequestBlock({ s, request: r, variant = 'card', openThread = nul
   const now = useNow();
   const a = agentOf(s, r.agent); const p = projectOf(s, r.project);
   const [text, setText] = useState('');
-  const open = r.status === 'open';
+  const open = r.status === 'open' && !r.heldBy;
   const waited = now - r.createdAt;
   const fill = (yes) => cx('btn', yes && primary && 'primary');
   const thread = openThread && (typeof openThread === 'string'
     ? html`<a class="btn ghost" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
     : html`<button type="button" class="btn ghost" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
   const opts = r.options || [];
-  const rec = r.kind === 'question' && r.recommendation ? opts.find((o) => o.primary) : null;
+  const rec = r.kind === 'question' && (r.recommendation || liveMode.on) ? opts.find((o) => o.primary) : null;
   const sub = a.failure && subOf(s, a.failure.subscription);
   const fixed = r.kind === 'failed' && sub && sub.signedIn;
-  return html`<section class=${cx('req', variant, r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
+  return html`<section aria-busy=${liveMode.on && chatLive.requestBusy(r)} class=${cx('req', variant, r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
     ${variant === 'card' && html`<div class="req-head">
       <span class=${cx('kind', open ? r.kind : 'closed')}>${KIND_LABEL[r.kind]}</span>
       ${who && html`<span class="req-who"><${Avatar} agent=${a} s=${s} size="sm" status=${false} />${agentLabel(s, a, { withTeam: true })}</span>`}
@@ -334,24 +400,24 @@ export function RequestBlock({ s, request: r, variant = 'card', openThread = nul
       <div class="ev"><${Icon} name="git-commit-horizontal" size=${14} class="muted" /><span class="mono">${r.source}</span><${Icon} name="arrow-right" size=${12} class="muted" /><span class="mono">${r.target}</span><span class="muted">${r.evidence.commits} commits · ${r.evidence.files} files</span></div>
     </div>`}
     ${open && r.kind === 'question' && html`<div class="req-actions">
-      ${rec && html`<button type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept recommendation</button>`}
-      ${opts.filter((o) => o !== rec).map((o) => html`<button key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
-      <form class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+      ${rec && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept recommendation</button>`}
+      ${opts.filter((o) => o !== rec).map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      <form aria-busy=${liveMode.on && chatLive.requestBusy(r)} class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
         <input class="input" placeholder="Another answer" aria-label="Another answer" value=${text} onInput=${(e) => setText(e.target.value)} />
-        ${text.trim() && html`<button class="btn" type="submit">Send</button>`}
+        ${text.trim() && html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} class="btn" type="submit">Send</button>`}
       </form>
       ${thread}
     </div>`}
     ${open && r.kind === 'approval' && html`<div class="req-actions">
-      ${opts.map((o) => html`<button key=${o.id} type="button" class=${cx(fill(o.primary && !r.blind), o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      ${opts.map((o) => html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} key=${o.id} type="button" class=${cx(fill(o.primary && !r.blind), o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
       ${thread}</div>`}
     ${open && r.kind === 'merge' && html`<div class="req-actions">
       <button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'merge-review', requestId: r.id })}>Review and merge</button>
-      <button type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
+      <button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
       ${thread}</div>`}
     ${open && r.kind === 'failed' && html`<div class="req-actions">
-      ${fixed
-        ? html`<button type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, 'resume')}><${Icon} name="play" size=${13} />Resume</button>`
+      ${liveMode.on || fixed
+        ? html`<button disabled=${liveMode.on && chatLive.requestBusy(r)} type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, 'resume')}><${Icon} name="play" size=${13} />Resume</button>`
         : html`<button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'signin', subscription: a.failure?.subscription || a.subscription, then: r.id })}>Sign in on ${machineOf(s, a.failure?.machine || p.machine).name}</button>`}
       ${thread}</div>`}
     ${!open && variant === 'detail' && html`<div class="answer"><${Icon} name="check" size=${14} /><span>${r.answer} at ${clock(r.answeredAt)}</span></div>`}
@@ -363,10 +429,13 @@ function ToolGroup({ item }) {
   return html`<details class="tools">
     <summary><${Icon} name="wrench" size=${13} /><span>${item.summary}</span><${Icon} name="chevron-right" size=${14} class="chev" /></summary>
     ${item.lines.map((l, i) => html`<div class="tool-line" key=${i}><span class="verb">${l.verb}</span><span class="arg">${l.arg}</span><span class="res">${l.res}</span></div>`)}
+    ${item.full && html`<div class="tool-box"><h5>Command</h5><${CodeBox} text=${item.full} label="command" /></div>`}
+    ${item.output && html`<div class="tool-box"><h5>Output</h5><${CodeBox} text=${item.output} label="output" /></div>`}
   </details>`;
 }
 function LargeItem({ item }) {
   const [state, setState] = useState('closed');
+  if (liveMode.on) return html`<div class="tools"><span>${item.title} (${item.size})</span><button type="button" class="btn sm" disabled=${chatLive.busy('large:' + item.sequence)} onClick=${() => chatLive.loadLarge(item)}>Load</button></div>`;
   const sample = ['round 2 · statement 11 · keyboard order at 390px', '  finding F-21 minor: focus leaves the drawer on Tab', '  finding F-22 major: Escape does not return focus to the menu button', 'round 2 · statement 12 · visible focus ring', '  no findings', 'round 2 · statement 13 · bottom key row', '  finding F-23 minor: Ctrl stays latched after Escape', 'round 2 · statement 14 · drawer order', '  finding F-24 minor: service pages come before agents', 'score: 6 points (1 major, 3 minor)', 'stuck statements: none', 'next: round 3 only if a major stays open'];
   return html`<div class="tools" style="grid-column:2">
     <div class="tool-line" style="border-top:0;min-height:var(--row)"><${Icon} name="file-text" size=${14} class="muted" /><span class="grow"><b style="font-weight:var(--weight-medium)">${item.title}</b> <span class="muted">(${item.size})</span></span>
@@ -386,6 +455,7 @@ registerDialog('large-item', ({ d }) => html`<${Dialog} title=${d.title} size="w
 // which the project view points at the side panel.
 export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
   const a = agentOf(s, agentId); const items = threadOf(s, agentId); const now = useNow();
+  useEffect(() => chatLive.watchThread(agentId), [agentId]);
   const box = useRef(null); const atEnd = useRef(true); const [away, setAway] = useState(false);
   const count = items.length + (s.pending[agentId] ? 1 : 0);
   // A thread opens at its latest message, and follows new ones while you are at the end.
@@ -395,16 +465,16 @@ export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
     if (focusReq) { const t = el.querySelector('#req-' + focusReq); if (t) { t.scrollIntoView({ block: 'center' }); t.focus?.({ preventScroll: true }); el.style.scrollBehavior = ''; return; } }
     el.scrollTop = el.scrollHeight; el.style.scrollBehavior = '';
   }, [agentId, focusReq]);
-  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current && !focusReq) el.scrollTop = el.scrollHeight; }, [count]);
+  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current && !focusReq) el.scrollTop = el.scrollHeight; }, [count, items]);
   const onScroll = (e) => { const el = e.currentTarget; atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; setAway(!atEnd.current); };
   const below = away ? openRequests(s, { agent: agentId }).length : 0;
   const opener = (r) => (r.agent === agentId ? null : onOpenThread ? () => onOpenThread(r.agent, r.id) : routeForRequest(s, r));
   let lastDay = null;
   return html`<div style="position:relative;display:flex;flex-direction:column;flex:1;min-height:0">
-    <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-label=${'Thread with ' + a.name}>
-      ${items.length === 0 && html`<div class="empty" data-empty><strong>No messages yet</strong></div>`}
+    <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-busy=${liveMode.on && chatLive.busy('thread:' + agentId)} aria-label=${'Thread with ' + a.name}>
+      ${items.length === 0 && html`<div class="empty" data-empty><strong>${liveMode.on && chatLive.busy('thread:' + agentId) ? 'Loading thread…' : 'No messages yet'}</strong></div>`}
       ${items.map((it) => {
-        const d = dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
+        const d = it.ts == null ? null : dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
         let body;
         if (it.type === 'user' && !it.from) {
           body = html`<div class="msg mine" key=${it.id}>
@@ -446,7 +516,7 @@ export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
 // Only the project lead takes messages. Another agent's thread is read-only, and gains a
 // reply box only while that agent has an open question for the owner.
 export function canMessage(s, a) {
-  return a.role === 'project-lead' || openRequests(s, { agent: a.id }).some((r) => r.kind === 'question');
+  return liveMode.on || a.role === 'project-lead' || openRequests(s, { agent: a.id }).some((r) => r.kind === 'question');
 }
 export function ReadOnlyBar({ s, agent, center, onLead }) {
   const st = agentStatus(s, agent); const p = projectOf(s, agent.project);
@@ -460,12 +530,19 @@ export function ReadOnlyBar({ s, agent, center, onLead }) {
 // ---- composer -----------------------------------------------------------------
 function ContextPicker({ s, agent, onAdd, onClose }) {
   const [q, setQ] = useState('');
+  const [found, setFound] = useState([]);
+  useEffect(() => {
+    if (!liveMode.on) return;
+    let active = true;
+    chatLive.searchContext(agent, q).then((items) => { if (active) setFound(items); }).catch((e) => { if (active) { setFound([]); act.toast(e.message, 'error'); } });
+    return () => { active = false; };
+  }, [agent.id, q]);
   const tasks = s.tasks.filter((t) => t.project === agent.project).map((t) => ({ k: t.label, label: `${t.label} ${t.title}`, icon: 'list-checks' }));
   const files = [...new Set(s.tasks.filter((t) => t.project === agent.project).flatMap((t) => t.files))].map((f) => ({ k: f, label: f, icon: 'file-code' }));
   const match = (x) => x.label.toLowerCase().includes(q.toLowerCase());
-  const T = tasks.filter(match).slice(0, 6), F = files.filter(match).slice(0, 6);
+  const T = liveMode.on ? found.filter((x) => x.reference._tag === 'task') : tasks.filter(match).slice(0, 6), F = liveMode.on ? found.filter((x) => x.reference._tag === 'file') : files.filter(match).slice(0, 6);
   useKey((e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }, []);
-  const row = (x) => html`<button type="button" key=${x.k} class="menu-item" onClick=${() => onAdd(x.k)}><${Icon} name=${x.icon} size=${14} /><span class="truncate">${x.label}</span></button>`;
+  const row = (x) => html`<button type="button" key=${x.k} class="menu-item" onClick=${() => onAdd(liveMode.on ? x : x.k)}><${Icon} name=${x.icon} size=${14} /><span class="truncate">${x.label}</span></button>`;
   return html`<div class="menu" style="position:absolute;left:8px;bottom:calc(100% + 4px);width:min(380px,calc(100% - 16px))">
     <div class="search" style="padding:2px"><${Icon} name="search" size=${14} /><input class="input" autofocus placeholder="Search tasks and files" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
     ${T.length > 0 && html`<div class="menu-label">Tasks</div>${T.map(row)}`}
@@ -529,6 +606,7 @@ export function Composer({ s, agentId, center }) {
   useEffect(() => { setCtx([]); setPicking(false); setFiles([]); }, [agentId]);
   const patch = (id, ch) => setFiles((cur) => cur.map((x) => (x.id === id ? { ...x, ...ch } : x)));
   const addFiles = (list) => {
+    if (liveMode.on) { refuse(); return; }
     const ok = [...list].filter((f) => { if (f.size <= FILE_LIMIT) return true; act.toast(`${f.name} is larger than 100 MB`, 'error'); return false; });
     const items = ok.map((f) => { const pic = f.type.startsWith('image/') && !/gif|svg/.test(f.type);
       return { id: uid('f'), file: f, name: f.name || 'Pasted image.png', size: f.size, image: pic, working: pic, url: null }; });
@@ -545,17 +623,17 @@ export function Composer({ s, agentId, center }) {
     onDrop: (e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); } };
   const onPaste = (e) => { const fl = e.clipboardData?.files; if (fl?.length) { if (!e.clipboardData.getData('text/plain')) e.preventDefault(); addFiles(fl); } };
   const live = s.conn.status === 'live';
-  const ready = (draft.trim() || files.length) && live && !files.some((f) => f.working);
-  const send = () => { if ((!draft.trim() && !files.length) || files.some((f) => f.working)) return; act.sendMessage(agentId, draft, ctx, files.map(sentForm).map(({ file, small, working, useOriginal, ...f }) => f)); setCtx([]); setFiles([]); bump((n) => n + 1); };
+  const ready = (draft.trim() || files.length) && !chatLive.busy('agent:' + agentId) && live && !files.some((f) => f.working);
+  const send = async () => { if (!ready) return; if ((!draft.trim() && !files.length) || files.some((f) => f.working)) return; const sent = await act.sendMessage(agentId, draft, ctx, files.map(sentForm).map(({ file, small, working, useOriginal, ...f }) => f)); if (liveMode.on && !sent) return; setCtx([]); setFiles([]); bump((n) => n + 1); };
   const onInput = (e) => {
     const v = e.target.value; act.setDraft(key, v); bump((n) => n + 1);
     const pos = e.target.selectionStart; if (v[pos - 1] === '@' && (pos === 1 || /\s/.test(v[pos - 2]))) setPicking(true);
   };
   const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
-  const addCtx = (k) => { setCtx((c) => (c.includes(k) ? c : [...c, k])); setPicking(false); act.setDraft(key, draft.replace(/@$/, '')); bump((n) => n + 1); ta.current?.focus(); };
+  const addCtx = (k) => { setCtx((c) => (c.some((x) => (x.k || x) === (k.k || k)) ? c : [...c, k])); setPicking(false); act.setDraft(key, draft.replace(/@$/, '')); bump((n) => n + 1); ta.current?.focus(); };
   const h = HARNESSES[a.harness];
   const subs = s.subscriptions.filter((x) => x.harness === a.harness);
-  const busyLine = pending ? 'Working on your message' : (a.state === 'working' || a.state === 'waiting') && a.activity ? a.activity : null;
+  const busyLine = liveMode.on && a.configuration?.status === 'pending' ? 'Model and effort apply from the next turn' : liveMode.on && ['refused', 'unsupported', 'unavailable'].includes(a.configuration?.status) ? a.configuration.status + ': ' + (a.configuration.reason || '') : pending ? 'Working on your message' : (a.state === 'working' || a.state === 'waiting') && a.activity ? a.activity : null;
   const canStop = a.state === 'working' || a.state === 'waiting';
 
   if (a.state === 'failed') {
@@ -568,18 +646,18 @@ export function Composer({ s, agentId, center }) {
   if (a.state === 'stopped') {
     return html`<div class=${cx('composer-wrap', center && 'center')}><div class="composer-state">
       <${Icon} name="circle-stop" class="muted" /><div class="txt"><b>${a.name} is stopped.</b><small>${draft ? 'Your draft is kept. ' : ''}Resume continues from its last turn.</small></div>
-      <button type="button" class="btn primary" onClick=${() => act.resumeAgent(a.id)}><${Icon} name="play" size=${13} />Resume</button>
+      <button type="button" disabled=${liveMode.on && chatLive.busy('agent:' + a.id)} class="btn primary" onClick=${() => act.resumeAgent(a.id)}><${Icon} name="play" size=${13} />Resume</button>
     </div></div>`;
   }
   return html`<div class=${cx('composer-wrap', center && 'center')}>
     ${(busyLine || canStop) && html`<div class="statusline">
       ${busyLine && html`<i class=${cx('dot', st.dot)}></i><span class="truncate">${busyLine}</span>`}
-      ${canStop && html`<button type="button" class="btn sm" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${11} />Stop agent</button>`}
+      ${canStop && html`<button type="button" disabled=${liveMode.on && chatLive.busy('agent:' + a.id)} class="btn sm" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${11} />Stop agent</button>`}
     </div>`}
     <div class=${cx('composer', over && 'drop')} style="position:relative" ...${dropOn}>
       ${over && html`<div class="drop-note" aria-hidden="true"><${Icon} name="upload" size=${16} />Drop to attach</div>`}
       ${picking && html`<${ContextPicker} s=${s} agent=${a} onAdd=${addCtx} onClose=${() => setPicking(false)} />`}
-      ${ctx.length > 0 && html`<div class="ctx">${ctx.map((c) => html`<span class="chip" key=${c}><span class="mono">${c}</span><button type="button" aria-label=${'Remove ' + c} onClick=${() => setCtx(ctx.filter((x) => x !== c))}><${Icon} name="x" size=${11} /></button></span>`)}</div>`}
+      ${ctx.length > 0 && html`<div class="ctx">${ctx.map((c) => html`<span class="chip" key=${c.k || c}><span class="mono">${c.label || c}</span><button type="button" aria-label=${'Remove ' + (c.label || c)} onClick=${() => setCtx(ctx.filter((x) => x !== c))}><${Icon} name="x" size=${11} /></button></span>`)}</div>`}
       <${Attachments} files=${files} onRemove=${(id) => setFiles(files.filter((f) => f.id !== id))} onOriginal=${(id) => patch(id, { useOriginal: !files.find((f) => f.id === id).useOriginal })} />
       <input ref=${fileIn} type="file" multiple hidden onChange=${(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <label class="sr" for=${'composer-' + agentId}>Message ${a.name}. Enter sends, Shift and Enter adds a line.</label>
@@ -590,12 +668,12 @@ export function Composer({ s, agentId, center }) {
         <${Menu} class="pick" side="top" label="Subscription" trigger=${html`<span class="truncate">${subLabel(s, a.subscription)}</span><${Icon} name="chevron-down" size=${12} />`}
           items=${[{ heading: 'Subscription' }, ...subs.map((x) => ({ label: `${h.name} · ${x.name}`, sub: machineOf(s, x.machine).name, checked: x.id === a.subscription, disabled: !x.signedIn, why: x.signedIn ? null : 'Signed out', onSelect: () => act.setAgentConfig(a.id, { subscription: x.id }) }))]} />
         <${Menu} class="pick" side="top" label="Model" trigger=${html`<span>${a.model}</span><${Icon} name="chevron-down" size=${12} />`}
-          items=${[{ heading: 'Model, from the next turn' }, ...h.models.map((m) => ({ label: m, checked: m === a.model, onSelect: () => act.setAgentConfig(a.id, { model: m }) }))]} />
+          items=${[{ heading: 'Model, from the next turn' }, ...(liveMode.on ? a.models || [] : h.models).map((m) => ({ label: m.label || m.id || m, checked: (m.id || m) === a.model, disabled: chatLive.busy('agent:' + a.id), onSelect: () => act.setAgentConfig(a.id, { model: m.id || m }) }))]} />
         <${Menu} class="pick" side="top" label="Effort" trigger=${html`<span>${a.effort}</span><${Icon} name="chevron-down" size=${12} />`}
-          items=${[{ heading: 'Effort, from the next turn' }, ...h.efforts.map((m) => ({ label: m, checked: m === a.effort, onSelect: () => act.setAgentConfig(a.id, { effort: m }) }))]} />
-        <span class=${cx('ctxuse', a.context >= 80 && 'warn-text')} data-tip="Share of the context window in use" data-tip-side="top">${a.context}%</span>
+          items=${[{ heading: 'Effort, from the next turn' }, ...(liveMode.on ? a.efforts || [] : h.efforts).map((m) => ({ label: m.label || m.id || m, checked: (m.id || m) === a.effort, disabled: chatLive.busy('agent:' + a.id), onSelect: () => act.setAgentConfig(a.id, { effort: m.id || m }) }))]} />
+        <span class=${cx('ctxuse', a.context >= 80 && 'warn-text')} data-tip="Share of the context window in use" data-tip-side="top">${a.context == null ? '—' : a.context + '%'}</span>
         ${pending
-          ? html`<button type="button" class="send stop" aria-label="Stop this reply" data-tip="Stop this reply" data-tip-side="left" onClick=${() => act.stopReply(agentId)}><${Icon} name="square" size=${12} /></button>`
+          ? html`<button type="button" class="send stop" disabled=${chatLive.busy('agent:' + agentId)} aria-label="Stop this reply" data-tip="Stop this reply" data-tip-side="left" onClick=${() => act.stopReply(agentId)}><${Icon} name="square" size=${12} /></button>`
           : html`<button type="button" class="send" aria-label="Send" disabled=${!ready} onClick=${send}><${Icon} name="arrow-up" size=${15} /></button>`}
       </div>
     </div>

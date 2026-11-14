@@ -8,6 +8,7 @@ import { type Parsed } from "./parse.ts"
 import { describeFailure, err, formatEvent, out } from "./output.ts"
 import { sanitizeJson } from "./sanitize.ts"
 import { reportWait } from "./wait.ts"
+import { readMockEditorExport } from "./mockEditorFile.ts"
 
 // SIGTERM or SIGINT interrupts a blocking wait; closing its connection
 // cancels the wait on the engine (an Interrupt frame, then the socket).
@@ -18,6 +19,8 @@ export const runCommand = (
   command: CommandName, parsed: Parsed, environment: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<number> =>
   Effect.scoped(Effect.gen(function* () {
+    const payload = command === "project.mocks.editor.save" && parsed.file !== undefined
+      ? { ...parsed.payload, content: yield* readMockEditorExport(parsed.file) } : parsed.payload
     const client = yield* connect({ environment })
     if (command === "client.wait") return reportWait(yield* waitForAgents(client, parsed.payload as unknown as Parameters<typeof waitForAgents>[1]).pipe(Effect.onInterrupt(() => cancelled)))
     if (command === "thread.export") {
@@ -37,7 +40,7 @@ export const runCommand = (
       )
       return reportWait(reply)
     }
-    const reply = yield* (call(parsed.payload) as Effect.Effect<any, unknown>)
+    const reply = yield* (call(payload) as Effect.Effect<any, unknown>)
     out(typeof reply?.data === "string" ? `${reply.data}\n` : `${sanitizeJson(reply, 2)}\n`)
     return 0
   })).pipe(

@@ -1,6 +1,8 @@
+import { restartAfterShutdown } from './client/restartLaunch.ts';
+import { installRestarter, captureRunningVersion } from "./client/serviceControl.ts"
 import { lstatSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -18,7 +20,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { makeCredentialRegistry } from "./accounts/credentialSource.ts";
 import * as SecretStore from "./accounts/SecretStore.ts";
 import { AlertSender } from "./client/alerts/AlertSender.ts";
-import { makeNtfy } from "./client/alerts/carriers/ntfy.ts";
+import { makeCarriers } from "./client/alerts/carriers/index.ts";
 import { SecretStore as SecretStoreService } from "./commands/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
@@ -34,6 +36,8 @@ import { migrate, migratePieces } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
+import * as GuardedRunner from "./harnesses/guardedRunner.ts";
+import { makeHarnessPrograms, userHarnessPrefix } from "./harnesses/programs.ts";
 import { installedHarnessDefaults } from "./runner/harnesses.ts";
 import { engineLists, type EngineLists } from "./pieces/lists.ts";
 import { drainPieceErrors } from "./pieces/guardPiece.ts";
@@ -60,7 +64,7 @@ const baseServices = (lists: EngineLists) => Layer.unwrap(Effect.gen(function* (
 const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(function* () {
   const recovery = yield* Effect.serviceOption(Restart.Restart);
   const customSender = yield* Effect.serviceOption(AlertSender);
-  const sender = Option.isSome(customSender) ? customSender.value : makeNtfy(yield* SecretStoreService);
+  const sender = Option.isSome(customSender) ? customSender.value : makeCarriers(yield* SecretStoreService);
   // Finish a removed batch before observing cancellation, so shutdown cannot
   // discard diagnostics between clearing the pending map and writing its logs.
   const drain = Effect.suspend(() => Effect.forEach(drainPieceErrors(), (entry) =>
@@ -84,13 +88,13 @@ const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(fu
   }
 }));
 
-const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists) =>
+const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults" | "harnessPrograms">, lists: EngineLists) =>
   pieceFollowers(lists).pipe(Layer.provideMerge(CommandHandler.layer({ ...configuration,
     capacityHoldCondition: (id, snapshot) => withinCapacityLimit(snapshot, id, capacityHoldCount(snapshot, id)),
   }, lists)));
 
 // Importing this module never starts the CLI or changes the process environment.
-export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
+export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults" | "harnessPrograms">, lists: EngineLists = engineLists) =>
   handlerServices(configuration, lists).pipe(Layer.provideMerge(baseServices(lists)));
 
 const program = (inheritedToken: string | undefined, webPassword: Redacted.Redacted<string> | undefined) => Effect.scoped(Effect.gen(function* () {
@@ -147,18 +151,27 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
       },
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
+    const managedRoot = userHarnessPrefix(process.env.HOME ?? folder);
+    const harnessPath = (process.env.PATH ?? "").split(delimiter).filter((path) => isAbsolute(path) && resolve(path) !== managedRoot && !resolve(path).startsWith(managedRoot + "/")).join(delimiter);
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
-      harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
+      harnessDefaults: installedHarnessDefaults(harnessPath),
+      harnessPrograms: makeHarnessPrograms({ home: process.env.HOME ?? folder, path: harnessPath, stateFolder: folder, credentials }) };
     const base = baseServices(lists);
-    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
+    const runnerEnvironment: NodeJS.ProcessEnv = { ...process.env, PATH: harnessPath };
+    // Bundled adapters resolve their own vendor runtimes. Do not implicitly
+    // select a mutable managed install through PATH or a service override.
+    delete runnerEnvironment.CODEX_PATH; delete runnerEnvironment.CLAUDE_CODE_EXECUTABLE;
+    const rawRunner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: runnerEnvironment, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
+    const runner = GuardedRunner.layer(configuration).pipe(Layer.provideMerge(rawRunner));
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
     const services = handlerServices(configuration, lists).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
     return yield* Effect.gen(function* () {
       if (debug) yield* Effect.logInfo("debug RPC group enabled");
       yield* listener.install(yield* application({ ownerCredential, debug, lists }));
       const web = yield* serveWeb({ password: webPassword, lists, staticRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+        studioRoot: fileURLToPath(new URL("../../studio/dist", import.meta.url)),
         registerSecret: (secret) => { explicitSecrets.push(secret); } });
       yield* Effect.addFinalizer(() => web.close);
       yield* (yield* Restart.Restart).recover;
@@ -188,6 +201,9 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
 // A graceful signal interrupts the whole scoped program. Finalizers close
 // connections and adapters before releasing the lifetime lock.
 if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  await captureRunningVersion(fileURLToPath(new URL("../../..", import.meta.url)));
+  const launchEnvironment = { ...process.env } as Record<string, string>;
+  let restarting = false;
   const inheritedToken = process.env.LGTM_TOKEN;
   const webPassword = process.env.LGTM_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.LGTM_WEB_PASSWORD);
   delete process.env.LGTM_WEB_PASSWORD;
@@ -195,12 +211,20 @@ if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === imp
   process.umask(0o077);
   const fiber = Effect.runFork(program(inheritedToken, webPassword));
   const stop = () => fiber.interruptUnsafe();
+  if (typeof process.execve === "function") installRestarter(() => {
+    if (restarting) return;
+    restarting = true;
+    // Let the acknowledgement leave both transports before closing scopes.
+    setTimeout(stop, 250);
+  });
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
   const result = await Effect.runPromise(Fiber.await(fiber));
+  installRestarter(undefined);
   process.removeListener("SIGTERM", stop);
   process.removeListener("SIGINT", stop);
-  if (Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
+  if (restarting) restartAfterShutdown(() => process.execve!(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], launchEnvironment));
+  if (!restarting && Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
     // Startup failures contain fixed service-owned categories only. Never
     // serialize a cause: the underlying database may quote stored data.
     const allowed = ["state folder is a symbolic link", "state folder mode is not 0700", "state folder is owned by another user", "state folder is not a directory", "socket path exceeds 100 bytes"];

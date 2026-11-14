@@ -94,6 +94,7 @@ export const makeFakeSecrets = (): FakeSecrets => {
 };
 
 export interface Fakes {
+  readonly harnessPrograms?: import("../../src/harnesses/programs.ts").HarnessPrograms;
   readonly runner: FakeRunner;
   readonly secrets: FakeSecrets;
   // WS-7b: the production default declines until the roles condition exists.
@@ -123,6 +124,7 @@ export const provideRig = <A, E, R>(
     Effect.map(EventLog.EventLog, fakes.wrapLog),
   ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
+    ...(fakes.harnessPrograms === undefined ? {} : { harnessPrograms: fakes.harnessPrograms }),
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
     ...(fakes.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: fakes.capacityHoldCondition }),
     ...(fakes.harnessDefaults === undefined ? {} : { harnessDefaults: fakes.harnessDefaults }),
@@ -203,6 +205,7 @@ export type SeedState = "starting" | "working" | "idle" | "paused" | "interrupte
 
 export interface SeedAgent {
   readonly id: string;
+  readonly role?: string;
   readonly name?: string;
   readonly parent?: string | undefined; // an agent id; absent means the owner
   readonly state?: SeedState | undefined;
@@ -221,7 +224,7 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   const token = mintAgentToken();
   const parent: Actor = spec.parent === undefined ? { _tag: "owner" } : { _tag: "agent", agentId: agentIdOf(spec.parent) };
   const events: Array<Event> = [decodeEvent({
-    _tag: "AgentStarted", agentId, name: spec.name ?? `name-${spec.id}`, role: "worker", groups: spec.groups ?? [], parent,
+    _tag: "AgentStarted", agentId, name: spec.name ?? `name-${spec.id}`, role: spec.role ?? "worker", groups: spec.groups ?? [], parent,
     harness: "first", account: "primary", permission: spec.permission ?? "ask", folder: spec.folder ?? defaultFolder,
     runMode: "acp", model: "test-model", effort: "high",
   })];
@@ -337,7 +340,7 @@ export const failureOf = (outcome: Outcome): { readonly _tag: string; readonly r
   outcome._tag === "Failure" ? { _tag: outcome.failure._tag, reason: outcome.failure.reason } : undefined;
 
 export const harnessSettings = (id = "first", overrides: Record<string, unknown> = {}) => ({
-  id, runMode: "acp", adapterPath: "/opt/adapters/first", adapterArguments: ["--stdio"],
+  id, runMode: "acp", adapterPath: process.execPath, adapterArguments: ["--stdio"],
   permissionMapping: { "read-only": "plan", ask: "default", edit: "acceptEdits", full: "bypass" },
   reportedModes: [{ id: "plan", level: "read-only" }], defaultPermission: "ask",
   models: ["test-model"], efforts: ["high"], denyReadMechanism: { _tag: "none" },

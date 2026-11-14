@@ -9923,7 +9923,7 @@ The original browser cases for conversation history and phone thread answering s
 The replacement shell keeps its closed phone navigation inert.
 The agent links also include their displayed state in their accessible name.
 The original Alerts and Settings layout cases waited for regions named Alerts and Settings.
-The actual service regions are named Phone notifications and Service settings.
+The actual service regions are named Notifications and Service settings.
 All four original browser failures and their complete contexts remain preserved.
 
 The two agent cases now open the actual navigation with its existing helper and click the named agent inside the Projects navigation.
@@ -10768,7 +10768,7 @@ The manager owns the separate new-project disposition; that case is not repeated
 ## 609. The Git lost-reply assertion is timing-sensitive in a full browser run
 
 Found: 2026-11-10, while finishing the independently reviewed W09 correction.
-State: open, reserved by the manager; no correction is applied in this merge.
+State: fixed by the web-flaky investigation.
 
 The full check on signed d71de21 passed typing, 507 unit files and 36 browser cases.
 The lost-reply assertion at git.spec.ts:269 still saw the initial unconfirmed acknowledgement within its unchanged five-second budget.
@@ -10785,9 +10785,24 @@ The fix stays as stated above: wait on the correct event, not a longer deadline.
 It is the next unit on area/website after the master merge.
 The original logs and failure contexts remain in the W09 author result.
 
+The web-flaky investigation reproduced the lost-reply failure once in two full browser repetitions with two workers.
+The engine log contained one completed commit.
+The page still showed the initial unconfirmed acknowledgment while its coherent Git refresh was pending.
+The test now observes that acknowledgment and the completed refresh before checking terminal uncertainty.
+The same run reproduced the fetch assertion with the old incoming count once in two repetitions.
+The synchronization test now observes the fetch, pull, and commit acknowledgment before checking each subsequent count.
+Every assertion retains its original five-second deadline.
+
 A related timing failure appeared in the full run of the rename branch on 2026-11-12, at git.spec.ts:316.
 After Pull, the sync line still said "1 incoming" after five seconds.
 The unchanged case passed on its own in 24.5 seconds.
+
+The corrected lost-reply and synchronization cases each passed 20 remote repetitions with two browser workers.
+The repeat run used zero retries and retained the original assertion deadlines.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
 
 
 ## 610. The merged shell constrained the Git workspace width
@@ -11015,3 +11030,2313 @@ The fix points the profile at `http://127.0.0.1:4178/mock/#/home` and copies the
 The components are now Button, Status dot, Agent row, Connection status, Segmented control, Inline link, Count and Badge.
 The agent rows show role names, such as Builder 2, in place of the invented name Rowan.
 `design/lgtm.fig` was made again from the rebuilt mock, and 15 of its 32 variants match the browser within 3 percent.
+
+## 622. The Machines page counts capacity-held agents as agent slots
+
+Found: 2026-11-13, while writing the checked gap table for connecting the mock.
+State: open.
+
+The current website's Machines page shows a number of held agent slots (`packages/web/src/admin/machines.tsx:20-21`).
+It counts the agents whose `capacityHeld` flag is true.
+That flag means a delivery was held because the model provider was at capacity (`packages/engine/src/routing/deliveries.ts:246`).
+It does not mean a machine slot is in use, so the number is wrong.
+The engine has no agent-slot record for a machine.
+The gap table is `.plans/plans/connect-mock/gap-table.md`.
+
+## 623. The live website shows the page's default settings, not the engine's
+
+Found: 2026-11-13, while connecting the mock to the engine (step 1 of the connect-mock plan).
+State: fixed for Service settings and Notifications in step 2.
+
+These pages now read their settings from the engine when opened.
+The Home notification offer reads the same carrier and dismissal settings.
+Unsupported settings are empty.
+Unset role overrides stay empty because the engine does not return effective role defaults.
+Appearance keeps browser preferences, as intended.
+Supplied actions call the authenticated client API.
+
+## 624. The live website's Machines page has no figures for the engine's machine
+
+Found: 2026-11-13, while connecting the mock to the engine.
+State: open.
+
+The engine sends no processor, memory, agent slot, address, operating system or harness version for any machine.
+The live website therefore shows a dash for processor and memory, and "Scanning…" for the harnesses.
+Its agent count reads "0 of 0", in the warning colour, because the slot limit is unknown and is stored as 0.
+The engine calls its own computer `local` until machine pairing exists, so the page names the machine `local`.
+
+## 625. The browser logs an error when a signed-out page checks its session
+
+Found: 2026-11-13, while connecting the mock to the engine.
+State: accepted.
+
+The live website asks `POST /api/session` whether it is signed in, and the engine answers 401 when it is not.
+A wrong password at `POST /api/login` is also answered with 401.
+Browsers log each 401 answer to the console as "Failed to load resource", although the page handles it.
+The browser tests therefore ignore console errors that name status 401.
+
+## 626. `lgtm serve --detach` does not say why the service failed to start
+
+Found: 2026-11-13, while starting the engine with a test state folder for the live website.
+State: open.
+
+With a long `LGTM_HOME`, the engine's socket path exceeds 100 bytes, and the service exits at once.
+The service prints "socket path exceeds 100 bytes", but `serve --detach` discards the child's output.
+The launcher reports only "lgtm: service failed to start".
+Running `node packages/engine/src/service.ts` directly shows the reason.
+
+## 627. The live board inferred sprint status from its phase.
+
+The first connection put a sprint into a column from its phase and completion time.
+The engine derives status from its completion text and task states.
+This change maps those four engine states and leaves Backlog empty.
+It also removes the mock's default priority, roadmap dates, and eight-phase progress from live board rendering.
+
+## 628. Project settings rendered values the engine does not store.
+
+The first connection supplied enabled test and review switches and a derived task prefix.
+The settings page also proposed a work assignment from the mock's model lists.
+This change leaves these live fields empty and keeps their actions on the explicit refusal.
+The lead's model and effort choices now come from the configuration read.
+
+## 629. A failed Git read hid independent task history.
+
+The new task detail read initially treated history and changed files as one successful operation.
+A refused Git read therefore hid history that the engine had returned.
+This change applies each successful read and shows the reason for each failed read.
+The browser fixture now registers a real temporary Git repository and its workspace settings.
+
+## 630. The sidebar did not refresh the owner's saved name.
+
+The connection originally read the owner's name only when it connected.
+Saving a display name during first run left the sidebar showing its old value.
+The connection now reads the settings again when their change arrives on the stream.
+
+## 631. The mock hides message post actions in a narrow panel.
+
+The existing message styles hide the post action buttons when the panel is narrower than 720 pixels.
+This also happens on a desktop when the sidebar and channel list reduce the panel width.
+The browser test uses a wide viewport to exercise those existing controls.
+Changing this layout remains outside this connection change.
+
+## 632. Generic dialogs closed before a live request finished.
+
+The mock's rename and confirmation dialogs close before their callbacks run.
+A live rename or archive therefore had no pending control and lost its draft on refusal.
+These dialogs now support waiting for a reply when the caller requests it.
+The connected project actions use this option.
+The standalone mock retains its immediate callbacks.
+
+## 633. Repository placeholders asserted that unknown data was absent.
+
+The repository page rendered a missing remote address as "None".
+Project settings rendered the same missing address as "No remote".
+The engine does not hold a remote address, so these statements were not supported by its records.
+The live fields now remain empty.
+The live repository description also omits the mock's promise that a lead will write it.
+
+## 634. The full browser check failed in three unchanged website cases.
+
+State: fixed by the web-flaky investigation.
+
+The full check at `04eb7aa` passed all TypeScript checks and all 528 test files.
+Its browser run passed the three Studio cases and failed three existing website cases.
+The Git staging case could not find the expected disabled "Commit 2 files" button after staging.
+The Git synchronization case retained "1 incoming" after Pull.
+The registered component preview case did not observe the expected document response.
+The affected website source, engine source, contracts, client source, and test bodies have no changes from `8f9f321` in this branch.
+The result file records the baseline checks for these failures.
+
+The web-flaky investigation reproduced the bulk-stage and component failures in a two-worker full browser run.
+The Git event log recorded a successful stage before the failed count assertion.
+The page was still refreshing its coherent state when that assertion expired.
+The test now waits for the stage acknowledgment and the completed refresh before checking the count.
+The component document returned 200 before the style assertion expired with its stylesheet still pending.
+The test now observes the exact issued document response before checking its separately authorized assets.
+It also finishes each reopened component document and its assets before changing its source or closing it.
+Those waits correct test ordering faults.
+The same investigation found repeated engine workspace validation on every component request.
+Issue web-flaky-1 records that product performance fault and its correction.
+The same correction separates the synchronization command acknowledgments from their subsequent counts.
+
+The corrected bulk-stage and component-preview cases each passed 20 remote repetitions with two browser workers.
+The same run also passed 20 synchronization cases and 20 heavy Git layout cases.
+The complete repeat run passed all 120 cases in 18.9 minutes without retries.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
+
+## 635. A failed logout claimed that the engine had ended the session.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The connection treated every logout response as a confirmed session revocation.
+It now removes the records immediately and shows a persistent warning unless the engine confirms the logout.
+An older session probe could also restore the records after logout.
+Session attempts now invalidate older replies.
+
+## 636. Truncated snapshots left references to missing records.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The mapping retained requests whose agents were absent from the mapped roster.
+Other bounded lists could leave missing repositories, projects, teams, sprints, tasks, or request holders.
+The mapping now recovers agent membership from unambiguous retained evidence.
+It omits children with missing required parents and clears optional links to omitted records.
+It does not turn a missing request holder into an owner-held request.
+
+## 637. Account and configuration events left the website stale.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Four account and configuration event types advanced the subscription cursor without refreshing mapped records.
+Those events now request a fresh snapshot before advancing the cursor.
+Oversized event markers use the same refresh rule.
+
+## 638. Lifecycle updates kept the previous activity text.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+An agent could resume working while its activity still said that it was signed out.
+The connection now recomputes the display state with the contracts helper.
+
+## 639. Failed retries postponed the offline deadline.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Every failed attempt restarted the offline timer and claimed a new contact time.
+Retries now share one outage deadline.
+Only a successful connection or a received stream item updates the last contact time.
+
+## 640. Refused settings changes still displayed Saved.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The Saved indicator bypassed the store's refusal guard.
+Its write now passes through the guarded update function.
+
+## 641. Unconnected controls simulated successful service actions.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+Reconnect now claimed success before the connection answered.
+Update checks, workflow checks, restarts, and harness scans also simulated successful work.
+The screen audit found similar pairing, repository discovery, account sign-in, message nudge, design-opening, download, and generated commit-message paths.
+A refused full run also scheduled a callback that tried to update a run that had never been created.
+Unconnected actions now show the required refusal notice before their simulation starts.
+Reconnect now leaves its status to the real connection.
+The standalone mock retains its simulation.
+
+## 642. The logout test supplied its own record cleanup.
+
+Found: 2026-11-13, in the review of the first live website connection.
+State: fixed.
+
+The previous rendering test supplied an ended session and empty records itself.
+Its name now describes that limited assertion.
+New tests invoke the actual logout control through the real connection.
+They inspect every mapped collection after confirmed and unconfirmed logout attempts.
+
+## 643. The separate browser gate reported four failures outside the studio page.
+
+Found: 2026-11-13, while verifying the connection review fixes on commit `7f56967`.
+State: fixed by the web-flaky investigation.
+
+The separate browser run passed 42 cases and failed four cases.
+The Git bulk-stage case at `packages/web/e2e/git.spec.ts:208` could not find the expected disabled Commit 2 files button.
+The Git fetch case at `packages/web/e2e/git.spec.ts:315` still displayed 0 incoming after its five-second deadline.
+Issue 609 already records a related Git synchronization timing failure.
+The logout-draft case at `packages/web/e2e/new-project.spec.ts:225` exceeded its 30-second limit.
+The component-preview case at `packages/web/e2e/new-project.spec.ts:605` did not observe the expected successful document response.
+The live studio case and the standalone mock case both passed.
+The original output is in `.foundry/remote-browser.log` in the `connect-fix` worktree.
+These failures were not investigated or attributed to a cause in this change.
+The lead owns the completion-gate assessment.
+The final full check on commit `c813a51` passed all 530 unit test files and 44 browser cases.
+The Git bulk-stage case failed at the same assertion.
+The registered-component preview case failed earlier at `packages/web/e2e/new-project.spec.ts:590`, where its expected heading was absent from the frame.
+The live studio case and the standalone mock case passed again.
+The final output is in `.foundry/remote-check.log` in the `connect-fix` worktree.
+
+The web-flaky correction separates the Git command acknowledgment from the coherent refresh.
+It separates display issuance, the exact document response, and rendered asset evidence.
+The original five-second assertion deadlines remain unchanged.
+Its logout correction is recorded in issue 653.
+The reproduced fetch report receives the same acknowledgment ordering correction in issue 609.
+
+The web-flaky repeat run passed all 120 cases in 18.9 minutes with two workers and zero retries.
+It included 20 repetitions each of bulk staging, lost-reply recovery, synchronization, logout, component preview, and the heavy Git layout journey.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
+
+## 644. A fast first response could leave the live page on its checking screen.
+
+Found: 2026-11-13, in the full browser check on commit `06eb0a0`.
+State: fixed.
+
+The store registered its listener in a passive effect.
+The initial session and snapshot could arrive before that listener existed.
+The store then held the signed-in records while the page still displayed its empty checking screen.
+The listener now registers in a layout effect before those asynchronous replies can arrive.
+The regression test uses the actual connection with immediate responses.
+The logout-control tests no longer delay their initial session response.
+The earlier delay had masked this product race in the test harness.
+
+## 645. Live request cards used the mock's fixed permission options.
+
+The mock's compact approval card always offered its own Allow and Deny identifiers.
+A harness can send different identifiers and persistent options.
+The live card now renders the engine's complete option list.
+The standalone mock keeps its original choices.
+The browser test answers a permission with a harness-specific identifier.
+
+## 646. Reading an absent thread could write into the live store.
+
+The mock's thread reader created an empty thread when none existed.
+Live threads are engine records, so that read now returns an empty list without writing.
+The live connection clears thread records when the owner session ends.
+
+## 647. A snapshot refresh could skip queued conversation events.
+
+The live connection advanced its stream cursor when it published a refreshed snapshot.
+A lifecycle event could trigger a snapshot that already included later prompt and reply events.
+Those events were then skipped when they arrived on the stream.
+The connection now advances the stream cursor only after processing each stream item.
+The first snapshot still anchors the initial subscription.
+The browser test verifies that a sent prompt appears before any reload.
+
+## 648. A fast session check could leave the page on its loading screen.
+
+The store subscribed its rendering listener in a delayed effect.
+A fast session check and snapshot could publish before that listener existed.
+The store now subscribes in a layout effect, before browser responses can arrive.
+The browser journey checks a signed-in reload after live actions.
+
+## 649. Context selection needs the registered worktree identity.
+
+A team's worktree can also be the project's registered checkout.
+The live context picker now uses the engine's worktree identifiers from the project and team records.
+It maps the search reply's result before displaying tasks and files.
+The browser test attaches a task identity to a real prompt in a temporary Git repository.
+
+## 650. Reads could start before the live connection was ready.
+
+Home could try its request and phone-offer reads before the transport became available.
+Home now starts those reads when the connection reports that it is live.
+A failed request uses the existing temporary notice, so its reason does not remain over the controls indefinitely.
+
+## 651. Some supplied labels were still shown as identifiers.
+
+The live composer showed an account identifier instead of its display name.
+Prompt context showed a task identifier instead of its available label.
+The roster did not distinguish an agent whose task was under review.
+The open screens now read account names and map task labels and the Reviewing state.
+The account reader retains only the identifier, harness, and display name.
+
+## 652. The live idle lane could claim that no work was assigned.
+
+An idle agent can still own an active task.
+The mock's fallback reason said "Nothing assigned" for that agent.
+The live lane now leaves the reason empty when the engine supplies no reason.
+The linked task remains visible.
+The standalone mock keeps its original wording.
+
+## 653. The existing project-creation logout journey can time out.
+
+Found: 2026-11-13, during the full remote check of `8577d48`.
+State: fixed by the web-flaky investigation.
+
+The case at `packages/web/e2e/new-project.spec.ts:225` reached its unchanged 30-second limit.
+The other 45 browser cases passed.
+The captured page showed the Machines registration form with its default values after login.
+The snapshot does not establish which awaited operation exhausted the limit.
+The same case passed alone at the required baseline, `8f9f321`.
+A bounded five-run comparison at that baseline then produced four identical timeouts and one pass.
+The production web source, engine source, and affected test file are unchanged from that baseline.
+The cause remains unproved.
+The task result records the complete checks and baseline comparisons.
+
+## 654. The snapshot could not be read once an account was added without an enabled flag
+
+Found: 2026-11-13, while setting up the first real project on LGTM Studio itself.
+State: fixed in the same change.
+
+An account added with `lgtm accounts` and no `enabled` field is stored without that field.
+The `client.snapshot` reply requires a true or false value for each account.
+The engine sent the unset value, so the reply could not be encoded and every snapshot failed.
+The current website and the live website both stayed on "Reconnecting", with no error shown.
+The engine now reports such an account as enabled, which is how account picking already treats it.
+The test is case 3.1a in `packages/engine/test/client/snapshot.test.ts`.
+
+## 655. The live website stays on "Reconnecting" when the snapshot fails, and says nothing
+
+Found: 2026-11-13, in the same check as issue 654.
+State: open.
+
+When `client.snapshot` fails for a reason other than a lost connection, the live website retries without end.
+It shows "Reconnecting" and gives the owner no reason.
+The connection in `packages/studio/src/connection.ts` drops the error.
+The owner should see that the service answered and what it said.
+
+## 656. The live approval card overflowed, and a delivered answer showed the engine's wrapper
+
+Found: 2026-11-13, by the owner, on the first real project.
+State: fixed in the same change.
+
+The live approval card showed each of the harness's options as its own button.
+A long standing option, such as "Yes, and don't ask again for commands that start with ...", ran past the card's edge.
+The card now has "Allow" and "Deny", as the mock designed it.
+A standing option from the harness sits in the menu beside its button, with the harness's wording as the note.
+An option of a kind the page does not know stays a button, and its text now wraps.
+A delivered answer appeared in the thread as "Data from another agent [...] (delivery ...): Answer to question ...".
+That text is the wrapper the engine puts around data for an agent's safety.
+The thread now shows one short line, "Answer delivered: ...", and shows other passed data without the wrapper.
+The context figure in the composer showed fifteen decimal places, and is now a whole percentage.
+
+## 657. The engine labels the owner's answer as "Data from another agent"
+
+Found: 2026-11-13, in the same check as issue 656.
+State: open.
+
+The wrapper around an answer the owner gave begins "Data from another agent" (`packages/engine/src/routing/envelope.ts:18`).
+The agent that asked is told the answer came from an agent, when it came from the owner.
+
+## 658. An open live page stays on "Offline" after the service restarts
+
+Found: 2026-11-13, by hand on the first real project.
+State: open.
+
+A restart of the service ends the browser's session.
+An open page of the live website then shows "Offline" and stays there.
+Only a reload brings up the Login page.
+The page should notice that the service answers again and ask the owner to sign in.
+
+## 659. The live Mocks tab did not read recorded bundles.
+
+The first live connection left each project's mock record empty.
+It also hid the Mocks tab because the snapshot does not carry a bundle flag.
+The step 2 adapter now reads complete mock history when the tab opens.
+It shows the Design stage tab and preserves whole revision approval semantics.
+A browser test covers current artifacts, stale artifact refusal, approval, and reload.
+This problem is fixed on the worker branch.
+
+## 660. The live repository design page used the sample's fixed sheets.
+
+The page did not read the registered design, components, or tokens.
+The step 2 adapter now loads those records when the page opens.
+The canvas retains its menus and tables without inventing flows or token modes.
+The isolated display controls restore keyboard focus after their requests finish.
+Browser tests cover actual mock and component documents, private URL revocation,
+and the editor route's refusal of changed design evidence.
+The expanded standalone test also caught and verified a palette regression introduced
+while connecting this page.
+This problem is fixed on the worker branch.
+
+## 661. Machines displayed unsupported capacity and installation placeholders.
+
+The live page treated a zero slot limit as real capacity.
+It also showed a persistent scanning state without reading harness discovery.
+The step 2 adapter now loads discovery and the saved workspace and web port.
+The page leaves unrecorded status, hardware, versions, limits, and timestamps empty.
+It counts worktrees from the loaded workspace records.
+Pairing, renaming, removing, and changing the limit retain the existing refusal.
+Browser tests cover these refusals, discovery, rescanning, and repository registration.
+This problem is fixed on the worker branch.
+
+## 662. Search treated unavailable repository metadata as known.
+
+The switcher showed "No remote" when the engine had not supplied a remote.
+Its wider agent text also used a lifecycle display word as activity.
+The live search mapping now indexes only the loaded repository, project, sprint,
+team, and role fields that the engine supplies.
+The existing word ranking remains in place.
+Unit tests cover the search mapping and ranking.
+The browser test covers navigation, empty results, and archived project exclusion.
+No search request is made to the engine.
+This problem is fixed on the worker branch.
+
+## 663. Display cleanup depended on a live socket.
+
+The new display adapter initially applied the socket guard to closing a frame.
+A lost socket could therefore prevent navigation cleanup from reaching the
+Hypertext Transfer Protocol (HTTP) endpoint.
+Closing an issued frame now remains available with the owner's session cookie
+after the socket or the connection closes.
+Opening a frame still requires the live connection.
+A focused test verifies both cleanup cases and the authenticated request options.
+This problem is fixed on the worker branch.
+
+## 664. A legacy Git browser case retained its initial uncertainty message.
+
+The full check on `c8f7009` passed all 529 unit test files.
+Its browser run failed the existing lost-reply case at `git.spec.ts:271`.
+The page retained its initial database acknowledgment warning instead of the
+expected terminal uncertainty message.
+Six focused repetitions of this case passed on baseline `803db7f`.
+The affected website source, engine source, and test body are unchanged.
+The cause has not been established.
+The worker result records the full check and baseline comparison outcomes.
+
+## 665. The known repository dialog referenced an unavailable local variable.
+
+The merge review found that opening the live dialog for a known repository
+referenced a `details` variable that the dialog did not define.
+The dialog now uses the repository's recorded local folder.
+It does not construct a folder from an unknown workspace setting.
+A regression test opens the dialog and checks the actual registered path.
+This problem is fixed in the merge.
+
+## 666. An answered question or approval card lost its contents.
+
+The owner reported this on 2026-11-13.
+An answered card in a thread shrank to its title and a short answer line.
+The summary, the recommendation and the report under "Details" were gone.
+The card now keeps everything it showed before the answer.
+The answer buttons stay in their row and are disabled.
+The chosen button is highlighted, in green for an allow or an accept and in red for a deny.
+A typed answer shows as "You answered" with the owner's words, and a cancelled request shows "Cancelled".
+"Details" stays usable beside them.
+The recommendation line leaves an answered card, and the row names the accepted answer instead.
+The change is in `BriefCard` in `design/mock/js/ui.js`, and the live website carries the chosen option's kind as `answerKind`.
+This is a change to the visible mock, and it awaits the owner's approval of the look.
+
+## 667. A lead repeated its question as a message after asking it.
+
+The owner reported this on 2026-11-13.
+The project lead called the `ask` tool, and the owner saw the question as a card.
+The lead then wrote "Sent through LGTM Studio:" and the same question again as an ordinary message.
+The tool's description did not say that the recipient already sees the question.
+The description in `packages/mcp/src/tools.ts` now says so, and it tells the agent not to repeat the question.
+This has not been checked against a real agent.
+A running agent keeps the old description until it is started again.
+The website does not hide a repeated question, because hiding an agent's free text could hide a real message.
+
+## 668. A live approval card showed the raw command as its title.
+
+The owner reported this on 2026-11-13.
+The Codex harness names a permission request with the command itself.
+The card's title was therefore a long command line.
+The live website now writes a plain title when the harness's description is only the command.
+Examples are 'Run "rm" in the terminal' and "Run a Python script of 40 lines".
+A harness's own description is kept when it differs from the command.
+The plain title names the program and not the agent's intent, because no harness reports the intent.
+The command and the folder under "Details" now sit in code boxes with a copy button.
+A long command scrolls inside its box, which is at most 260 pixels high.
+The folder now comes from the tool's own working folder when the harness reports one.
+
+## 669. A tool row in a live thread grew to the size of its command.
+
+The owner reported this on 2026-11-13.
+The grey row that shows an agent's tool call used the whole command as its one-line label.
+A long script filled the page, and its output had no limit either.
+The closed row now shows the first line of the command, cut with an ellipsis.
+The full command and the output open inside the row, in code boxes that scroll and can be copied.
+
+## 670. An answered question shows its accepted answer beside the buttons.
+
+The owner reported this on 2026-11-13.
+An answered question card puts the accepted answer in the button row, between "Deny" and "Details".
+The owner finds that placement odd.
+The owner wants a short form of the accepted answer on its own line above the buttons, as the card's second or third line.
+The owner will work on this part of the look later, so it is recorded and not changed.
+
+## 671. A fast connection reply could leave a reloaded page blank.
+
+Found: 2026-11-13, while testing the service screens against the real engine.
+State: fixed in this change.
+
+The store subscribed after the browser painted the page.
+A fast session check and snapshot could arrive before that subscription existed.
+The page then kept its initial checking screen until another update arrived.
+The store now subscribes during layout, before asynchronous connection replies can arrive.
+
+## 672. Registered workspaces need their project and team links joined.
+
+Found: 2026-11-13, while connecting the Git picker.
+State: fixed in this change.
+
+A registered workspace need not hold a project identifier or a team identifier.
+Projects and teams name their workspaces in their own records.
+The mapping now joins those records so that the Git picker includes their worktrees.
+
+## 673. The settings contract does not return effective role defaults.
+
+Found: 2026-11-13, while connecting Service settings.
+State: open.
+
+The role settings request returns stored overrides.
+It does not return the effective limits after the engine applies its defaults and role files.
+The website shows an empty number for an unset limit.
+An unset switch is labelled as not set by the service.
+Worker stall time edits the service-wide stall limit.
+The separate lead and assigned timers have no matching setting and remain empty.
+
+## 674. Notification retries need the original receipt after a lost reply.
+
+Found: 2026-11-13, while connecting notification delivery actions.
+State: fixed in this change.
+
+A carrier exchange can finish before its reply reaches the browser.
+A repeated click must recover the original request instead of creating another delivery.
+The connection keeps the request identifier until a reply confirms the result.
+The notification page keeps the original alert generation and attempt while recovery is pending.
+A unit test checks that recovery reuses the identifier.
+
+## 675. Git destinations must keep their workspace identifiers.
+
+Found: 2026-11-13, while reviewing the integration mapping.
+State: fixed in this change.
+
+The page displays a parent branch name.
+A branch name alone does not identify a registered workspace.
+The mapping also keeps the parent workspace identifier.
+Integration and main review use that identifier to select their destinations.
+
+## 676. The existing website's browser assertions failed in the full check.
+
+Found: 2026-11-13, during the final remote check of the Studio Git and service screens.
+State: open.
+
+The full check of commit `5802092` passed all typechecks and 7,909 unit tests.
+All three Studio browser journeys passed.
+The existing website's bulk staging test failed at `git.spec.ts:208`.
+Its five-second assertion could not find the disabled `Commit 2 files` button.
+The failure snapshot showed that staging had succeeded while the working refresh remained pending.
+The existing component preview test failed at `new-project.spec.ts:605`.
+It observed issuance status 0 instead of 200 within five seconds.
+The preview failure is already described in issue 611.
+Both unchanged tests passed in isolation against baseline `8f9f321`.
+That isolated pass does not establish either failure's cause.
+No production code, assertion, or deadline was changed for these failures.
+The full parallel browser suite was then run against an isolated export of baseline `8f9f321`.
+It reproduced both failures at the exact same assertions.
+It also reached the existing logout test's 30-second timeout at `new-project.spec.ts:225`.
+The implementation branch's full run passed that logout test.
+The baseline run finished with 43 passed tests and three failed tests.
+The implementation run finished with 45 passed browser tests and two failed browser tests.
+The complete comparison is recorded in the builder's result.
+The first area merge's full check passed all 529 unit files and 7,920 unit tests.
+All five merged Studio browser cases passed.
+Three existing website cases failed.
+The Git lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The logout-draft case exceeded its 30-second limit at `new-project.spec.ts:225`.
+The component preview case failed at its `data-loaded` assertion at `new-project.spec.ts:626`, as described in issue 611.
+Their causes remain unproved.
+
+The review merge's full check passed 532 unit files and 7,960 unit tests.
+All five Studio browser cases passed.
+The existing website's cases failed at `git.spec.ts:208`, `git.spec.ts:271`, and `new-project.spec.ts:626`.
+The final merge with area commit `aed0fce` passed 533 unit files and 7,980 unit tests.
+All six Studio browser cases passed.
+The browser suite finished with 48 passed cases and two failed cases.
+The lost-reply case failed at `git.spec.ts:271`, as described in issue 609.
+The component preview case observed issuance status 0 instead of 200 at `new-project.spec.ts:605`, as described in issue 611.
+The separate credits check passed.
+No existing website assertion or deadline was changed.
+
+## 677. The automatic merge retained duplicate shared declarations.
+
+Found: 2026-11-13, while merging the accepted board work into the Git builder's branch.
+State: fixed in the merge.
+
+Both builders added a request method to the live website's test connection.
+The automatic merge kept both methods without reporting a conflict.
+The Studio type check rejected the duplicate identifier.
+The automatic merge also duplicated the JavaScript request export and the dialog's live import.
+The merge now keeps one request method, one request export, and one live import.
+The test connection keeps the board builder's request recording.
+
+## 678. The review control fixtures did not load connected service settings.
+
+Found: 2026-11-13, while merging the step 1 review fixes with the connected service pages.
+State: fixed in the merge.
+
+Four review regression tests looked for controls before the service settings had loaded.
+Their fake connection refused every read and did not install the live mapping functions.
+The fixture now installs the same mappings as the live entry point.
+It returns explicit settings read replies and waits for the service controls to become ready.
+It checks that opening the screen issued only known reads.
+The original refusal assertions still inspect every request after each control is clicked.
+The service browser journey also waits for the standing-rules write to finish before clicking its next control.
+The streamed setting can update before the write's final refresh has completed.
+The test keeps its original refusal assertion and deadlines.
+The initial stall-time input also waits for the settings fieldset's pending state to clear.
+A later remote run observed an empty value after the initial stall-time edit.
+The remote settings save also waits for the form to report no unsaved changes before reloading.
+A subsequent run read the previous check-in value after reloading.
+
+## 679. The Home reader retained an answered request after logout.
+
+Found: 2026-11-13, while merging the chat work with the connection review fixes.
+State: fixed in the merge.
+
+The chat reader kept answered requests across snapshot updates.
+It also restored an answered request when logout cleared the connection's records.
+The reader now retains an answered request only while its agent is still present.
+A regression test loads an answered request through the Home reader and clicks the actual logout control.
+It checks that the connection signs out and the request store becomes empty.
+
+## 680. The Nudge regression test still expected an unconnected control after the merge.
+
+The web-flaky investigation reproduced five failures in five runs with two browser workers.
+Every trace stopped before logout at an attempt to fill a read-only repository name.
+The asynchronous project read had selected the existing Actual Product repository.
+Its registration detour correctly preserves that repository's name.
+The old test passed only when it opened the detour before that default selection arrived.
+This was a test fault.
+The test now explicitly selects New repository before entering its private registration draft.
+The corrected journey still verifies the real logout, the next login, and both cleared drafts.
+
+The corrected logout journey passed all 20 remote repetitions with two browser workers and zero retries.
+Its real session revocation and cleared-draft assertions remain intact.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
+## 681. The merged Messages module imported the live binding twice.
+
+Found: 2026-11-13, during the remote browser check of this merge.
+State: fixed in this merge.
+
+Both branches added the live binding to the Messages module's imports.
+Git kept both declarations when it merged the import lists.
+The browser rejected the module and left both the live page and the standalone mock blank.
+The test transformer accepted the declarations, so the Studio tests did not expose the error.
+Removing the redundant import lets the browser parse the module.
+
+## 682. The board mapping replaced worker names with role labels.
+
+Found: 2026-11-13, during the merged chat browser journey.
+State: fixed in this merge.
+
+The area board mapping replaced each worker's engine name with its role label.
+The chat roster needs the engine name to identify a worker and its controls.
+The merged mapping keeps worker names and retains the area's project lead and team lead labels.
+The browser journey checks the same worker in the blocked lane and the table.
+
+
+## web-flaky-1. A component preview repeated its Git workspace validation for every artifact.
+
+Found: 2026-11-13, while reproducing issues 634 and 643.
+State: fixed.
+
+The component display read verified the design file, its tokens, and every registered component independently.
+Each artifact verification repeated the same repository and workspace Git checks.
+The selected component then repeated those checks once more.
+The browser repeated this work for the document and every authorized asset request.
+A real two-component registration started 60 Git processes for one component read.
+The browser trace showed pending document and asset reads while its assertion deadlines expired.
+Separating the browser's document and asset waits exposed the journey's unchanged 60-second limit.
+This was a product performance fault as well as a test ordering fault.
+
+The engine now verifies the workspace once within the request's Git gate.
+It still checks every artifact's current bounded bytes, path, and registered fingerprint.
+It still checks the selected component's private data and dedicated folder.
+It retains no verification across requests.
+The regression test rejects changed design bytes, tokens, sibling components, selected components, branches, symbolic links, and agent access on subsequent reads.
+That test fails against the old engine at 60 Git processes and passes with the correction.
+No timeout, retry, authentication rule, or display authority was changed.
+
+The corrected browser journey passed all 20 remote repetitions alongside the other Git and logout cases.
+The complete two-worker repeat run passed all 120 cases in 18.9 minutes with zero retries.
+
+The final remote check passed all TypeScript checks, all 532 unit test files, all 48 browser cases, and the credit check.
+The unit suite retained its two pre-existing skips.
+The fixes are in signed commits `eeab43a` and `3e5f892`.
+
+## 683. A plain-word approval description was read as a command.
+
+The full check on 2026-11-13 found this in the live chat browser journey.
+The fix for issue 668 treated a harness's description as the command whenever the tool's input was not readable.
+A request without its source event, such as a row on Home, then turned "Run Studio checks" into 'Run "Run" in the terminal'.
+The description now stands in for the command only when the engine marks the input as cut.
+A unit test covers the plain-word case.
+
+## 684. Service settings shows no models for any harness.
+
+The owner reported this on 2026-11-13.
+The owner changed the default harness to Claude on "Service settings" and saw no models.
+The same happened for the other two harnesses.
+The engine's harness list carries an empty model list for every harness.
+The engine learns a harness's models only from a running agent, through `client.agent.configuration`.
+The page therefore has nothing to offer before an agent of that harness runs.
+The page also does not say why the list is empty.
+A fix needs the engine to ask a harness for its models without a running agent.
+This is fixed by the s4-models change.
+The authenticated `client.harness.choices` request opens a temporary session on a registered account.
+The request returns the reported models and efforts before any persistent agent exists.
+The request closes its harness before it replies.
+The live website uses these reports and shows a plain reason when choices are unavailable.
+
+## 685. The Messages tab shows no board on a project without teams.
+
+The owner reported this on 2026-11-13.
+The project "Connect website engine" had a lead and no team.
+The owner decided that every project starts with a default set of channels.
+Fixed on 2026-11-13.
+New projects open General and Leads in the same atomic batch as the project.
+The board reactor appends missing defaults for existing projects on startup.
+General gains every project agent.
+Leads gains each team lead when that agent belongs to a project team.
+The owner and the project lead are members of both channels.
+The Messages tab shows both channel names and accepts the owner's posts.
+
+## 686. The Mocks tab is absent on a project without mocks.
+
+The owner reported this on 2026-11-13.
+The live website shows the "Mocks" tab only when a project is in its design stage or has a recorded mock.
+The project "Connect website engine" has neither, so the tab is not shown.
+The mock behaves the same way with its sample data.
+Whether the tab should always show, with an empty state, is the owner's decision.
+This is not changed.
+
+## 687. The owner judged Subscriptions and Service settings unfinished.
+
+The owner reported this on 2026-11-13.
+The owner said that "Service settings" needs a lot of work and is acceptable for now.
+The owner said that "Subscriptions" needs work before a release.
+The owner did not yet say what is missing on either page.
+
+
+## 688. An anchored channel could appear under unrelated projects.
+
+Found and fixed on 2026-11-13 while implementing the default project channels.
+The website inferred a channel's projects from all of its members.
+A member from another project could make an anchored channel appear there too.
+The website now places a channel under the project named by its project lead anchor.
+Team channels continue to use their team's project.
+Channels without a project lead anchor continue to use their members.
+
+
+## 689. The Git browser journey filled a disabled field before staging finished.
+
+Found on 2026-11-13 during the default-channel full check.
+The existing Git journey clicked a staging action.
+It immediately tried to fill the commit message while the Git view still reported Working.
+The first run found this after Stage all during a merge.
+A second full run found the same timing problem after staging one file.
+The field remained disabled until the browser's ten-second action timeout expired.
+The shared file-action helper now waits for the Git view to finish each action.
+The merge step also waits for Stage all before it fills the message.
+The wait uses the journey's existing thirty-second assertion budget.
+
+
+## 690. Default project channels did not respect the board's membership rules.
+
+Found in the review of commit be84dd6 on 2026-11-13.
+Fixed on the worker/s4-channels branch.
+The Leads channel now recognizes the contracts' lead role and its named variants.
+A lead must share a team group from the same project.
+The reactor uses the existing member-removal history to preserve the owner's removals.
+It excludes stopped and crashed agents from new admissions.
+It skips archived and archiving projects.
+It shares the board's 64-member limit.
+A skipped admission produces one service post in that channel.
+The post identifies the agent and tells the owner how to add it manually after making room.
+The post's stable identifier prevents repeated notices and automatic retries across restarts.
+The reactor does not remove members already recorded in older events.
+Project creation refuses with "board disabled" when the board is switched off.
+This matches team creation and prevents creation side effects before the refusal.
+
+## 691. An agent can give its child a lead role in its own project.
+
+Reviewed and accepted for the default project channels on 2026-11-13.
+The team record has a group and has no separate team-lead identity.
+An agent allowed to start a child can assign a lead role and its project's team group.
+That child can join the Leads channel of its own project.
+The project ancestry check excludes agents from other projects even if they claim that group.
+The channel does not grant project-management authority.
+Changing this behavior would require a firmer team-lead identity in the engine.
+
+## 692. Default project channel names conflict with the manager's unique-name rule.
+
+Open after the default-channel review on 2026-11-13.
+The owner manages a General channel and a Leads channel for each project.
+These automatic channels can repeat those names across projects.
+The board's manual open command still requires a unique name for each manager.
+The owner therefore cannot manually open another General channel or another Leads channel.
+The rule remains unchanged pending an owner decision.
+
+## 693. Two Git browser journeys failed intermittently during the channel review checks.
+
+Found on 2026-11-13 while verifying the default-channel review fixes.
+The complete browser run passed 49 cases and failed two Git cases.
+The fetch, pull, and push journey timed out after five seconds waiting for "push completed.".
+Its saved page still showed "push: Waiting for acknowledgment…".
+The Studio Git journey timed out clicking "Approve without evidence".
+Its saved page showed that button and a reconnecting connection.
+The page also reported that the engine socket could not be opened.
+The cause is not established.
+The review fixes did not change production Git behavior.
+The failing snapshots and command output are retained in the worker's local foundry logs.
+Both failing journeys passed when rerun serially without changing their test or production code.
+The focused rerun reported two passes in 3.1 minutes.
+The cause remains open.
+
+## 694. Notification forms appeared before their live settings finished loading.
+
+Found: 2026-11-13, while adding email notifications.
+State: fixed in this change.
+
+The email browser journey could type into an empty form before the first settings reply arrived.
+The reply then replaced the form and discarded the input.
+The live page now waits for the notification settings before mounting its carrier and quiet-hours forms.
+The email browser journey covers saving and reloading the settings.
+
+## 695. Merge notifications needed to end when their owner review was decided.
+
+Found: 2026-11-13, while adding the merge alert kind.
+State: fixed in this change.
+
+An alert raised from an opened merge review needed a matching close condition.
+The alert now clears when its review is decided or replaced.
+An existing open review enters the first alert baseline without a new push.
+The lifecycle test covers an opened and then refused review.
+
+
+## 696. A service-page read can show a connection notice during reload.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: open.
+
+The live page can briefly show "The service is not connected" after a reload.
+The settings then load and the controls work.
+The service-page reader starts when the session is signed in, before the transport necessarily reports a live connection.
+Issue 650 fixed the same ordering for Home reads.
+The notification browser journey verifies that saved settings survive this reload.
+The captured live screenshot preserves the temporary notice.
+
+## 697. Some notification kinds still use their contract identifiers as labels.
+
+Found: 2026-11-13, while inspecting the live Notifications screenshot.
+State: fixed after the review.
+
+The existing live page uses friendly labels for its five original sample kinds.
+Other engine kinds fall back to identifiers such as `board.post` and `roles.stall`.
+Their switches work through the client application programming interface.
+Every existing kind now has a plain label in the same voice as the sample kinds.
+The notification browser journey checks those labels.
+
+
+## 698. Saving carrier settings changed its enabled state and repeated delivered alerts.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+Saving email settings enabled the carrier and reset every delivery mark.
+Saving ntfy settings also reset its enabled state.
+The reducer now preserves enabled state and delivery identity for an unchanged destination.
+A sender-only email change preserves completed deliveries.
+A destination change makes open alerts eligible again.
+Regression tests cover each destination field and an alert raised while a carrier is off.
+
+## 699. Quiet hours held account problems and the web server security signal.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The override recognized only agent failures.
+The lead ruled that account problems and a web server outage must also pass through.
+One named engine list now defines the three urgent kinds.
+The page and notification guide describe all three.
+Regression tests exercise every urgent kind with the override on and off.
+
+## 700. Changing email credentials could silently retire a password and leave email on.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The page now requires a replacement password before saving a different credential destination.
+Its hint explains that the stored password would be cleared.
+The engine disables email when its password association is cleared.
+The save reply reports whether a password is required.
+A new enable request is refused until a password is stored.
+The browser journey and engine regression tests cover the changed destination.
+Older destination events retain their implied activation during replay.
+New setup requests record an explicit disabled state until a password is installed.
+
+## 701. The terminal could not store an email password, and email settings could not be removed.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The terminal accepts the email carrier name and reads its password only from standard input.
+The confirmation shows the actual mail destination.
+An owner request and page control now remove carrier settings and retire the password.
+The command-line tests reject secret values supplied as arguments.
+The engine and browser tests cover removal without changing ntfy.
+
+## 702. Alerts held by quiet hours looked unsent without an explanation.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The list reply now includes a computed held state for pending alerts.
+The page shows "Held until quiet hours end".
+Restart tests cover both held and failed email deliveries.
+The browser journey checks the held wording.
+
+## 703. Notification regression tests did not distinguish several wrong implementations.
+
+Found: 2026-11-13, in the review of `2568a8f`.
+State: fixed after the review.
+
+The daylight-saving cases now require different offsets before and after both clock changes.
+An off-carrier case proves that an open alert sends once after enabling.
+Additional cases reject carriage returns and line feeds in email addresses.
+A retry case checks the quiet-hours refusal and real SMTP attempts after restart.
+The rejection assertions inspect an actual reply and captured logs rather than an event list that test sends never change.
+
+## 704. Three existing browser journeys failed in the full notification follow-up check.
+
+Found: 2026-11-13, during the full check after the notification review fixes.
+State: open, with isolated passes and no established cause.
+
+The full check passed all TypeScript checks and 8,118 unit tests.
+Its browser stage passed 48 journeys and failed three.
+The conversation journey could not find its composer after logging in again.
+The stale Git evidence journey still showed a submitting review when its merge assertion timed out.
+The Studio Git journey could not find the approval-without-evidence button.
+The three journeys and the expanded email journey then passed together with one browser worker.
+The existing journey bodies and the conversation and Git implementations were unchanged by these fixes.
+An isolated pass does not establish why the full run failed.
+The full gate therefore remains failed.
+The output is recorded in `.foundry/fixes-check.log` and `.foundry/fixes-browser-recheck.log` in the notification worktree.
+
+## 705. Legacy session model reports were not exposed as choices.
+
+The model-choice reader used only configuration selectors.
+Gemini reports its models through the legacy model list in the new-session reply.
+The engine now reads that list when there is no model configuration report.
+A scripted protocol-version-one test covers the complete discovery request.
+This is fixed in this change.
+
+## 706. The new discovery read exposed a module initialization cycle.
+
+The native Node.js alert-restart fixtures failed while importing the new read.
+The client read registry tried to read the handler before its module finished initializing.
+The registry now calls the handler through a deferred function.
+The alert-restart tests cover that import path.
+This is fixed in this change.
+
+## 707. The setup Git-message model selector has no write action.
+
+The first-run page calls the existing unavailable-action handler when its Git-message model changes.
+The service Git-message model setting has no persisted engine field either.
+This change supplies reported choices to those controls.
+It does not add a Git-message generator or a new stored setting.
+The New project dialog inherits the service lead defaults instead of offering a separate model selector.
+Those existing product limits remain.
+
+## 708. Effort discovery must follow the selected model.
+
+A model change can replace the harness's effort choices.
+A report for the default session model cannot describe every model's efforts.
+The discovery request now accepts a model identifier.
+The engine applies that identifier before reading choices.
+The cache separates reports by selected model.
+The service page requests efforts for its selected model.
+This is fixed in this change.
+
+## 709. Subscription model choices must belong to the named account.
+
+Two accounts on one harness can report different models.
+The subscription page now requests each account's choices.
+A row uses that account's report and unavailable reason.
+The default-harness report no longer supplies another account's choices.
+This is fixed in this change.
+
+## 710. A stopped agent needs reported choices to save a new configuration.
+
+The old command validated stopped-agent choices against configured harness lists.
+Those lists are empty for the built-in harnesses.
+The command now validates against the account's discovery report when the agent has no process.
+A model that is no longer reported does not hide the current model list.
+The stopped-agent regression checks the read and the saved choice.
+This is fixed in this change.
+
+## 711. A starting agent needs discovery until its model report arrives.
+
+The full check found that the failed-start remedy lost its model choices during startup.
+An unavailable live report was hiding the account's discovery result.
+The read now uses discovery while the agent is starting and has not reported models.
+The existing model-refused and effort-refused remedy tests cover this behavior.
+This is fixed in this change.
+
+## 712. A discovery failure must use one unavailable sentence.
+
+The initial generic discovery error had two sentences.
+The requested empty state allows one plain sentence.
+The error now uses one sentence.
+A session-failure regression checks that sentence and the child's cleanup.
+This is fixed in this change.
+
+## 713. Configuration discovery held the engine writer permit.
+
+A stopped agent's configuration planner could start discovery inside the single writer transaction.
+A hanging adapter therefore delayed unrelated event writes.
+The planner now uses only cached client reports and explicit configured lists.
+A regression holds a discovery open while configuration is refused and another write commits.
+An uncached caller without an explicit list must read the account's choices before saving them.
+
+## 714. Concurrent discovery and failed reports were unbounded.
+
+Concurrent requests for the same account and model could start duplicate adapters.
+Distinct keys now share two process permits in the engine process.
+Concurrent requests for the same key share one job, including explicit refreshes.
+The last waiting request closes the job's scope and waits for child cleanup.
+Successful reports expire after five minutes.
+Empty reports and failures expire after thirty seconds.
+The result cache retains at most 128 entries.
+Tests cover the deadline, cancellation, shared processes, refreshes, expiry, and eviction.
+
+## 715. Discovery left Cursor sessions and process identities behind.
+
+Cursor discovery created a persistent engine session directory for each temporary identifier.
+Discovery now removes that directory on success, failure, timeout, or cancellation.
+It also deletes its structured query language (SQL) process identity row after closing the child.
+The cleanup leaves ordinary agents' persistent sessions unchanged.
+A separate regression resolves a symbolic temporary directory before creating its folder grant.
+
+## 716. Configured lists and fake discovery reports were coupled.
+
+Stopped-agent discovery ignored a non-empty configured list when offering or accepting choices.
+The offline configuration path now intersects a non-empty report with the configured list.
+An unavailable report falls back to the owner's explicit list.
+The fake runner's discovered report is now an independent fixture that a test can replace.
+A test uses disjoint configured and discovered choices to prevent that fixture from masking the limit again.
+The original cancellation test also waited for a configuration gate without requesting a model change.
+The wait helper returned its last observation without asserting that the gate was entered.
+That test now proves both entry and a living child before interrupting the request.
+
+## 717. Settings waited for the slowest harness.
+
+The Service settings read waited for every harness and account report before rendering any choices.
+The page now renders a per-harness reading sentence as soon as its settings arrive.
+It publishes each report independently and rejects replies from an earlier page generation.
+The browser journey holds the first harness open while selecting the second harness's reported model.
+It also checks a signed-in account with an empty report and an account-free harness.
+The build now rejects every model-menu patch whose expected reference text is missing.
+
+## 718. Discovery notices must not enter the writer or an agent lane.
+
+The handler already checked the snapshot and the registered incarnation before writing runner events.
+An unregistered discovery identifier therefore could not create a permission request or change an agent mode.
+That check was inside the writer transaction.
+The handler now drops an absent roster identifier before requesting the writer or an agent lane.
+The inner checks remain in place for races and stale incarnations.
+A regression sends valid permission and mode notices for an absent discovery identifier.
+It verifies zero writer attempts, zero new events, and zero permission or mode calls.
+
+## 719. Account homes can retain discovery session history.
+
+The Agent Client Protocol (ACP) recordings show session identifiers and configuration replies.
+They do not record filesystem writes in account homes.
+A temporary working folder therefore does not prove that discovery leaves no persistent harness metadata.
+No real harness was started for this investigation.
+
+Claude Code documents transcripts under `~/.claude/projects/<encoded-working-directory>/<session-id>.jsonl`.
+Its directory documentation also lists per-session debug, tool-result, and memory data.
+The documentation establishes storage outside the working folder, but it does not establish whether a prompt-free ACP session always creates a transcript.
+The sources are [session storage](https://code.claude.com/docs/en/sessions#export-and-locate-session-data) and [the account directory](https://code.claude.com/docs/en/claude-directory).
+
+The Codex ACP adapter creates a Codex thread during `session/new`.
+Codex has a persistent rollout recorder and state index under its configured account home.
+The source distinguishes recorder creation from explicit persistence, so it does not prove that every prompt-free discovery produces a rollout file.
+LGTM Studio's named-account shadow home also shares entries from its source home.
+The sources are [the adapter's new-session implementation](https://raw.githubusercontent.com/zed-industries/codex-acp/main/src/codex_agent.rs), [the rollout recorder](https://raw.githubusercontent.com/openai/codex/main/codex-rs/rollout/src/recorder.rs), and `packages/engine/src/accounts/shadowHome.ts`.
+
+Gemini's ACP new-session handler initializes a chat before returning its model report.
+The chat initializes its recording service, which creates a chats directory and writes initial session metadata.
+Its documented session location is `~/.gemini/tmp/<project_hash>/chats/`.
+A distinct temporary project folder can therefore leave a distinct project history directory outside that folder.
+The sources are [the ACP session manager](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/cli/src/acp/acpSessionManager.ts), [chat initialization](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/core/client.ts), [the recording service](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/services/chatRecordingService.ts), and [session management](https://geminicli.com/docs/cli/session-management/).
+
+The installed Cursor runtime's `acp-storage.ts` stores its session database beneath `CURSOR_CONFIG_DIR/acp-sessions`.
+The existing `cursorMcp.ts` integration redirects that location into the engine's per-agent session folder.
+Discovery now removes both its disposable settings and its redirected session directory.
+The runtime evidence and version are recorded in `packages/engine/src/runner/cursorMcp.ts`.
+The recordings do not establish whether Cursor writes other account-wide session metadata.
+
+Cleaning arbitrary account-home history is not implemented in this change.
+Those stores can contain the owner's other sessions and use version-dependent layouts.
+The bounded cache reduces repeated discovery without deleting account data or altering login settings.
+A future harness-specific discovery mode could disable persistence where its supported interface permits it.
+
+## 720. A request could join a discovery that was already closing.
+
+The first shared-job implementation removed its key only after child cleanup finished.
+A new request arriving during the last waiter's cancellation could attach to that cancelled job.
+The final waiter now removes the key before closing the scope.
+A regression holds the old job's cleanup open and proves that a new request starts independently.
+The initial regression also held its cleanup gate across a failed assertion.
+Its release now runs in an immediate finalizer so a failing assertion cannot park the test.
+
+## 721. The model-recovery fixture depended on configured discovery.
+
+The full check found one remaining test that expected configured model names to become a fake peer report.
+The model-recovery conversation offered `valid-model` only through that coupling.
+It now scripts its peer's discovery report independently of the configured list.
+The model and effort recovery tests retain their real handler, lost reply, resume, and draft assertions.
+The matching first-run browser fixture had the same dependency.
+It now scripts the peer report separately as well.
+These are test-fixture corrections after separating discovery in review item 7.
+
+## 722. The build-loop diagram still contains a hard exit after round six.
+
+The owner removed the review limit on 2026-11-11.
+The prose now asks for approval before every further round.
+The steps under "Next round" still send round six to cutting, splitting, or accepting the plan.
+The default workflow definition follows the newer decision and repeats the approval request.
+The historical specification was left unchanged.
+
+## 723. Workflow editing does not select or execute a project's workflow.
+
+The engine had no stored workflow definition when this work began.
+The new definition store and visual editor provide configuration operations.
+Project selection and workflow execution remain the later build-loop work.
+The Workflows page states that projects still run the default workflow.
+
+## 724. The remote helper needs approval outside the restricted tool environment.
+
+The local package installation first failed because its store lock was read-only.
+The remote test helper first failed because the restricted environment presented an unsafe system Secure Shell configuration file.
+Automatic approval review initially rejected the remote sync because the destination was unverified.
+The repository's remote-checks document identifies the default address as the owner's test computer.
+Providing that evidence allowed the required helper and the pinned dependency installation to run.
+No system configuration was changed.
+
+## 725. An existing project push command parity test failed once in the full run.
+
+The first full check failed the dotted `project.push` terminal dispatch case.
+The same case passed immediately when run by itself.
+No project push implementation was changed in this work.
+The final full check determines whether the failure repeats.
+The initial output is retained in the worker's result artifacts.
+
+## 726. Serializing a reply before redaction missed secrets with escaped characters.
+
+The first workflow reply sanitizer redacted the serialized JSON string.
+A registered secret containing a newline or quote was escaped before the sanitizer could match it.
+The new regression test failed on that assertion.
+The handler now redacts each string value before serialization.
+The regression test and authenticated workflow API tests pass.
+
+## 727. The existing service-settings browser journey failed once while waiting for its saved state.
+
+The full check passed 8,080 unit tests and 50 browser tests.
+The existing service-settings journey timed out at `studioService.ts:74` after changing the heartbeat from 25 to 31.
+Its save bar did not show "No unsaved changes." within five seconds.
+The unchanged journey passed when run alone.
+The workflow browser journey passed in the full run.
+The service-settings implementation was left to its assigned builder.
+The full check therefore remains a failed run even though the isolated retry passed.
+
+
+## 728. Workflow actions have no event or receipt.
+
+This is open for the owner.
+Workflow actions operate directly on configuration files.
+They write neither an engine event nor an action receipt.
+The owner must decide how workflow changes should appear in the audit history.
+
+## 729. Two browser tabs can overwrite a workflow without a warning.
+
+This is open for the owner.
+The last successful save wins when two tabs edit the same workflow.
+The editor has no revision check or conflict warning.
+
+## 730. Renaming a workflow changes only its display name.
+
+This is open for the owner.
+Saving a different name leaves the workflow identifier and filename unchanged.
+The owner must decide whether a separate identifier rename is needed.
+
+## 731. The visual editor cannot change inner steps.
+
+This is open for the owner.
+The editor shows and preserves a block's inner steps.
+Only the application programming interface (API) and terminal can edit these steps.
+
+
+## 732. The Git browser journey could not approve without evidence.
+
+The review-fix full check passed every unit test.
+The existing Git browser journey timed out at `packages/web/e2e/support/studioGit.ts:100`.
+The Approve without evidence button became disabled while Playwright waited to click it.
+The unchanged journey passed alone in 2.2 minutes.
+The full check remains a failed run.
+The Git implementation and its journey were left unchanged for their assigned builder.
+This intermittent failure remains open.
+
+## 733. A workflow reload could request the list before connecting.
+
+The review-fix full browser run exposed this race.
+The Workflows page requested its list before the live connection was ready.
+It kept The service is not connected after the connection became live.
+The page now waits for the live connection before its first list request.
+It preserves an already loaded draft when the connection recovers.
+A deterministic Studio unit test covers startup and reconnection.
+
+
+## 734. Merge abort and conflict reopening were not connected.
+
+The live Git page refused both controls.
+The engine now exposes owner-only requests for the expected active merge.
+Abort uses Git's merge abort command after checking both heads and explicit confirmation.
+Reopening uses Git's resolve-undo index extension and restores the canonical three-way conflict.
+The resolved file list survives a page reload and service reconstruction.
+An inactive merge, a stale head, and an unsafe file path are refused.
+Unsupported conflict kinds retain the terminal workflow.
+
+## 735. Parent updates and builder integrations were missing.
+
+The Git page did not report how many commits a workspace was behind its parent.
+The state reply now carries that count separately from the remote count.
+A parent update uses the registered workspace relationship and the existing bounded integration operation.
+A registered worktree whose parent is a registered team can integrate into that team.
+The page maps that checkout as an agent worktree.
+Optional project, team, and owner text does not establish the integration relationship.
+Dirty source or destination workspaces still refuse the merge.
+A conflict remains available in the ordinary conflict view.
+
+## 736. Sending a main review back lost the owner's reason.
+
+The review had no sent-back state or connected action.
+The owner can now decline the exact open review with a nonblank reason.
+The decision and the addressed board post are stored in one writer transaction.
+The board planner retains its own namespace and access checks.
+An identical retry returns the original receipt without another post.
+The built merge dialog reuses the existing send-back control and reason form styles.
+The design reference is unchanged.
+
+## 737. Git message generation has no configured execution boundary.
+
+ProjectSettings has no Git text-model or account selection.
+The live service mapping's gitModel value is an empty placeholder.
+The runner has a temporary discovery operation, but it sends no prompt and returns only choices.
+Ordinary prompts require a registered agent, an incarnation, a delivery, and durable thread routing.
+There is no bounded short task that returns generated Git text with an owner-selected account and model.
+Commit and pull request generation therefore retain their existing refusal.
+This assignment adds no implicit account selection and sends no repository content to a model.
+
+## 738. Hosted pull request editing has no stored provider record.
+
+GitMainReview is a local approval record for a reviewed pair of heads.
+It has no hosted pull request number, provider identity, title, or body.
+The Git service can read local review evidence and merge it with owner approval.
+It does not create a hosted pull request.
+No authenticated provider update operation exists in the engine.
+The title and body controls therefore retain their refusal.
+A hosted record and a bounded authenticated provider action are prerequisites for connecting them.
+
+
+## 739. The required local live check passed sixteen of twenty-three steps.
+
+The run used private service state under `/tmp/lgtm-live-b15F6M`.
+It did not use the owner's service on port 8787.
+The removed-variables, state-read, always-allow, permission-kinds, reload, and token-scan checks failed.
+The recording step was skipped because earlier checks failed.
+The final comparison of rebuilt views and secret scanning of events, replies, and output passed.
+The token-scan check separately reported an agent token in a harness session file or process arguments.
+These harness findings are outside this Git assignment.
+The complete bounded output is retained in the worker's result logs.
+The assignment's earlier reference count was nineteen of twenty-three.
+
+
+## 740. Competing review decisions need one workspace operation lane.
+
+The first send-back implementation used the writer transaction alone.
+A regression held an owner merge open and showed that a decline could record sent-back before that merge finished.
+The decline now acquires the same workspace operation lane as prepare and approve.
+It rechecks the stored review after the earlier operation ends.
+A completed approval makes the queued decline refuse without posting a reason.
+
+
+## 741. The Git journey clicked approval during a background refresh.
+
+Opening a main review finishes the comparison and evidence reads before recording an open review.
+The engine has no later transition that makes that review ready.
+The resulting project snapshot schedules the page's Git refresh after one hundred milliseconds.
+That refresh reads the project's workspaces and the selected file details through the same pending key as mutations.
+The merge dialog disables approval while that key is pending.
+The dialog can therefore be visible while its approval button remains disabled for the duration of those reads.
+A loaded computer can exhaust the journey's ten-second click budget in that state.
+A gated page regression reproduces an open review with a pending background read.
+The Git journey now waits for the existing aria-busy state to become false after opening each merge review.
+It uses the existing assertion budget and does not raise a timeout.
+No separate engine readiness delay was found.
+
+## 742. The builder mapping initially lost legacy team display metadata.
+
+The broader regression run found that callers without the optional team list displayed a team workspace as a project workspace.
+The mapping now retains the existing workspace team identifier as a display fallback.
+A registered builder parent still takes precedence in the page mapping.
+The engine continues to require the registered parent relationship for integration authority.
+
+## 743. The first send-back composition dropped board withdrawals.
+
+Review of df9e486 found that tag-prefix filtering discarded an unprefixed DeliveryWithdrawn event.
+The named composition now checks the complete board plan before appending its final project decision.
+It retains the board planner's event order and deliveries.
+It rejects an afterCommit hook and side rows outside the board namespace through the ordinary checks.
+A regression replaces an earlier queued lead wake and verifies its withdrawal in the same decision transaction.
+Separate malformed planner tests verify both boundary refusals.
+
+## 744. A sent-back review did not wake an idle lead.
+
+The original addressed notice required no reply and created no independent wake duty.
+The post now requires a reply from the recorded project lead.
+A regression verifies a queued board delivery containing the reason without any earlier duty.
+A stopped, missing, crashed, or unavailable interrupted lead makes the decision refuse.
+The fixed reason says that the project lead is unavailable and the review was not sent back.
+The stored review remains open in that case.
+This refusal policy is an implementation choice for the owner to review.
+
+## 745. Parent updates incorrectly required a clean parent checkout.
+
+The parent supplies only a committed object and is not mutated by an update.
+The dedicated update operation now shares the integration implementation without its source cleanliness requirement.
+The child must still be clean.
+The expected parent head and the common repository must still match.
+Tests retain uncommitted and untracked parent files while integrating its committed changes.
+The existing builder and team integrations retain their source cleanliness checks.
+
+## 746. Reopening a conflict could discard an edit made after resolution.
+
+The resolved file read now returns a bounded content fingerprint with each path.
+The reopening request requires that observation and explicit confirmation.
+The page captures the observation before asking for confirmation.
+The confirmation says that the current file contents are replaced.
+An edit since that observation returns the fixed stale-state refusal and preserves the edit.
+The ordinary filesystem race limit documented in issue 49 still applies.
+
+## 747. An unsafe resolved path could hide the rest of a merge.
+
+A resolved file can later become a directory, a symbolic link, or a member of a nested checkout.
+The resolved file read now skips such paths and returns the other safe files.
+Unreadable and oversized individual files are also omitted from the bounded list.
+The reopening operation continues to validate its requested path independently.
+Regressions cover each unsafe kind while retaining another resolved file.
+
+## 748. Background Git reads disabled owner controls.
+
+Review rejected the idle-state wait introduced in 741 because its debounce remained racy.
+The built page now tracks automatic refreshes under a separate Git read key.
+Only an owner action in flight sets the pending key used to disable its controls.
+The owner action invalidates earlier background reads before writing fresh state.
+The extra merge-review idle waits were removed from the browser journey.
+A rendered merge dialog regression holds a background read and verifies that approval stays enabled.
+It then starts an owner action and verifies that approval becomes disabled.
+The design reference is unchanged and the build-time replacement fails on a mismatch.
+The original full check also reproduced issue 689 at Stage file.txt after a discard.
+That run passed 8230 unit tests and 52 browser tests before this browser failure.
+
+## 749. A blocked merge abort was reported as uncertain.
+
+Git can refuse an abort when a working edit overlaps an index entry that the abort must replace.
+The service recognizes that bounded refusal only when both heads and the index entries remain unchanged.
+It returns the fixed abort_blocked reason.
+Other failed mutations retain uncertainty when their outcome is not proved.
+A wire test verifies that the refusal is replayable and leaves no pending attempt.
+The abort confirmation now says that files added during the merge are removed.
+A changed-index test verifies that Git removes a newly staged file and restores the original clean state.
+
+## 750. Builder Git reads currently have project-wide access.
+
+The workspace mapping added in df9e486 widened the existing project Git read scope to builder worktrees under registered teams.
+Every authenticated agent assigned to that project can read those builder worktrees through changes, diff, history, commit.files, git.state, review, and conflict.
+This includes a project agent in another team.
+An outsider cannot read them by supplying the project identifier.
+A project agent cannot use those requests to read the repository base checkout.
+The owner can read registered local workspaces independently of project membership.
+A wire regression pins these cases across all seven read requests.
+The policy is recorded for the owner to rule on and is not changed by this review fix.
+
+## 751. Unscoped Git destination lookup relies on owner-only access.
+
+Integration, parent update, and durable attempt admission resolve their registered destination without inheriting the source project's scope.
+That lookup is safe only while these mutations remain owner-only.
+Comments now state this dependency at each lookup.
+The requests still validate the registered relationship and repository identity.
+The authenticated agent refusal regression pins the new owner-only requests.
+A future access change must review the destination lookup as well.
+
+## 752. Builder integration holds the source workspace operation lane.
+
+Builder-into-team integration mutates the team checkout while holding the builder's operation lane.
+The shared Git gate bounds individual external operations but does not make the team lane its operation owner.
+This can matter when another command targets the team during the integration.
+The review explicitly requested recording this issue without changing the lane.
+The source lane is retained for the owner's ruling.
+
+## 753. The live-check difference matches the documented Codex-seat context.
+
+The three additional failures compared with the nineteen-of-twenty-three reference are state-read, permission-kinds, and reload.
+The reference failures were removed-variables, always-allow, and token-scan.
+Issue 526 records the same sixteen-of-twenty-three outcome inside a Codex seat at unchanged application code.
+The new run reports that Claude did not attempt the requested state command or expose permission options.
+It also reports that Claude ended the hold turn without the exact restart command.
+These Git changes do not alter the live-check probes, runner, or permission implementation.
+Those probes do not call the new Git requests.
+The available evidence attributes these extra failures to the already documented harness execution context rather than the Git change.
+The sixteen-of-twenty-three run remains evidence from this worker and is not substituted for the manager's baseline.
+
+## 754. New fixed Git refusals were hidden by the public reason allowlist.
+
+Exact wire assertions found that the blank reason, unavailable lead, invalid parent, and inactive merge cases reached the client as command refused.
+The public allowlist now includes their fixed messages and abort_blocked.
+No caller text, filesystem path, or subprocess diagnostic is exposed by these additions.
+
+
+## 755. The Git journey staged a file before its preceding discard completed.
+
+The review's final full check again reproduced issue 689 at Stage file.txt.
+All 8256 unit tests and the other 52 browser tests passed.
+The five consecutive isolated Git journeys had also passed.
+Discard publishes the selected project's changed file list before finishing its reads of the other workspaces.
+The journey waited only for the discarded row to disappear.
+It could therefore attempt its next owner action while the preceding discard still held the owner's pending key.
+The journey now waits for that preceding action's existing aria-busy state to become false after confirmation.
+This is separate from the removed merge-review background-read wait.
+No timeout is raised and automatic reads still do not disable owner controls.
+The final full-check failure is retained in the handoff.
+
+
+## 756. The Git journey reopened review before send-back completed.
+
+The browser-only rerun passed the corrected discard boundary and failed at the second Open merge review action.
+The send-back operation closes its dialog before completing its workspace readback.
+The journey treated the closed dialog as completion and could start another action while send-back still held the owner's pending key.
+The journey now waits for that preceding owner action's existing aria-busy state to become false.
+This wait is before opening the next review, rather than after opening a review during an automatic refresh.
+The production background-read fix is unchanged.
+No timeout is raised.
+The failed browser-only run had 52 passes and one failure in 7.6 minutes.
+
+## 757. The terminal parity test read a generated file and hung the full check.
+
+`packages/cli/test/parity.test.ts` read the default workflow from `design/mock/workflows/build-loop.json`.
+The Studio build generates that file, and Git ignored it.
+A fresh checkout on the remote test computer had no such file.
+The test then waited without ending, and the full check on `75e05c8` produced no output for 43 minutes.
+The 60-second test limit did not end the test.
+The test now reads the engine's own file, `packages/engine/src/workflows/build-loop.json`.
+The reason the test limit did not fire is not yet known.
+
+## 758. The mock could not open in a fresh checkout without a Studio build.
+
+`design/mock/js/app.js` imports the "Workflows" screen.
+That screen imports `design/mock/vendor/workflow-contracts.js` and fetches `design/mock/workflows/build-loop.json`.
+The Studio build generates both files, and Git ignored them.
+The mock opened on its own would fail to load until someone ran the build.
+Both files are now committed.
+They can fall behind `packages/contracts/src/workflows.ts` and the engine's default workflow until the build is run again.
+No test yet fails when they fall behind.
+
+## 759. The sample mock was blank when the engine served it.
+
+`design/mock/index.html` used an inline import map to find the workflow contracts.
+The engine's static server sends a content security policy that allows no inline script.
+The browser ignored the import map, the "Workflows" screen failed to import, and the whole page stayed blank.
+The Notifications journey opens the sample through the engine first, so it failed on `85cf37e`.
+The mock now imports the committed bundle `design/mock/vendor/workflow-contracts.js` directly, with no import map.
+
+## 760. The Git journey failed once at "Use both" under load.
+
+The full check on `85cf37e` failed at `packages/web/e2e/support/studioGit.ts:157`.
+The "Use both" button did not appear within ten seconds after an external merge conflict and a refresh.
+The same journey passed when it ran alone on the same commit.
+The cause is not known.
+
+## 761. Cursor has no compliant automatic recipe.
+
+Cursor's official installation page documents a download piped into a shell.
+The assignment forbids that installation method inside LGTM Studio.
+The recipe therefore exposes the official command for the owner to run manually.
+The Install button stays disabled for Cursor.
+The owner can run the command and use Check again.
+An automatic recipe needs an official method that satisfies these limits.
+The source is https://cursor.com/docs/cli/installation.
+
+## 762. A timed-out installer must stop its descendants.
+
+The first harmless timeout test exposed an orphaned fixture process.
+The initial process helper did not create the process group it tried to kill.
+The helper now uses spawn with a separate process group on Linux.
+A timeout, cancellation, or oversized output kills that group.
+The exact orphaned fixture process from the failed test was removed.
+The literal-argument and process-limit regression now passes.
+
+## 763. A status refresh must preserve a complete harness row.
+
+An asynchronous status read briefly replaced installed rows with incomplete settings rows.
+The Add account dialog could observe that intermediate state.
+The page now finishes its asynchronous reads before replacing the harness map.
+The browser journey checks adding an account after installation and after reload.
+The old service-page test also exposed a host CLI bootstrap shim during version probing.
+Embedded test engines now use an empty host search path unless their constructor supplies one.
+The production service explicitly supplies its real search path.
+Every installer test uses a harmless fixture.
+
+## 764. Concurrent npm installs would share a destination.
+
+The shipped recipes install into one user prefix.
+Separate harness locks alone would permit concurrent writes there.
+The engine now serializes all installer requests for that prefix.
+A second request receives a plain refusal while the first is running.
+The overlap regression checks the same harness and another harness.
+
+## 765. Contract inventories need the new installation surface.
+
+The full check found that the independent command and event inventories did not yet list the installer additions.
+The contract tests now name all four owner-only requests and both installation audit events.
+Their existing request-identifier and event round-trip checks now cover these additions.
+The expected agent tool inventory remains unchanged.
+The command-line parity fixtures now exercise the new commands in their spaced and dotted forms.
+The subscription matrix now includes both events and checks their owner-only visibility.
+
+## 766. Redaction must precede output shortening.
+
+The security review found that shortening a raw version string could leave a partial secret at its end.
+A new harmless regression reproduced that boundary.
+The engine now redacts the complete version capture before selecting its first line and limiting its length.
+Oversized or forcibly interrupted captures are discarded.
+A failure still returns its plain reason.
+This prevents the capture limit from cutting a secret before the redactor can recognize it.
+
+## 767. A Codex sign-in command must name the account's private home.
+
+Additional Codex accounts use the engine's existing private authentication layout.
+Displaying a command for the shared home would sign the owner into a different folder.
+The new read now resolves the same effective home as readiness and launch.
+It does not create that folder or copy credentials.
+A harmless regression writes a synthetic credential to the displayed folder and verifies that the readiness read sees it.
+A login-folder secret reference or conflicting settings receive a plain refusal.
+
+## 768. The installer must resolve its own package manager.
+
+The first installer selected npm and Node.js through a mutable search path.
+A harness executable folder could therefore replace the installer itself.
+The installer now resolves the running Node.js and its adjacent npm to real absolute paths.
+It passes a fixed search path and starts in a new empty temporary folder.
+The hostile-path regression fails against the original implementation.
+
+## 769. Managed executable files need an installation receipt.
+
+The first status read executed any file found in the managed harness folder.
+The installer now records the real executable path and hashes every regular file and executable link in its dependency tree.
+The receipt lives in the engine state folder, outside the installation prefix.
+Status and runner entry points refuse a changed tree before executing it.
+Version reads happen after installation or an explicit owner refresh.
+Ordinary status reads use saved versions.
+This check does not provide an operating-system boundary against another process with full access to the engine user's state and source files.
+A hostile process running as the same user can rewrite the receipt and bless a tampered program.
+The "changed since install" check guards against accidents and changes by install scripts.
+It does not stop a hostile process running as the same user.
+
+## 770. A package version does not pin its dependency tree.
+
+The automatic Codex and Gemini recipes now include npm lockfiles with registry integrity hashes.
+They use npm ci with all lifecycle scripts disabled.
+The current Claude Code npm package needs its postinstall linking script.
+Its separate CLI installer is therefore manual.
+The bundled Claude adapter and native runtime remain available without that separate install.
+Cursor's shell installer remains manual.
+Automatic installation is limited to Linux, where process recovery can identify a leftover process group.
+
+## 771. Interrupted installs need cleanup and recovery.
+
+The original request masked interruption while a detached package manager ran.
+Requests now cancel the complete process group and wait for cleanup before auditing cancellation.
+Engine shutdown closes active installs.
+A durable operation identity lets startup find leftover descendants and remove their partial installation.
+The operation has a ten-minute deadline to accommodate slow downloads.
+Failed and cancelled installs remove their partial prefix.
+
+## 772. An unreadable login file must not break every harness section.
+
+Status now handles a malformed, oversized or unreadable login store per harness.
+It reports that the sign-in state cannot be read.
+Other harness sections remain available.
+A subprocess probe still requires readable credential sources so its output can be redacted safely.
+
+## 773. Cursor's executable name is not a vendor identity.
+
+An arbitrary program named agent on the service search path is no longer probed as Cursor.
+Discovery requires Cursor's installation location and a recognizable version report.
+A failed version read reports an unknown version.
+A found version that differs from a recipe's pin is labelled explicitly.
+
+## 774. Moving the subscriptions page lost existing controls.
+
+The combined page again shows the signed-in and capacity summary.
+Sample account creation refuses an offline machine and a machine without the selected harness.
+The default permission picker is back under Service settings.
+An old subscriptions address is rewritten to the Harnesses address.
+The browser journey covers these restorations.
+
+## 775. Automatic installs do not support inherited proxy settings.
+
+This matter is open.
+The installer deliberately drops proxy variables and npm configuration variables.
+An installation behind a required proxy can fail.
+A future proxy setting needs an explicit owner-controlled design that preserves the fixed recipe and redaction rules.
+
+## 776. npm has a built-in configuration beside its program.
+
+This matter is open.
+The installer disables user and global npm configuration and uses an empty working folder.
+npm still reads its own built-in configuration.
+For this to alter the installer, another process would need to change the trusted Node.js and npm installation or its built-in configuration.
+The installer does not claim to protect a compromised toolchain.
+
+## 777. npm rejects one file used as both user and global configuration.
+
+The original environment named /dev/null for both configuration roles.
+Current npm refuses to load the same configuration file twice.
+The user configuration now names a repository-owned empty file.
+The global configuration still names /dev/null.
+The command-plan and child-environment regressions cover the fixed environment without installing a vendor package.
+
+## 778. The full browser check can time out in the existing Git journey.
+
+The full check of the original feature passed its type checks and unit tests.
+It passed 51 browser journeys.
+The Git journey timed out while clicking its existing integration control.
+The Harnesses journey passed in that run.
+This matter remains open because the Git journey is outside this builder's assignment.
+
+## 779. The web transform requires an explicit relative lockfile URL.
+
+The full review check found that Vite treated the dynamic lockfile URL as an asset glob.
+A relative glob must begin with a dot and a slash.
+The engine now uses that explicit relative URL.
+Nine web test suites failed during import before this correction.
+The focused follow-up runs every affected suite.
+
+## 780. New engine tests must register the rebuild hook.
+
+The repository-wide guard found three new test files without their rebuild registration.
+The files that open an event log now register a scoped rebuild comparison.
+The process-only and filesystem-only files register the no-log form.
+The follow-up includes the repository guard and the harness tests.
+
+## 781. The service journey still looked for permission settings on Harnesses.
+
+The review restored the default permission picker to Service settings.
+The existing browser helper still looked for it on Harnesses.
+The helper now verifies model persistence on Harnesses before checking permission persistence in Service settings.
+The separate Harnesses journey also verifies the restored location.
+
+## 782. The admin browser journey intermittently misses token clearing.
+
+The full browser run passed 50 journeys and failed two journeys.
+The admin journey failed while waiting for its token-cleared label.
+An immediate isolated rerun passed without a source change.
+This matter remains open because notifications are outside this builder's assignment.
+The other failure was the permission-picker test location recorded above.
+
+## 783. A same-user process can replace the installed harness despite verification.
+
+This matter is open.
+Every input the installation verification reads is in a folder that a process running as the same user can write.
+Such a process can restore the staged files and rewrite npm's hidden lockfile before the check, or rewrite the program after extraction.
+It can therefore still have a different program installed, run by the engine, recorded in the receipt, and proposed as the harness.
+The check stops accidents, install scripts, and a swap that is not restored.
+It is not a wall against a hostile process running as the same user.
+The real fix is the planned sandbox for agents.
+The check compares staged files with the committed files and installed package metadata with the pinned entries.
+Only optional entries may be absent.
+Every present entry must match its name, version, resolved location and integrity hash.
+An extra entry or an executable outside the expected package folder is refused.
+
+## 784. Damaged install intents blocked engine startup.
+
+Pending intents are now published by writing a temporary file and renaming it.
+Recovery removes malformed and unreadable intents and known unreceipted partial prefixes.
+It also cleans an intent for a harness whose recipe has been removed.
+The event log records interrupted operations as failed while the engine starts.
+A damaged intent cannot authorize a process signal without a verified identity.
+Recovery logs that identity limit instead of claiming that such a process was stopped.
+
+## 785. The separate Codex installation was unused by its adapter.
+
+The engine uses its bundled Codex adapter and vendor runtime.
+The separate automatic Codex recipe and its lockfile have been removed.
+The page describes Codex as bundled with nothing to install.
+
+## 786. A slow version probe deleted a verified installation.
+
+The probe immediately after installation now has a fixed thirty-second limit.
+A timeout keeps the verified tree and reports that it is installed with an unknown version.
+The saved receipt retains that state across an engine restart.
+An explicit refresh that times out also keeps a previously verified installation available.
+An ordinary explicit refresh retains its two-second limit.
+
+## 787. A recognized program looked missing until its version was checked.
+
+A program found through the service search path now reports that it was found with its version not checked yet.
+It allows account creation without offering another installation.
+Package identity uses the nearest exact package boundary in the real path.
+A nested dependency cannot inherit the identity of a package higher in its path.
+A program on the service search path is trusted to the same degree that the runner already trusts that path.
+This trust does not protect against a same-user process changing that program.
+
+## 788. An embedded engine implicitly enabled real installations.
+
+An embedded engine now defaults to a read-only file check and refuses installation.
+Only the production service explicitly supplies the real installer.
+A test can opt in by injecting a harmless installer dependency.
+
+## 789. A sample account could no longer simulate signing in.
+
+The sample Sign in control now updates the sample account again.
+The live control still displays the owner's provider command without running it.
+The browser journey adds a sample account and signs it in.
+
+## 790. Whole-tree receipt checks can block the engine.
+
+This matter is open.
+The engine hashes the whole managed tree synchronously on every status read and agent launch.
+Large installations can therefore delay other work on the engine's event loop.
+
+## 791. The page has no control to cancel an installation.
+
+This matter is open.
+The installation can run for ten minutes.
+The owner cannot cancel it from the page.
+Engine shutdown and request interruption still stop its process group.
+
+## 792. A symbolic link in the home path refuses automatic installation.
+
+This matter is open.
+The managed root must equal its absolute real path.
+A home folder reached through a symbolic link therefore refuses automatic installation.
+
+## 793. npm can read configuration from the managed prefix.
+
+This matter is open.
+A project .npmrc placed in the managed prefix can affect npm or break an installation.
+The npm cache is also inside the agent-writable managed root.
+The post-install checks reject changed manifests or package metadata before executing the installed program.
+Those checks do not create a boundary against another process running as the same user.
+
+## 794. Gemini's real installation still needs an owner trial.
+
+This matter is open.
+No real vendor installation has run during this assignment.
+Gemini CLI has not been verified with install scripts disabled.
+It has not been checked for writes to its own package folder during normal operation.
+The third review fixed the hidden-lock comparison to allow missing optional entries while still requiring all other entries.
+The owner must try a real installation manually before release.
+The automated tests use local fake package trees and never contact a registry.
+
+## 795. Recipe citations cannot be verified from this repository alone.
+
+This matter is open.
+The repository records source addresses but does not include snapshots of those pages.
+Their contents can change or become unavailable.
+The recipe's documentation claims therefore cannot be confirmed from this repository alone.
+
+## 796. Recovery could remove a valid installation or block startup.
+
+The third review found that recovery did not check the managed root for symbolic links.
+A planted pending intent could remove a valid receipted installation.
+A regular file in place of the installation-records folder or a disappearing pending file could stop startup.
+Recovery now refuses a symbolic managed root with a warning and removes nothing.
+It keeps valid receipted trees and removes their stale pending intents.
+It tolerates filesystem failures with fixed warnings instead of blocking startup.
+
+## 797. The version probe could change a tree before its receipt was replaced.
+
+The second receipt previously hashed the tree again without comparing it with the first receipt.
+A change made during the version probe could therefore become the accepted installation.
+The installer now validates the whole tree against the first receipt after the probe.
+A changed tree is refused and removed.
+Only the version field of a valid receipt is updated.
+
+## 798. Model-choice replies erased harness installation details after the merge.
+
+The merged website first read installation status and recipes correctly.
+A later model-choice reply replaced the entire harness entry with its model fields.
+This removed the installed flag and made Add account request a recipe for an already installed custom harness.
+It also replaced the recipe's display name with the harness identifier.
+The live build now combines each model update with the current choices, installation status and recipes.
+A regression executes the built website's actions with delayed model replies.
+It checks both the installed flag and the recipe's display name after the replies arrive.
+
+## 799. The explicit defaults bookmark lost its harness model editor after the merge.
+
+The Harnesses page owns the shared defaults editor.
+The existing explicit /settings?section=defaults bookmark still has callers that edit harness defaults.
+After the merge, that address showed only the remaining service defaults.
+The live copy now includes the shared harness defaults editor for that explicit bookmark.
+The ordinary Service settings address and the standalone sample keep their current layouts.
+The editor uses the same asynchronous model reports on both addresses.
+The browser journey is unchanged.
+
+
+## 800. Service updates remain manual.
+
+The service settings page does not download or execute an update.
+An update replaces the program that holds the owner's credentials and runs agents.
+The page shows the terminal commands for the owner to inspect and run.
+Its update button retains the explicit refusal.
+The version check uses a fixed Git argument list and permits only HTTPS transport.
+A different remote head is reported as different, because it does not prove that the remote commit is newer than a local worker branch.
+
+## 801. Reviewer defaults have no automatic selector yet.
+
+The engine stores the default reviewer count and the different-vendor rule in project settings.
+The page says that these values are saved for future reviewer assignment.
+No engine code currently selects reviewers.
+The defaults therefore do not yet assign a reviewer or enforce a vendor choice.
+The first reviewer selector must read these defaults.
+
+## 802. Several service controls still lack their execution paths.
+
+The need-to-know default has no team-creation privacy setting to consume it.
+Removing agent credits would need a defined commit-rewriting policy before the approved Git heads change.
+The Git message model has no service-owned message-generation request to consume it.
+The tests-first default, agent-review default, and review-round limit have no workflow executor to consume them.
+These controls retain the notice that they are not connected and change nothing.
+Standing permission rules still await the owner's harness recordings, as AGENTS.md requires.
+The existing standing-rules setting is outside this implementation and still does not enforce permission rules.
+
+## 803. Stall timers currently follow idle board obligations.
+
+The existing stall rule watches idle agents with unanswered board work.
+It deliberately excludes a working turn, queued delivery, account hold, and open dependency.
+The assigned timer applies before the first recorded turn.
+The worker and lead timers apply to subsequent eligible stall episodes.
+These settings do not detect a silent active turn.
+The separate runaway turn timer still governs long active turns.
+The live page explains the idle-obligation scope so that the owner does not mistake the values for active-turn output deadlines.
+
+## 804. The parity fixture depended on generated mock output.
+
+The command parity fixture read the workflow sample from a generated design file.
+A fresh remote copy did not contain that file before a website build.
+Several command tests then timed out after their fake engine threw while preparing replies.
+The fixture now reads the canonical engine workflow file.
+This removes the build-order dependency.
+
+## 805. The settings live check passed 17 of 23 stages.
+
+The settings worker ran the required live check with private temporary state.
+The run passed 17 stages out of 23.
+Claude did not attempt the removed-variables, state-read, always-allow, or permission-kinds probes.
+The token scan found agent tokens in process arguments.
+Recording was skipped because earlier stages failed.
+The final event, reply, and output scan passed.
+The reload and token-revocation probes passed for both harnesses.
+These results have the execution-context limitation described in issue 526.
+The token exposure remains the previously reported issue 240.
+This run does not establish the known 19-of-23 baseline.
+
+## 806. The new browser test used an unsupported declaration option.
+
+The first full settings check stopped during TypeScript checking.
+The new browser test passed a timeout property as Playwright test metadata.
+Playwright ran the isolated journey but rejected that property during type checking.
+The test now uses the configured browser timeout.
+The next check found two unbranded request identifiers in the executable restart test.
+Those synthetic identifiers now use the client contract's request identifier type.
+
+## 807. Service controls were missing from the standalone client declarations.
+
+The full unit run found six contract inventory failures after adding the service controls.
+The running service exposed both requests through the installed group.
+The standalone client definition group did not include them.
+Both requests now belong to that group and its owner-only access table.
+The explicit inventory tests include both requests.
+The alert, read, and web subgroups still exclude them before installation.
+
+## 808. A Git transport default alone did not constrain URL rewriting.
+
+A repository can override a general transport default with a per-protocol setting.
+A URL rewrite could then select an executable helper after the HTTPS URL check.
+The version checker now sets Git's HTTPS-only protocol environment allowlist.
+Git documents that this allowlist overrides existing protocol configuration.
+A test combines an HTTPS remote, an executable URL rewrite, and an explicit protocol allowance.
+The check refuses the rewritten transport without creating its marker file.
+The relevant Git documentation is at https://git-scm.com/docs/git.
+
+## 809. The workflow redaction fixture omitted project state.
+
+The full unit run found one workflow redaction failure in addition to the six contract failures.
+The fixture passed an empty snapshot to the workflow handlers.
+Reading the saved workflow folder now requires the normal project view.
+The fixture now supplies an empty project view and its private state folder.
+Its real redactor and secret assertions remain unchanged.
+
+## 810. The heartbeat save race recurred in the settings full check.
+
+The settings full check passed all 552 unit files and 8,303 tests.
+Two unit tests were skipped.
+The browser run passed 53 journeys and failed two.
+The existing service-settings journey failed at `studioService.ts:74` after saving a 31-second heartbeat.
+This is the same unsaved-state failure recorded in issue 727.
+The unchanged journey passed in the targeted retry.
+The new settings journey passed both times.
+The full check remains a failed run.
+
+## 811. The existing email journey could not find its Notifications heading.
+
+The settings full browser run failed the existing email journey.
+The targeted retry reproduced the failure.
+The error says that the Notifications heading was not found.
+The reported source location maps to `studioNotifications.ts:73` instead of the heading assertion.
+The failure therefore does not establish that email credentials were saved or tested.
+The standalone sample journey passed in the full browser run.
+The sample fixture used an inline import map under the engine's strict Content Security Policy.
+That policy blocks the map, so the workflow contract import cannot resolve.
+The fixture now serves the existing generated workflow bundle directly at the sample module path.
+Neither the policy nor the design files change.
+The corrected email journey passed alone in six seconds.
+
+## 812. The merged live check matched the known baseline.
+
+The required live check ran again after merging `origin/area/build-loop`.
+It passed 19 stages out of 23.
+The removed-variables, always-allow, and token-scan stages failed.
+Recording was skipped because earlier stages failed.
+Both harnesses passed reload recovery and old-token refusal.
+The final event, reply, and output scan passed.
+The run used private state under `/tmp/lgtm-live-HIveOX`.
+The owner's service was not changed.
+
+## 813. The merged full check failed while waiting for Use both.
+
+The merged full check passed all 554 unit files.
+It passed 8,392 unit tests and skipped two.
+The browser run passed 54 journeys and failed the Git journey.
+The failure was a ten-second click timeout at `studioGit.ts:157` while waiting for Use both.
+This is a different location from the task's known intermittent failure at line 100.
+The unchanged Git journey passed alone in 3.1 minutes.
+The credit check passed after that retry.
+The service-settings, email, new settings, and standalone sample journeys passed in the full run.
+The full check remains a failed run.
+The settings worker changed no Git timeout or implementation beyond the lead's required integration merge.
+
+## 814. Service build replacements could silently stop matching.
+
+The settings transformer used unchecked string replacements.
+The merged Harnesses screen still matches every patch.
+Every replacement now checks its exact match count and fails the build on a mismatch.
+Each individual replacement must match exactly once.
+The existing replacement of all five busy indicators has an explicit count.
+Regression tests remove and duplicate each source fragment.
+
+## 815. Holder stall notices used wording addressed to the stalled agent.
+
+A disabled nudge or an increased replacement threshold could send the holder the agent's instructions.
+Notice wording now follows the recipient at every occurrence.
+The running watch test changes an armed timer in both directions without restarting.
+Zero, negative, and huge timer settings are refused.
+The existing timer rearming already honored saved changes.
+
+## 816. Partial project settings could clear the workflow folder and review defaults.
+
+Omitting these two fields now preserves their stored values.
+The request has an explicit clearWorkflowFolder flag.
+The live page offers a button to restore the default workflow folder.
+Review defaults are preserved during that clear.
+
+## 817. Restart executes the writable checkout under the same user.
+
+Restart runs the installed Node.js executable and the script currently at the recorded path.
+An agent running as the owner's user can change that checkout before an owner requests restart.
+The same-user limit described in SECURITY.md applies to these launch files too.
+Existence, regular-file, read, and execute checks prevent an accidental missing launch file from stopping every agent.
+They do not establish that the program is trusted or unchanged.
+Agent sandboxes remain planned.
+
+## 818. A stop signal during the restart window can still reexecute the service.
+
+The restart acknowledgement schedules shutdown after a short transport drain.
+A stop signal during this window interrupts the service but leaves the restart flag set.
+The process can therefore start again after that signal.
+This review records the behavior without changing signal semantics in this fix.
+
+## 819. Restart lacked a durable owner receipt and checked launch files too late.
+
+Restart is now a mutation with an owner-attributed ServiceRestartRequested event.
+The event and its request identifier receipt commit before any agent stop.
+A replay returns the receipt without restarting again, including after reexecution.
+A distinct request during a pending restart is refused.
+The launch preflight refuses missing files, directories, unreadable files, and a nonexecutable Node.js program before stopping agents.
+An execution failure after teardown writes a fixed recovery line and sets exit status 78.
+Launch-file substitution by the same user remains subject to issue 817.
+
+## 820. Version checks trusted checkout TLS configuration and assumed the default branch.
+
+A per-URL certificate setting could override the command's general certificate check.
+Network comparison now runs in an empty temporary directory with system and global Git configuration disabled.
+The checkout supplies only its tracked remote URL and branch metadata.
+The temporary directory is removed after comparison, including failure.
+The version check now searches the fixed /usr/bin:/bin path for Git instead of naming one absolute binary.
+The Git service also launches Git by its command name.
+The comparison and displayed update commands use the tracked branch.
+A checkout without tracking receives a fixed explanation and no update commands.
+Credential-bearing URLs are tested independently from executable transport refusal.
+The output and time limits are exercised against real child processes.
+
+## 821. Settings regression fixtures needed corrections during review fixes.
+
+The first build-transformer test used an unavailable TypeScript compiler runtime enum.
+It now reads the transformer's literal patch fragments directly.
+The first running-timer fixture bound the same socket twice.
+It now reuses its existing connection.
+The audit test initially named a nonexistent caller_json column.
+The event table stores the caller as a fixed caller key.
+The standalone Harnesses test now supplies the added version-loader dependency when evaluating the built module.
+The version-reply race test already passed before changing the settings reference.
+The existing state object reads settings at reply time rather than holding a settings snapshot.
+The code now explicitly merges the returned version fields into the current store's settings.
+
+## 822. The restart continuation needed an explicit recursive effect type.
+
+The first review-fix type check found a cycle between the mutation handler and its stop continuation.
+The handler now has its existing public execute type as an explicit annotation.
+The continuation uses the concrete command and log error types instead of an unconstrained effect.
+The following type check passed for every package and the root.
+The affected suite passed 312 tests.
+The live settings browser journey passed with the folder reset and no-tracking explanation.
+
+## 823. The first full review-fix check found a visibility fixture gap and a forbidden type import.
+
+The new restart event was missing from the exhaustive subscription visibility samples.
+Its empty payload now has a sample, so the existing tests check owner-only visibility in catch-up and live streams.
+A type-only import of LogWriteFailed from the client piece also crossed the repository's piece boundary.
+The restart continuation now preserves its caller's error type through a generic parameter.
+The client piece does not import the log writer.
+
+## 824. Two process-only tests omitted the required rebuild registration.
+
+The first full check finished with 8,547 passed tests, five failed tests, and two skipped tests.
+The exhaustive registration guard found the new restart-launch and version-process files.
+These two tests create no engine log.
+They now register the explicit noLog form required for those tests.
+The browser and credit stages did not run because the unit stage failed.
+
+## 825. The final review-fix check still hit the known Git browser timeout.
+
+The final full check passed all package and root type checks.
+All 567 unit files passed, with 8,552 passed tests and two skipped tests.
+The browser stage passed 55 of 56 journeys.
+The Git journey timed out for ten seconds while clicking Use both after reopening a conflict.
+The merged file reports this at packages/web/e2e/support/studioGit.ts:165, rather than the earlier line 157.
+The live settings, Harnesses, Notifications, and standalone sample journeys passed.
+The credit check passed separately after the failed browser stage skipped its chained invocation.
+The settings worker changed no Git implementation or timeout beyond the required integration merge.
+The lead assigned that Git problem to another builder.
+
+## 826. This Codex session cannot invoke the remote test helper.
+
+The Mocks control assignment requires the `run-remote-test` wrapper.
+Automatic approval review rejects this session's source transfer to the remote test computer.
+The lead will run the requested checks from this worktree and return their output.
+The builder records exact commands in `.foundry/test-request.txt`.
+
+## 827. The first Mocks check found incorrect comment authors and ambiguous test controls.
+
+The comment mapper passed a complete comment to the author mapper.
+It now passes the comment's author.
+The Studio source tests used the browser's URL class for filesystem paths.
+They now use repository-relative paths, as the existing Studio tests do.
+The new browser journey found both the comment Send button and the side panel Send button.
+It now selects the comment form's Send button.
+The combined targeted run exited with status 143 before its terminal parity tests reported a result.
+The next request runs parity separately.
+
+## 828. The public API hid fixed mock refusal reasons.
+
+The second browser run received a generic refusal instead of the engine's stale-revision reason.
+The public reason list omitted that fixed mock reason.
+It also omitted fixed artifact and design reasons used by editor saves.
+The list now includes those fixed sentences without exposing paths or host errors.
+The authenticated screen and editor tests now assert stale-revision reasons across the transport.
+
+## 829. The full check found missing event fixtures and indirect rebuild registration.
+
+The first full Mocks check passed type checking and failed seven tests.
+Four exhaustive fixtures omitted the three new screen review events.
+Those fixtures now cover event tags, owner-only subscriptions, stored identity preservation, and prose redaction.
+The two new engine test files registered their rebuild checks through a shared fixture.
+The discovery guard requires a direct registration in each test file.
+Each test now registers the real rebuild comparison before seeding its engine state.
+The shared fixture no longer registers a duplicate comparison.
+
+## 830. The older Mocks browser journey still expected disconnected controls.
+
+The second full check passed all unit tests and failed two browser journeys.
+The older project journey expected no New badge on an unseen revision.
+It also expected individual approval to show the disconnected notice.
+It now checks the persisted seen action and individual approval and withdrawal.
+The new Mocks journey passed in that full run.
+The email journey separately failed to find its Notifications heading.
+Its reported source line points at a later password assertion, so the exact navigation boundary is not established by this output.
+The next request reruns that unchanged journey in isolation before choosing a fix.
+
+## 831. The email browser fixture served the sample without a usable workflow module.
+
+The isolated email journey again failed to find its Notifications heading.
+The fixture serves the standalone sample through the engine's strict script policy.
+That policy blocks the sample's inline import map.
+The sample workflow module then imports an unavailable TypeScript source path, so the application cannot load.
+The fixture now copies the workflow contracts bundle from its existing Studio build over the sample's source re-export.
+The engine's content policy and the standalone sample sources are unchanged.
+The next isolated email run will verify this fixture correction.
+
+## 832. The third full check failed in the merged Git conflict journey.
+
+The run passed 8459 unit tests and 54 browser tests.
+The Git journey timed out at `packages/web/e2e/support/studioGit.ts:157` while waiting for Use both after recreating a conflict and refreshing.
+The assignment's known intermittent Git failure was named at line 100.
+This output does not establish that the new failure is the same one.
+Both Mocks journeys and the corrected email journey passed.
+The Mocks builder has not changed the Git journey, Git implementation, or its timeout.
+The unchanged journey passed its isolated rerun.
+The fourth full check repeated the same failure while the other 54 browser tests passed.
+The saved browser snapshot contains an enabled Use both control at failure capture.
+The journey's refresh helper waits for the Git mutation aria-busy flag to be false.
+The merged build tracks refreshes under the separate git-read key, so that flag does not prove that refresh has finished.
+This provides a concrete synchronization mismatch for the Git lead to review.
+The Mocks builder leaves the Git implementation and journey unchanged.
+The final review-fix check at `b06bca4` passed 8626 unit tests, with 2 skipped, and 55 of 56 browser tests.
+Its only failure is the same Git journey waiting for Use both after reopening the file, now at `packages/web/e2e/support/studioGit.ts:165`.
+The review-fix assignment explicitly assigns the Git journey to another builder and says that it must not block the Mocks handoff.
+Both Mocks journeys and the standalone sample journey passed.
+
+## 833. The review found Mocks behavior and coverage gaps.
+
+The review found that the feedback loader makes one read per screen version and fails when any engine event arrives during the load.
+Earlier screen comments disappear from the page after a new mock revision.
+A comment does not notify the project's designer or lead.
+The terminal editor-save command cannot carry a large export as one argument.
+Editor saves need explicit stage-reset confirmation, format checks, preserved modes, and recovery after a file replacement whose recording fails.
+The build transformation accepts duplicate matches and silently accepts a missing seen-badge replacement.
+The test fixtures also need a second actual project, a direct saver symbolic-link check, package-relative execution, and oversized contract coverage.
+These findings are the scope of `.foundry/fix-task.md`.
+The builder is adding failing regression tests before changing each implementation.
+
+## 834. Compressed design exports are not inspected for registered secrets.
+
+The editor-save redaction check scans decoded export bytes as text.
+A secret inside a compressed `.fig` export is not detected by that check.
+The review found this limitation and asked that it be recorded for the owner.
+A file signature check does not inspect compressed document contents.
+
+## 835. An explicit Git refresh could be dropped behind an automatic read.
+
+The Refresh Git button and automatic refreshes used the same git-read pending key.
+A click during an older read returned false without starting a fresh read.
+The page's owner-action busy state also remained false during that explicit refresh.
+An external merge can therefore be absent from the page when the owner expects the refresh to have completed.
+A full browser run with the old refresh and corrected owner dialogs reproduced Use both after an external merge and refresh.
+That run had 54 passes and one failure in 9.2 minutes.
+The snapshot had Conflicts selected and eventually contained the choice buttons without an owner Working state.
+The read could outlast the click budget while the journey already saw the owner-action state as idle.
+The gated regression separately proves the dropped-refresh case.
+Explicit refresh now uses the owner-action key and advances the read generation.
+An older automatic reply cannot overwrite its newer conflict state.
+Automatic reads retain their separate key and do not disable approval.
+A gated regression verifies that a held older read cannot discard the explicit refresh or replace its result.
+
+## 836. The conflict view hid an unfinished selection read.
+
+The baseline full browser run failed at Use both after reopening a resolved file.
+Its captured page had the Conflicts view open and the owner action still marked Working.
+The conflicted file said Ready while its body contained no choices.
+The page had published the conflict file list before reading the selected file's conflict parts.
+The view now says Loading conflicts while that selection is unread.
+The file list also says Loading instead of Ready.
+Choices remain disabled until their selection is loaded.
+A rendered regression holds this state and verifies the visible status and disabled resolution control.
+
+## 837. Git dialogs closed before their owner action finished.
+
+Issues 755 and 756 were worked around by journey waits after discard and send-back.
+Discard now uses the existing confirmation dialog's pending mode through its complete readback.
+Abort and reopen use that same pending mode.
+Their dialogs show Discarding, Aborting, or Reopening until completion.
+Send-back keeps its dialog open and shows Sending back until its readback and pending state finish.
+Its Cancel controls are disabled and its close callback is guarded while the action is pending.
+The two workaround waits were removed.
+The discard journey observes the visible confirmation closing instead.
+Unit regressions hold readback and verify that the dialogs remain open.
+No timeout was raised.
+
+## 838. The baseline admin journey lost its changed heartbeat value once.
+
+The unmodified d34b903 full browser run failed in admin-pages.spec.ts at its heartbeat assertion.
+The input showed 25 after the test filled 30, blurred the input, and clicked Refresh settings.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+This page is outside the current Git assignment and was not changed.
+
+## 839. The baseline thread journey observed no permission answer once.
+
+The unmodified d34b903 full browser run failed in thread-browser.spec.ts after its permission clicks.
+The fake runner had zero answerPermission calls instead of one within five seconds.
+The snapshot still showed the open permission request.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+The Git page changes do not change this thread implementation.
+This finding remains outside the current Git assignment.
+
+
+## 840. The Git journey clicked past the visible reopening confirmation.
+
+The first full browser validation with the page fixes passed the external-merge refresh boundary.
+It later attempted Use both immediately after confirming Reopen.
+That step still had only its ten-second click budget while the owner was being shown a retained confirmation and a loading conflict view.
+The end snapshot contains the Reopen confirmation and Loading conflicts.
+It also contains a socket-unavailable toast after the failed test began shutting down its service.
+The complete output had 54 passes and one failure in 10.1 minutes.
+The journey now observes the reopening confirmation closing before choosing lines.
+An owner sees that same progress and waits for the dialog to finish.
+This wait uses the existing expectation budget and raises no timeout.
+The page fix itself is unchanged.
+
+
+## 841. Git action readback reread every unrelated worktree in sequence.
+
+The first complete validation on 7c37033 passed all 55 browser cases in 10.5 minutes.
+Its Git journey took 5.8 minutes.
+The second run passed the external-merge and reopening steps but exceeded the whole journey's unchanged six-minute limit during final approval.
+The end snapshot showed that final review with current passed evidence and an owner readback still marked Working.
+That run had 54 passes and one failure in 10.6 minutes.
+Each mutation had reread the project, its teams, its builders, and its base even when only one checkout changed.
+Stage, unstage, discard, resolution, reopening, and send-back now read back their selected checkout.
+Operations that can move a branch head retain the complete project readback because sibling parent-relative counts can change.
+The Git worktree picker refreshes the chosen checkout before its owner controls become available.
+Other checkouts retain their cache across index-only changes.
+Explicit and automatic project refreshes retain their complete workspace reads.
+Regressions hold an unrelated checkout during staging, retain all sibling reads after integration, and require fresh Git state through the Git picker.
+No engine gate, authorization check, Git command, or timeout is changed.
+
+
+## 842. The global inspection selector does not call the Git detail reader.
+
+The global inspection menu in the copied app updates the selected branch directly.
+The Git worktree picker calls the Git selection action and refreshes its records.
+Selecting an unread checkout through the global menu can therefore show cached file rows without loading their details.
+This path was already present on the assigned baseline.
+The current assignment keeps out of the app source and does not change that global menu.
+The owner can use the Git worktree picker or Refresh Git for a fresh read.

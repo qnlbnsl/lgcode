@@ -17,7 +17,9 @@ export const settingsRefusal = (error: unknown) => {
 };
 export const resolveSettings = (settings: RolesSettings, role: { readonly limits: RoleLimits; readonly kind?: RoleKind } | undefined) => ({
   ...defaultLimits, ...(role?.kind === "lead" || role?.kind === "orchestrator" ? { stallMinutes: 20 } : {}),
-  ...settings.limits, ...role?.limits,
+  ...settings.limits,
+  ...(role?.kind === "lead" || role?.kind === "orchestrator" ? { stallMinutes: settings.leadStallMinutes ?? settings.limits?.stallMinutes ?? 20 } : {}),
+  ...role?.limits,
 });
 export const roleSettings = (file: RoleFile | null, role: string) => {
   const { kind, name, flags } = parseRole(role);

@@ -1,3 +1,4 @@
+import { mockScreenPlanners, mockScreenReads } from "./mockScreenReviews.ts"
 import { MockBundle, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { fieldStructure, eventStructure, type RedactionStructure } from "../log/redactionStructure.ts"
@@ -29,7 +30,7 @@ const validReviews = (bundle: typeof MockBundle.Type) => {
       && (row.status === "new" ? row.known === undefined : row.known !== undefined
         && (row.status === "matches" ? row.known === row.field.type : row.known !== row.field.type))))
 }
-const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): MockApproval["worklist"] => ({
+export const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): MockApproval["worklist"] => ({
   screens: revision.bundle.screens.map((row) => row.screenId),
   drafts: revision.bundle.components.filter((row) => row.provenance === "draft").map((row) => row.componentId),
   draftedFields: revision.bundle.draftedFields,
@@ -38,7 +39,7 @@ const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): Mo
 })
 // Leave room for the request and cursor in the 256 KiB read envelope. Admit
 // both the revision and its eventual approval, including duplicated fields.
-const readable = (revision: MockRevision, approval: MockApproval) => Buffer.byteLength(JSON.stringify(agentReadReply("budget", { items: [revision], approval }))) <= 192 * 1024
+export const readable = (revision: MockRevision, approval: MockApproval) => Buffer.byteLength(JSON.stringify(agentReadReply("budget", { items: [revision], approval }))) <= 192 * 1024
 // Use the production structural positions, so prose is redacted before the
 // aggregate budget is admitted, while typed identities remain intact.
 const cleanBundle = (input: Input, bundle: typeof MockBundle.Type) => Effect.gen(function* () {
@@ -238,5 +239,5 @@ const artifact: ReadHandler = (input, raw) => Effect.gen(function* () {
   if (Buffer.byteLength(JSON.stringify(reply)) > 256 * 1024) return yield* refused("mock artifact reply exceeds the read budget")
   return { reply }
 })
-export const mockPlanners = { "project.mocks.record": record(), "project.mocks.approve": approve() }
-export const mockReads = { "project.mocks.read": read, "project.mocks.artifact": artifact }
+export const mockPlanners = { ...mockScreenPlanners, "project.mocks.record": record(), "project.mocks.approve": approve() }
+export const mockReads = { ...mockScreenReads, "project.mocks.read": read, "project.mocks.artifact": artifact }

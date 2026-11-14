@@ -1,7 +1,7 @@
 // The mock's sample data and the functions that read it.
 // The data is plain objects. It is a design aid, not a contract for the engine.
 // Agents have no personal names: an agent is known by its role and its team.
-import { MIN, HOUR, DAY, persist, FRAMED } from './lib.js';
+import { MIN, HOUR, DAY, persist, FRAMED, live } from './lib.js';
 
 const T = Date.now();
 const at = (msAgo) => T - msAgo;
@@ -311,24 +311,54 @@ export function seed() {
   ];
 
   return {
+    ...base(),
     session: { status: (FRAMED && new URLSearchParams(location.hash.split('?')[1] || '').get('session')) || persist('session', 'in'), firstRun: false },
     conn: { status: 'live', lastHeard: T },
+    owner: { name: 'Maya Okafor', initials: 'MO' },
+    machines, subscriptions, repos, projects, teams, agents, epics, sprints, tasks, requests, threads, channels, posts,
+    expanded: { 'repo:lgtm': true, 'project:console': true, 'team:console-shell': true },
+    inspecting: { console: 'feat/agent-console/shell' },
+    T,
+  };
+}
+
+// The parts of the store that hold no sample: the owner's preferences, the page's own state,
+// and the service settings at their defaults.
+function base() {
+  return {
     prefs: {
       theme: persist('theme', 'system'), density: persist('density', 'compact'),
       sidebarFolded: persist('sidebarFolded', false), sidebarWidth: persist('sidebarWidth', 264),
       panelWidth: persist('panelWidth', 420), panelOpen: persist('panelOpen', true), onlyNeedingYou: false,
     },
-    owner: { name: 'Maya Okafor', initials: 'MO' },
-    machines, subscriptions, repos, projects, teams, agents, epics, sprints, tasks, requests, threads, channels, posts,
-    drafts: {}, pending: {}, expanded: { 'repo:lgtm': true, 'project:console': true, 'team:console-shell': true },
-    inspecting: { console: 'feat/agent-console/shell' }, toasts: [], dialog: null, phoneOffer: persist('phoneOffer', 'open'),
+    drafts: {}, pending: {}, expanded: {}, inspecting: {}, toasts: [], dialog: null, phoneOffer: persist('phoneOffer', 'open'),
     settings: {
-      ntfyServer: '', ntfyTopic: '', ntfyToken: '',
+      ntfyServer: '', ntfyTopic: '', ntfyToken: '', tokenSet: false, ntfyEnabled: false, email: { enabled: false, tokenSet: false },
       webEnabled: true, port: 8787, checkIn: 15, proxyMode: false, publicAddress: '',
       stallWatch: true, standingRules: false, capacityBackoff: 5, crashRetries: 1, teamIdle: 60,
       removeCredits: false, gitModel: 'Haiku 5.5',
+      notifyOn: { question: true, approval: true, merge: true, failed: true, sprint: false },
+      quiet: { on: false, from: '22:00', to: '07:00', timeZone: 'UTC', failed: true },
+      defaultHarness: 'claude', defaultModel: 'Sonnet 5.5', defaultEffort: 'Medium', defaultPermission: 'Edit files without asking',
+      needToKnow: false, stallAssigned: 5, stallWorker: 10, stallLead: 20, autoNudge: true, replaceAfter: 3, capacityRetries: 12,
+      workflowPath: '~/.lgtm', maxRounds: 6, testsDefault: true, reviewDefault: true,
+      version: '', commit: '', dataFolder: '',
     },
-    T,
+  };
+}
+
+// The store of the live website before the engine has answered. Every collection is empty,
+// so each screen shows its empty structure. The engine's records replace these through
+// the connection; see engine.js. Nothing here comes from seed().
+export function emptyState() {
+  return {
+    ...base(),
+    session: { status: 'checking', firstRun: false },
+    conn: { status: 'reconnecting', lastHeard: Date.now() },
+    owner: { name: 'Owner', initials: 'O' },
+    machines: [], subscriptions: [], repos: [], projects: [], teams: [], agents: [], epics: [], sprints: [], tasks: [], requests: [],
+    threads: {}, channels: [], posts: [],
+    T: Date.now(),
   };
 }
 
@@ -338,7 +368,8 @@ export const repoOf = (s, p) => byId(s.repos, p.repo);
 export const projectOf = (s, id) => byId(s.projects, id);
 export const agentOf = (s, id) => byId(s.agents, id);
 export const teamOf = (s, id) => byId(s.teams, id);
-export const teamName = (t) => (t ? `${t.stage === 'Plan' ? 'Planning' : t.stage} team${t.area ? ' · ' + t.area : ''}` : '');
+// A team the engine named keeps its own name. A team without one is named by its stage and area.
+export const teamName = (t) => (!t ? '' : t.name || `${t.stage === 'Plan' ? 'Planning' : t.stage} team${t.area ? ' · ' + t.area : ''}`);
 export const teamsOf = (s, pid) => s.teams.filter((t) => t.project === pid);
 export const agentsOfTeam = (s, tid) => s.agents.filter((a) => a.team === tid);
 export const agentsOfProject = (s, pid) => s.agents.filter((a) => a.project === pid);
@@ -392,7 +423,7 @@ export function openRequests(s, filter = {}) {
     && (!filter.kind || r.kind === filter.kind)).sort(byAttention);
 }
 export const requestsOfTask = (s, tid) => s.requests.filter((r) => r.task === tid && r.status === 'open');
-export const requestsOfSprint = (s, sid) => { const ids = new Set(tasksOfSprint(s, sid).map((t) => t.id)); return s.requests.filter((r) => r.status === 'open' && ids.has(r.task)); };
+export const requestsOfSprint = (s, sid) => { const ids = new Set(tasksOfSprint(s, sid).map((t) => t.id)); return s.requests.filter((r) => r.status === 'open' && (r.sprint === sid || ids.has(r.task))); };
 
 // The dot and the short words for an agent, from its state and its open requests.
 export function agentStatus(s, a) {
@@ -413,17 +444,18 @@ export function agentStatus(s, a) {
 }
 export function projectStatus(s, p) {
   if (p.archived) return { word: 'Archived', tone: null };
+  if (p.archiving) return { word: 'Archiving', tone: 'warn' };
   const n = openRequests(s, { project: p.id }).length;
   if (n) return { word: `Needs you · ${n}`, tone: 'warn', n };
   const working = agentsOfProject(s, p.id).some((a) => a.state === 'working');
   if (!working) return { word: 'Idle', tone: null };
-  return { word: { Design: 'Designing', Plan: 'Planning', Build: 'Building', Review: 'Reviewing', 'Hand over': 'Handing over' }[p.stage], tone: 'ok' };
+  return { word: { Design: 'Designing', Plan: 'Planning', Build: 'Building', Review: 'Reviewing', 'Hand over': 'Handing over' }[p.stage] || 'Working', tone: 'ok' };
 }
 export function sprintProgress(s, sp) {
   const ts = tasksOfSprint(s, sp.id);
   return { total: ts.length, done: ts.filter((t) => t.state === 'done').length, active: ts.filter((t) => t.state === 'active' || t.state === 'review').length };
 }
-export const threadOf = (s, aid) => s.threads[aid] || (s.threads[aid] = []);
+export const threadOf = (s, aid) => s.threads[aid] || (live.on ? [] : (s.threads[aid] = []));
 export const routeForAgent = (s, a) => `/p/${a.project}/chat/${a.id}`;
 export const routeForRequest = (s, r) => `/p/${r.project}/chat/${r.agent}?req=${r.id}`;
 export const taskByLabel = (s, pid, label) => s.tasks.find((t) => t.project === pid && t.label === label);

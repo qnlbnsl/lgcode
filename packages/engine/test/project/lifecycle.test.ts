@@ -175,3 +175,26 @@ it.live("keeps one visible lead and closes a real adapter rejected during setup"
     expect((yield* readLog).filter(({ event }) => event._tag === "AgentStartFailed").map(({ event }) => event)).toEqual([{ _tag: "AgentStartFailed", agentId: row.leadAgentId, reason: "could-not-start" }])
   }))
 })
+
+
+it.live("issue 685: creates both default channels atomically and lets the owner post", () => {
+  const harness = harnessFor("cursor", writeFakeAdapter(rig))
+  const account = accountFor(harness.id, { turns: [] }, echoFile(rig), { CURSOR_API_KEY: "secret:project-test" })
+  return withEngine(rig, { harness, accounts: [account], secrets: { "secret:project-test": "synthetic-project-credential-1234" } }, () => Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.work, shell: "sh" } }))
+    const payload = { requestId: freshRequest(), name: "Board", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "Board repo" } }
+    const created = success(yield* call(ownerCredential, "project.create", payload))
+    const events = yield* readLog
+    const creation = events.find((row) => row.event._tag === "project.Created")!
+    const channels = events.filter((row) => row.event._tag === "board.ChannelOpened" && row.requestId === creation.requestId)
+    expect(channels.map((row) => row.event._tag === "board.ChannelOpened" && row.event.name)).toEqual(["General", "Leads"])
+    for (const row of channels) {
+      if (row.event._tag !== "board.ChannelOpened") continue
+      expect(row.event.members).toEqual([{ _tag: "owner" }, { _tag: "agent", agentId: projectView(yield* snapshot).projects[created.projectId]!.leadAgentId }])
+      success(yield* call(ownerCredential, "board.post", { channelId: row.event.channelId, text: "Owner post", to: [], reply: "none" }))
+    }
+    expect(success(yield* call(ownerCredential, "project.create", payload))).toEqual(created)
+    expect((yield* readLog).filter((row) => row.event._tag === "board.ChannelOpened")).toHaveLength(2)
+  }))
+})

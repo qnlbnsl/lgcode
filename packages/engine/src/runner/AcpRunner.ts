@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readlinkSync, statSync } from "node:fs";
+import { readlinkSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { comparePermission, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgtm/contracts";
@@ -101,6 +101,7 @@ interface Process {
   dead: boolean;
   mode: string;
   options: ReadonlyArray<ConfigOption>;
+  legacyModels?: unknown;
   applied: AgentChoice;
   configuring: boolean;
   configurationUncertain: boolean;
@@ -337,12 +338,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   // registered or the spawn has failed, so two setups for one agent can never
   // both reach the spawn, even from a caller that bypasses the send lanes.
   const reserved = new Set<string>();
-  const spawn = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.suspend(() => {
+  const spawn = (input: Spawn, session?: SessionReference, discovery = false): Effect.Effect<SessionInfo, RunnerRejected> => Effect.suspend(() => {
     if (processes.has(input.agentId) || reserved.has(input.agentId)) return Effect.fail(rejected("agent already has a process"));
     reserved.add(input.agentId);
-    return spawnReserved(input, session).pipe(Effect.ensuring(Effect.sync(() => { reserved.delete(input.agentId); })));
+    return spawnReserved(input, session, discovery).pipe(Effect.ensuring(Effect.sync(() => { reserved.delete(input.agentId); })));
   });
-  const spawnReserved = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.gen(function* () {
+  const spawnReserved = (input: Spawn, session?: SessionReference, discovery = false): Effect.Effect<SessionInfo, RunnerRejected> => Effect.gen(function* () {
     if (session !== undefined && session._tag !== "acp") return yield* rejected("session is not an ACP session");
     const harness = input.harness;
     if (harness.runMode !== "acp" || !isAbsolute(harness.adapterPath) || resolve(harness.adapterPath) !== harness.adapterPath) return yield* rejected("adapter path is not resolved");
@@ -412,9 +413,10 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     let entry: Process | undefined;
     return yield* Effect.gen(function* () {
       if (harness.id === "cursor") {
+        const sessions = join(configuration.stateFolder, "cursor-sessions", input.agentId);
+        if (discovery) yield* Scope.addFinalizer(scope, Effect.sync(() => rmSync(sessions, { recursive: true, force: true })));
         const settings = yield* Effect.acquireRelease(
           Effect.try({ try: () => {
-            const sessions = join(configuration.stateFolder, "cursor-sessions", input.agentId);
             serverName = cursorServerName(sessions);
             return cursorMcpConfig(environment, serverName, input.folder, sessions);
           }, catch: () => rejected("account tool server configuration cannot be prepared") }),
@@ -747,6 +749,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* drainTerminals(processEntry);
       processEntry.loading = false;
       processEntry.options = (opened.configOptions ?? []) as ReadonlyArray<ConfigOption>;
+      processEntry.legacyModels = opened.models;
       if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input.model, processEntry.version);
       if (input.effort !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "thought_level", input.effort, processEntry.version);
       yield* setMode(processEntry, input.permission);
@@ -877,12 +880,22 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     yield* Deferred.await(sent).pipe(Effect.ensuring(Effect.sync(() => { if (entry.sent === sent) delete entry.sent; })));
   });
   return Runner.of({
+    discover: (input) => Effect.gen(function* () {
+      yield* spawn(input, undefined, true);
+      const entry = yield* live(input.agentId, sha256Hex(Redacted.value(input.token)));
+      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered), entry.legacyModels);
+    }).pipe(Effect.ensuring(Effect.suspend(() => {
+      const entry = processes.get(input.agentId);
+      return (entry === undefined ? Effect.void : close(entry)).pipe(Effect.ensuring(
+        Option.isSome(processDatabase) ? processDatabase.value`DELETE FROM processes WHERE agent_id = ${input.agentId}`.pipe(Effect.asVoid, Effect.orDie) : Effect.void,
+      ));
+    }).pipe(Effect.orDie))),
     start: (input) => spawn(input), load: (input) => spawn(input, input.session),
     prompt: (input) => send(input, false), compact: (input) => send(input, true),
     configure,
     choices: ({ agentId, incarnation }) => Effect.gen(function* () {
       const entry = yield* live(agentId, incarnation);
-      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered));
+      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered), entry.legacyModels);
     }),
     context: ({ agentId, incarnation }) => live(agentId, incarnation).pipe(Effect.map((entry) => entry.context)),
     cancel: ({ agentId, deliveryId, sentSequence }) => Effect.gen(function* () {

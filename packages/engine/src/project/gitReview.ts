@@ -6,7 +6,8 @@ import { type Input, type Payload, type PiecePlanner, refused, CommandUncertain 
 import { type ReadHandler } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
-import { gitCall, gitReply, repositoryPath, withGit, workspacePath } from "./gitApi.ts"
+import { gitCall, gitReply, repositoryPath, withGit, workspacePath, workspaceReference } from "./gitApi.ts"
+import { postPlanner } from "../board/commands.ts"
 import type { GitService } from "./git/index.ts"
 
 const scope = (input: Input, raw: Record<string, unknown>, git: GitService) => Effect.gen(function* () {
@@ -119,3 +120,30 @@ const status: ReadHandler = (input, raw) => Effect.gen(function* () {
 })
 export const reviewPlanners = { "project.review.report": report, "project.review.prepare": prepare, "project.review.approve": approve }
 export const reviewReads = { "project.review.status": status }
+
+// Runs under the writer. No Git subprocess is needed for a stored review decision.
+// The command handler checks the project and board portions through their own
+// namespace boundaries before appending both in the same transaction.
+export const declineMainReview: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  yield* owner(input)
+  const p = raw as Payload<"project.review.decline">
+  if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled")
+  const workspace = yield* workspaceReference(input, raw)
+  const project = own(projectView(input.snapshot).projects, p.projectId)
+  const review = own(projectView(input.snapshot).gitReviews, p.worktreeId)
+  if (project === undefined || project.worktreeId !== workspace.worktreeId || project.archiving || project.archivedAt !== undefined
+    || review === undefined || review.reviewId !== p.reviewId || review.projectId !== p.projectId || review.outcome !== "open"
+    || review.head !== p.expectedHead || review.baseHead !== p.expectedBaseHead) return yield* refused("main review is unavailable; prepare a new review")
+  const reason = yield* input.runtime.log.redactText(p.reason.trim().replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""))
+  if (reason.trim() === "") return yield* refused("give a reason for sending the review back")
+  const lead = own(input.snapshot.agents, project.leadAgentId)
+  if (lead === undefined || lead.state._tag === "stopped" || lead.state._tag === "crashed"
+    || lead.state._tag === "interrupted" && lead.reloadable !== true) return yield* refused("project lead is unavailable; the review was not sent back")
+  const target = { _tag: "agent", agentId: project.leadAgentId } as const
+  const board = yield* postPlanner()(input, { requestId: p.requestId, direct: target, to: [target], reply: "all",
+    text: `The owner sent back the main review for ${review.branch} into ${review.base}.\n${reason}` })
+  const decided: GitMainReview = { ...review, outcome: "sent_back", reason, decision: null, mergeHead: null,
+    decidedAt: (yield* Clock.currentTimeMillis) as GitMainReview["decidedAt"] }
+  const reply = yield* gitReply(input, p.requestId, decided)
+  return { ...board, events: [...board.events, { _tag: "project.MainReviewDecided", review: decided }], reply: () => reply }
+})

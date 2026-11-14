@@ -384,7 +384,7 @@ The composer sends on Enter and inserts a line on Shift+Enter.
 It offers context search through Add context and @.
 The tool row exposes subscription, model, effort, and actual context usage.
 Usage that a harness does not report is unavailable rather than invented.
-The first waiting request offers phone notifications when no service is set.
+The first waiting request offers notifications when no service is set.
 Not now is stored permanently.
 That offer is absent from first-run setup.
 Notification retry and a test notification use the real notification transport.

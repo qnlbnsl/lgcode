@@ -1,8 +1,11 @@
+import * as liveGit from './live/git.js';
+import * as chat from './live/chat.js';
 // Everything that changes the mock's state, and the small simulation that makes agents
 // answer and move. Nothing here talks to a service. Each change the real product sends to the
 // engine is also reported to engine.js, under the RPC tag the real client API uses.
-import { store, update, notify, uid, remember, go, MIN } from './lib.js';
+import { store, update, notify, uid, remember, go, MIN, live, refuse, engineWrite } from './lib.js';
 import * as engine from './engine.js';
+import * as board from './live/board.js';
 import {
   agentOf, projectOf, teamOf, threadOf, openRequests, agentLabel, byId, tasksOfSprint, teamName, HARNESSES,
 } from './data.js';
@@ -15,7 +18,18 @@ export function toast(text, tone = 'ok') {
   update((s) => { s.toasts.push({ id, text, tone }); });
   setTimeout(() => update((s) => { s.toasts = s.toasts.filter((t) => t.id !== id); }), 3600);
 }
-export function openDialog(dialog) { update((s) => { s.dialog = dialog; }); }
+// In live mode, an action that the engine does not take yet changes nothing and says so.
+// The notice is written directly, because every other change in a refused turn is dropped.
+export const NOT_CONNECTED = 'This is not connected to the service yet. Nothing was changed.';
+live.onRefuse = () => {
+  if (S().ui.saved) S().ui.saved = null;
+  const id = uid('toast');
+  S().toasts.push({ id, text: NOT_CONNECTED, tone: 'error' }); notify();
+  setTimeout(() => { S().toasts = S().toasts.filter((t) => t.id !== id); notify(); }, 3600);
+};
+// True, after the notice, when the website is live and this action is not connected yet.
+export function refused() { if (!live.on) return false; refuse(); return true; }
+export function openDialog(dialog) { if (['pair-machine', 'signin'].includes(dialog.type) && refused()) return; update((s) => { s.dialog = dialog; }); }
 export function closeDialog() { update((s) => { s.dialog = null; }); }
 // Asks before a destructive change. `onConfirm` runs only after the owner agrees.
 export function confirm({ title, body, lost = [], action, danger = true, onConfirm }) {
@@ -76,6 +90,7 @@ function replyFor(a, text) {
 }
 export function setDraft(key, text) { S().drafts[key] = text; }
 export function sendMessage(agentId, text, context = [], files = []) {
+  if (live.on) return chat.sendMessage(agentId, text, context, files);
   text = text.trim();
   if (!text && !files.length) return;
   const a = agentOf(S(), agentId);
@@ -102,6 +117,7 @@ export function sendMessage(agentId, text, context = [], files = []) {
 }
 // Stops the reply that is being written. The agent keeps running.
 export function stopReply(agentId) {
+  if (live.on) return chat.stopReply(agentId);
   engine.call('cancel-reply', { agentId });
   update((s) => {
     clearTimeout(s.pending[agentId]); delete s.pending[agentId];
@@ -111,6 +127,7 @@ export function stopReply(agentId) {
   });
 }
 export function stopAgent(agentId) {
+  if (live.on) return chat.stopAgent(agentId);
   const s = S(); const a = agentOf(s, agentId);
   const approvals = openRequests(s, { agent: agentId }).filter((r) => r.kind === 'approval');
   const doStop = () => update((st) => {
@@ -131,6 +148,7 @@ export function stopAgent(agentId) {
   } else doStop();
 }
 export function resumeAgent(agentId) {
+  if (live.on) return chat.resumeAgent(agentId);
   engine.call('resume', { agentId });
   update((s) => {
     const a = agentOf(s, agentId);
@@ -140,10 +158,12 @@ export function resumeAgent(agentId) {
     threadOf(s, agentId).push({ id: uid('m'), type: 'note', ts: Date.now(), text: `You resumed ${a.name}.` });
   });
 }
-export function setAgentConfig(agentId, patch) { engine.call('configure', { agentId, ...patch }); update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
+export function setAgentConfig(agentId, patch) { if (live.on) return chat.setAgentConfig(agentId, patch); engine.call('configure', { agentId, ...patch }); update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
 
 // ---- requests ------------------------------------------------------------------
 export function answerRequest(requestId, optionId, text) {
+  if (live.on && S().worktrees?.some((w) => w.review?.id === requestId)) return liveGit.answerReview(requestId, optionId);
+  if (live.on) return chat.answerRequest(requestId, optionId, text);
   const s = S(); const r = byId(s.requests, requestId); if (!r || r.status !== 'open') return;
   const a = agentOf(s, r.agent); const opt = (r.options || []).find((o) => o.id === optionId);
   let answer;
@@ -193,7 +213,7 @@ export function answerRequest(requestId, optionId, text) {
     threadOf(st, ag.id).push(message);
   }), 1400);
 }
-export function declinePhoneOffer() { update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
+export function declinePhoneOffer() { if (live.on) return chat.declinePhoneOffer(); update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
 
 // ---- projects ------------------------------------------------------------------
 export function slug(name) { return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'; }
@@ -205,6 +225,7 @@ export function nameFromGoal(goal) {
   return name ? name[0].toUpperCase() + name.slice(1) : 'New project';
 }
 export function createProject({ repo, goal, machine, subscription, newRepo }) {
+  if (live.on) return board.createProject({ repo, goal, machine, subscription, newRepo });
   const s = S();
   let repoId = repo;
   if (newRepo) {
@@ -238,6 +259,7 @@ export function createProject({ repo, goal, machine, subscription, newRepo }) {
   return id;
 }
 export function archiveProject(pid, archived = true) {
+  if (live.on) return board.archiveProject(pid, archived);
   engine.call(archived ? 'archive' : 'restore', { projectId: pid });
   update((s) => {
     const p = projectOf(s, pid); p.archived = archived;
@@ -247,6 +269,7 @@ export function archiveProject(pid, archived = true) {
 }
 // A lead that hears about screens starts a Design team and the Mocks tab appears.
 export function startDesignTeam(pid) {
+  if (refused()) return;
   update((s) => {
     const p = projectOf(s, pid); if (p.hasMocks) return;
     engine.call('team.create', { projectId: pid, stage: 'Design' });
@@ -291,8 +314,35 @@ export function startSimulation() {
 }
 
 // ---- preview states (the mock's own controls) ------------------------------------
-export function setConnection(status) { update((s) => { s.conn.status = status; if (status === 'live') s.conn.lastHeard = Date.now(); }); }
-export function setSession(status) { update((s) => { s.session.status = status; }); remember('session', status === 'in' ? 'in' : 'out'); }
+export function setConnection(status) {
+  // In live mode the connection reports its own state. "Reconnect now" asks it to try again.
+  if (live.on) { if (status === 'live') engine.connection().reconnect?.(); return; }
+  update((s) => { s.conn.status = status; if (status === 'live') s.conn.lastHeard = Date.now(); });
+}
+export function setSession(status) {
+  // In live mode only the engine signs the page in. The page may still clear a rejected login.
+  if (live.on) { if (status !== 'in') engineWrite({ session: { ...S().session, status } }); return; }
+  update((s) => { s.session.status = status; }); remember('session', status === 'in' ? 'in' : 'out');
+}
+// Signs in with the service's password. The mock accepts any password except "wrong".
+// The live website asks the engine. Resolves to the session's new status.
+export async function signIn(password) {
+  if (live.on) return engine.connection().signIn(password);
+  await new Promise((done) => setTimeout(done, 700));
+  const status = password.trim().toLowerCase() === 'wrong' ? 'rejected' : 'in';
+  setSession(status);
+  return status;
+}
+// Asks again whether the service answers, after the Login page said it does not.
+export async function retryService() {
+  if (live.on) return engine.connection().reconnect?.();
+  await new Promise((done) => setTimeout(done, 1200));
+  setSession('out'); toast('The service is answering again');
+}
+export async function signOut() {
+  if (live.on) { await engine.connection().signOut(); go('/login'); return; }
+  setSession('out'); go('/login');
+}
 export function resetMock() { try { for (const k of Object.keys(localStorage)) if (k.startsWith('lgtm-mock:')) localStorage.removeItem(k); } catch { /* storage is optional */ } location.hash = '#/home'; location.reload(); }
 export { MIN, teamName, tasksOfSprint, agentLabel, teamOf };
 

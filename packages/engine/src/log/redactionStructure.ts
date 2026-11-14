@@ -45,6 +45,8 @@ const draftFields = { elements: { fields: { sourceId: identity, screens: { eleme
 const mockComparisons = { elements: { fields: { field: draftFields.elements } } };
 const mockWorklist = { fields: { screens: { elements: identity }, drafts: { elements: identity }, schemaChanges, draftedFields: draftFields } };
 export const eventStructure: RedactionStructure = { taggedFields: {
+  HarnessInstallStarted: { harnessId: identity, operationRequestId: identity },
+  HarnessInstallFinished: { harnessId: identity, operationRequestId: identity, state: identity },
   QuestionAsked: requestLinks, PermissionRequested: requestLinks,
   "project.OwnerTaskNotificationPlanned": { notificationId: identity, projectId: identity, taskId: identity, targetAgentId: identity },
   "project.DesignRecorded": { projectId: identity, revisionId: identity, fileFingerprint: identity, tokensFingerprint: identity,
@@ -56,6 +58,10 @@ export const eventStructure: RedactionStructure = { taggedFields: {
       scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields, reviewedComparisons: mockComparisons,
       components: { elements: { fields: { componentId: identity, sourceId: identity, fingerprint: identity, screens: { elements: identity } } } } } } },
   "project.MockApproved": { projectId: identity, approvalId: identity, revisionId: identity, leadAgentId: identity, worklist: mockWorklist },
+  "project.MockScreenCommented": { projectId: identity, revisionId: identity, screenId: identity, commentId: identity, author: actor },
+  "project.MockScreenApprovalSet": { projectId: identity, revisionId: identity, screenId: identity, author: actor },
+  "project.MockScreenSeen": { projectId: identity, revisionId: identity, screenId: identity, author: actor },
+  "project.MockScreensSeen": { projectId: identity, versions: { elements: { fields: { revisionId: identity, screenId: identity } } }, author: actor },
   "project.GitAttempted": { attempt: { fields: { requestId: identity, bodyHash: identity, caller: actor, command: identity, worktreeId: identity } } },
   "project.GitFinished": { caller: actor, operationRequestId: identity, outcome: identity, refusal: identity },
   "project.GitEvidenceReported": { report: gitReport },

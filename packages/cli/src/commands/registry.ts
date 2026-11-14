@@ -10,6 +10,12 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.service.version": "Read the running version and optionally compare the tracked remote branch over HTTPS without downloading code.",
+  "client.service.restart": "Confirm sign-out of every page and stop running agents, then restart the service with its original arguments and environment.",
+  "client.harness.status": "Read each harness's installed program, path and version.",
+  "client.harness.recipe": "Show the exact repository-owned install commands for a harness.",
+  "client.harness.install": "Install a harness using its fixed user-only recipe. Provider sign-in stays in your terminal.",
+  "client.harness.account.check": "Check local sign-in evidence without authenticating with a provider.",
   "project.context.search": "Search readable project tasks and files in a registered local project workspace; returns typed references and truncation state.",
   "project.repository.discover": "Discover bounded local repositories inside the workspace folder.",
   "project.branches": "List actual branches of a registered local repository.",
@@ -29,7 +35,12 @@ const summaries: Record<CommandName, string> = {
   "project.fetch": "Fetch origin for a registered local workspace.",
   "project.pull": "Fast-forward a clean registered local workspace from its upstream.",
   "project.push": "Publish the registered workspace branch to origin.",
-  "project.integrate": "Merge a registered team workspace into its clean project workspace.",
+  "project.integrate": "Merge a registered team into its project, or a registered builder into its team.",
+  "project.update": "Merge the registered parent head into a clean project, team or builder workspace.",
+  "project.merge.abort": "Abort the expected active merge after explicit confirmation.",
+  "project.conflict.resolved": "List reopenable resolved text files in the current merge.",
+  "project.conflict.reopen": "Restore a resolved file's original conflict stages in the expected merge.",
+  "project.review.decline": "Send an open main review back with a reason addressed to its project lead on the board.",
   "project.review": "Read actual review evidence against a local base branch in your project.",
   "project.review.report": "Record reported test or review data for the current project head with an existing project thread item; reports never approve a merge.",
   "project.review.prepare": "Prepare an owner review of the registered project and base heads, commits, diffs, and reported evidence without merging.",
@@ -39,6 +50,9 @@ const summaries: Record<CommandName, string> = {
   "project.conflict.choose": "Choose a canonical conflict hunk after checking its fingerprint.",
   "project.conflict.resolve": "Resolve canonical conflict hunks from current confirmed choices.",
 
+  "client.alerts.quiet.set": "Set quiet hours, their time zone and the failure override.",
+  "client.alerts.carrier.remove": "Remove one carrier configuration and its secret.",
+  "client.alerts.carrier.enabled.set": "Enable or disable one configured notification carrier.",
   "client.alerts.carrier.set": "Change the alert carrier.",
   "client.alerts.carrier.set-token": "Store the carrier token from standard input, after confirming the server.",
   "client.alerts.carrier.clear-token": "Clear the carrier token.",
@@ -51,6 +65,7 @@ const summaries: Record<CommandName, string> = {
   "client.alerts.settings.set": "Change an alert kind's push setting.",
   start: "Start an agent.",
   configure: "Choose an agent's model and/or effort for its next turn. Read client.agent.configuration for acknowledgement or refusal.",
+  "client.harness.choices": "Discover a harness account’s reported models and effort choices.",
   "client.agent.configuration": "Read an agent's desired and applied configuration and available choices.",
   "client.agent.context": "Read the latest reported context usage, or its unavailable state.",
   prompt: "Send a prompt to an agent.",
@@ -69,6 +84,12 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
+  "client.workflows.list": "List default, user and repository workflows.",
+  "client.workflows.read": "Read a workflow definition.",
+  "client.workflows.clone": "Clone a workflow with a new name.",
+  "client.workflows.save": "Save or rename a user workflow.",
+  "client.workflows.validate": "Validate a workflow without saving.",
+  "client.workflows.delete": "Delete a user workflow.",
   "client.web.settings": "Read the web server settings and state.",
   "client.web.settings.set": "Change the web server settings.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only).",
@@ -103,6 +124,13 @@ const summaries: Record<CommandName, string> = {
   "project.setup.complete": "Complete first-run setup after a successful project creation.",
   "project.setup.discover": "Observe actual repositories, adapters and local credential evidence without launching or signing in.",
   "project.placement.preview": "Preview actual project placement without reserving paths or creating files.",
+  "project.mocks.comment": "Post a plain text owner comment on the current recorded mock screen.",
+  "project.mocks.screen.approve": "Approve or withdraw owner approval of one recorded screen without advancing the project stage.",
+  "project.mocks.seen": "Record that the owner has seen exactly one recorded screen version.",
+  "project.mocks.seen.batch": "Record all displayed unseen screen versions atomically as the owner.",
+  "project.mocks.reviews.read": "Read bounded historical screen feedback for your whole project in one reply.",
+  "project.mocks.editor.save": "Save an editor export into the exact recorded design file and record a new mock revision as the owner.",
+  "project.mocks.screen.read": "Read versioned comments, approval and seen marks on a screen in your project.",
   "project.mocks.record": "Record a project-scoped mock revision with actual artifact references.",
   "project.mocks.read": "Read bounded immutable mock revisions and current owner approval.",
   "project.mocks.artifact": "Read actual bounded artifact text as data, or unavailable.",
@@ -173,8 +201,8 @@ export const helpText = (command: CommandName): string => {
     ].join("\n") + "\n"
   }
   if (command === "client.alerts.carrier.set-token") return [
-    "Usage: lgtm client alerts carrier set-token", "       lgtm client.alerts.carrier.set-token", "", summaries[command], callers,
-    "Takes no arguments. Type yes to confirm the displayed server, then supply the token on standard input.",
+    "Usage: lgtm client alerts carrier set-token [ntfy|email]", "       lgtm client.alerts.carrier.set-token [ntfy|email]", "", summaries[command], callers,
+    "Select ntfy (the default) or email. Type yes to confirm the displayed server, then supply its password or token on standard input.",
     "The token is never echoed or accepted in --input."
   ].join("\n") + "\n"
   const options = [
@@ -182,6 +210,9 @@ export const helpText = (command: CommandName): string => {
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",
     "  --help          Show this help."
   ]
+  if (command === "project.mocks.editor.save") options.splice(1, 0,
+    "  --file <path>   Read an editor export of at most 512 KiB on this computer.",
+    "                  Put the recorded identities and confirmed: true in --input; omit content.")
   if (command === "thread.export") return `Usage: lgtm thread export <agent> --out <file>\n\nExport all thread pages to a file on this computer with mode 0600.\n${callers}\nUse the positional agent and --out; --input is not supported.\n`
   if (command === "wait" || command === "client.wait") {
     options.splice(1, 0,

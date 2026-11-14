@@ -50,7 +50,7 @@ export const workspaceReference = (input: Input, raw: Record<string, unknown>) =
     const id = raw.projectId as string
     const project = own(view.projects, id)
     if (project === undefined || !canReadProject(input.snapshot, input.actor, id) || project.repoId !== workspace.repoId
-      || !(project.worktreeId === workspace.worktreeId || Object.values(view.teams).some((team) => team.projectId === id && team.worktreeId === workspace.worktreeId))) {
+      || !(project.worktreeId === workspace.worktreeId || Object.values(view.teams).some((team) => team.projectId === id && (team.worktreeId === workspace.worktreeId || team.worktreeId === workspace.parentId && workspace.checkout === "worktree")))) {
       return yield* refused("project is unavailable to this caller")
     }
   }
@@ -121,7 +121,7 @@ export const gitReply = (input: Input, requestId: unknown, result: unknown, agen
       || key === "state" && ["missing", "current", "stale"].includes(value as string)
       || key === "provenance" && value === "reported"
       || key === "decision" && ["approve", "approve_without_evidence"].includes(value as string)
-      || key === "outcome" && ["open", "merged", "refused"].includes(value as string)) return Effect.succeed(value)
+      || key === "outcome" && ["open", "merged", "refused", "sent_back"].includes(value as string)) return Effect.succeed(value)
     if (typeof value === "string") return input.runtime.log.redactText(value)
     if (Array.isArray(value)) return Effect.forEach(value, (item) => redact(item))
     if (value !== null && typeof value === "object") return Effect.forEach(Object.entries(value), ([key, item]) => redact(item, key).pipe(Effect.map((clean) => [key, clean] as const))).pipe(Effect.map(Object.fromEntries))

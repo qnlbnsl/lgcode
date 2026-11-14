@@ -9,6 +9,7 @@ import { visibleTo } from "./visibility.ts";
 import { retryNotification, testNotification } from "../commands/notifications.ts";
 import { readWebSettings } from "../client/settings.ts";
 import { clientReads } from "../client/reads/index.ts";
+import { harnessReads } from "../harnesses/requests.ts";
 import { getRoleFile } from "../roles/roleFile.ts";
 import { listActions } from "../roles/actions.ts";
 import { orient } from "../roles/orient.ts";
@@ -20,6 +21,7 @@ export interface ReadReply { readonly reply: Record<string, unknown>; readonly m
 export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
   Effect.Effect<ReadReply, any, any> | Stream.Stream<ClientStreamItem, any, any>;
 export const reads = {
+  ...harnessReads,
   ...clientReads,
   "client.alerts.test": testNotification,
   "client.alerts.retry": retryNotification,

@@ -1,15 +1,18 @@
+import { Workflows } from './screens/workflows.js';
+import * as liveGit from './live/git.js';
+import * as chat from './live/chat.js';
 // The application shell: sidebar, top bar, the project tab row, the lead panel, and routing.
 import {
   html, render, useState, useEffect, useRef, Icon, cx, store, update, useStore, useRoute, go, href, ago, useNow, useKey, useMedia,
-  HOUR, plural, isMac,
+  HOUR, plural, isMac, live, guardStore, engineWrite, refusal, refuse,
 } from './lib.js';
 import {
-  seed, projectOf, repoOf, agentOf, teamOf, teamName, teamsOf, agentsOfTeam, leadOf, openRequests, agentStatus, projectStatus,
-  KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf,
+  seed, emptyState, projectOf, repoOf, agentOf, teamOf, teamName, teamsOf, agentsOfTeam, leadOf, openRequests, agentStatus, projectStatus,
+  KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf, HARNESSES,
 } from './data.js';
 import * as act from './actions.js';
 import * as engine from './engine.js';
-import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar } from './ui.js';
+import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar, Empty } from './ui.js';
 import './dialogs.js';
 import { Home, AllProjects } from './screens/home.js';
 import { Board, SprintPage, TaskPage, TeamPage, RepoPage } from './screens/project.js';
@@ -21,8 +24,11 @@ import { MocksTab, seedMocks } from './screens/mocks.js';
 import { RepoDesign } from './screens/design.js';
 import { MessagesTab, AgentsTab, seedBoard } from './screens/messages.js';
 import { WorkflowTab, seedWorkflow } from './screens/workflow.js';
-import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
+import { Machines, Harnesses, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
+import { emptyWorkflow } from './screens/workflow.js';
+import { emptyMocks } from './screens/mocks.js';
+import * as mocks from './live/mocks.js';
 
 // ---- named places ---------------------------------------------------------------
 // A page that mounts the website can fill these places with its own components, without
@@ -135,7 +141,7 @@ function Sidebar({ s, route, onNavigate }) {
       <button type="button" class="icon-btn" aria-label="Find project or agent" data-tip="Find project or agent" data-tip-side="right" onClick=${() => act.openDialog({ type: 'switcher' })}><${Icon} name="search" size=${16} /></button>
       <button type="button" class="icon-btn" aria-label="New project" data-tip="New project" data-tip-side="right" onClick=${() => act.openDialog({ type: 'new-project' })}><${Icon} name="plus" size=${16} /></button>
       <span class="spacer"></span>
-      ${rail('/machines', 'server', 'Machines')}${rail('/subscriptions', 'key-round', 'Subscriptions')}${rail('/notifications', 'smartphone', 'Phone notifications', failedNotes > 0)}${rail('/settings', 'settings', 'Service settings')}
+      ${rail('/workflows', 'workflow', 'Workflows')}${rail('/machines', 'server', 'Machines')}${rail('/harnesses', 'key-round', 'Harnesses')}${rail('/notifications', 'smartphone', 'Notifications', failedNotes > 0)}${rail('/settings', 'settings', 'Service settings')}
     </div>
     <div class="side-top">
       ${nav('/home', 'house', 'Home', n > 0 && html`<span class="count warn">${n}</span>`)}
@@ -151,14 +157,15 @@ function Sidebar({ s, route, onNavigate }) {
     </div>
     <div class="side-foot">
       ${nav('/machines', 'server', 'Machines', html`<span class="state faint" style="margin-left:auto;font-size:var(--text-xs)">${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</span>`)}
-      ${nav('/subscriptions', 'key-round', 'Subscriptions')}
-      ${nav('/notifications', 'smartphone', 'Phone notifications', failedNotes > 0 && html`<span class="count error">${failedNotes}</span>`)}
+      ${nav('/harnesses', 'key-round', 'Harnesses')}
+      ${nav('/notifications', 'smartphone', 'Notifications', failedNotes > 0 && html`<span class="count error">${failedNotes}</span>`)}
+      ${nav('/workflows', 'workflow', 'Workflows')}
       ${nav('/settings', 'settings', 'Service settings')}
       <${Slot} name="sidebar.account" s=${s} route=${route} />
       <div class="row" style="height:var(--row);padding:0 2px 0 8px;margin-top:4px;gap:8px">
         <${OwnerAvatar} s=${s} /><span class="truncate grow" style="font-weight:var(--weight-medium)">${s.owner.name}</span>
-        <${MockControls} s=${s} />
-        <button type="button" class="icon-btn" aria-label="Log out" data-tip="Log out" data-tip-side="left" onClick=${() => { act.setSession('out'); go('/login'); }}><${Icon} name="log-out" size=${15} /></button>
+        ${!live.on && html`<${MockControls} s=${s} />`}
+        <button type="button" class="icon-btn" aria-label="Log out" data-tip="Log out" data-tip-side="left" onClick=${act.signOut}><${Icon} name="log-out" size=${15} /></button>
       </div>
     </div>
     ${!folded && html`<${Resizer} side="right" label="Resize the sidebar" value=${s.prefs.sidebarWidth} min=${220} max=${420} reset=${264} onChange=${(v) => act.setPref('sidebarWidth', v)} />`}
@@ -182,8 +189,8 @@ function Live({ s }) {
   const word = { live: 'Live', reconnecting: 'Reconnecting', offline: 'Offline' }[c.status];
   return html`<${Menu} class=${cx('live', c.status)} align="end" width=${280} label=${'Connection: ' + word}
     trigger=${html`<i class=${cx('dot', c.status === 'live' ? 'working' : c.status === 'reconnecting' ? 'waiting' : 'failed')}></i><span class="not-phone">${word}</span>`}
-    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? 'Connected to the service on Workstation.' : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
-    items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); act.toast('Connected'); } }]} />`;
+    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? `Connected to the service on ${(s.machines.find((m) => m.here) || s.machines[0])?.name || 'this computer'}.` : c.lastHeard ? `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.` : 'The service has not answered yet.'}</div></div>`}
+    items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); if (!live.on) act.toast('Connected'); } }]} />`;
 }
 function Inspecting({ s, project }) {
   const wts = (s.worktrees || []).filter((w) => w.repo === project.repo && (!w.project || w.project === project.id));
@@ -203,7 +210,7 @@ function TopBar({ s, route, project, onMenu }) {
     if (route.parts[2] === 'sprint') { const sp = byId(s.sprints, route.parts[3]); if (sp) crumbs.push({ to: route.path, label: sp.label }); }
     if (route.parts[2] === 'task') { const t = byId(s.tasks, route.parts[3]); if (t) crumbs.push({ to: route.path, label: t.label }); }
   } else if (route.parts[0] === 'r') { const r = byId(s.repos, route.parts[1]); crumbs.push({ to: '/r/' + route.parts[1], label: r?.name || 'Repository', cls: 'repo' }); }
-  else crumbs.push({ to: route.path, label: { home: 'Home', projects: 'All projects', machines: 'Machines', subscriptions: 'Subscriptions', notifications: 'Phone notifications', settings: 'Service settings' }[route.parts[0]] || 'Home' });
+  else crumbs.push({ to: route.path, label: { home: 'Home', projects: 'All projects', machines: 'Machines', subscriptions: 'Harnesses', harnesses: 'Harnesses', notifications: 'Notifications', settings: 'Service settings', workflows: 'Workflows' }[route.parts[0]] || 'Home' });
   return html`<header class="topbar">
     <button type="button" class="icon-btn only-phone" aria-label="Open navigation" onClick=${onMenu}><${Icon} name="menu" size=${18} /></button>
     <nav class="crumbs" aria-label="Where you are">
@@ -238,6 +245,7 @@ function SidePanel({ s, agent, project }) {
   </aside>`;
 }
 function ProjectView({ s, route, project }) {
+  useEffect(() => { if (live.on && route.parts[2] !== 'mocks') void mocks.loadMocks(project.id); }, [project.id, s.boardRevision]);
   const tab = route.parts[2] || 'board'; const lead = leadOf(s, project);
   const chatAgent = tab === 'chat' ? agentOf(s, route.parts[3] || lead.id) : null;
   const other = s.ui.panelAgent && agentOf(s, s.ui.panelAgent);
@@ -247,7 +255,7 @@ function ProjectView({ s, route, project }) {
   const tabs = [
     { id: 'board', label: 'Board' },
     { id: 'workflow', label: 'Workflow' },
-    project.hasMocks && { id: 'mocks', label: 'Mocks' },
+    (project.hasMocks || live.on && (project.stage === 'Design' || s.mocks[project.id]?.screens.length)) && { id: 'mocks', label: 'Mocks' },
     chatAgent && chatAgent.role !== 'project-lead'
       ? { id: 'chat', label: agentLabel(s, chatAgent, { withTeam: true }), icon: 'eye' }
       : { id: 'chat', label: 'Chat', count: open, tone: 'warn' },
@@ -274,6 +282,7 @@ function ProjectView({ s, route, project }) {
   else if (tab === 'chat') body = html`<${ChatTab} s=${s} project=${project} agentId=${chatAgent?.id || route.parts[3]} route=${route} />`;
   else if (tab === 'messages') body = html`<${MessagesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'agents') body = html`<${AgentsTab} s=${s} project=${project} route=${route} />`;
+  else if (live.on && ['terminal', 'files'].includes(tab)) body = html`<${NotConnected} what=${tab === 'files' ? 'Files' : 'The terminal'} />`;
   else if (tab === 'terminal') body = html`<${TerminalTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'files') body = html`<${FilesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'git') body = html`<${GitTab} s=${s} project=${project} route=${route} />`;
@@ -296,6 +305,11 @@ function ProjectView({ s, route, project }) {
   </div>`;
 }
 
+// A screen whose records the engine cannot give yet, in live mode. It never shows the sample.
+function NotConnected({ what }) {
+  return html`<div class="page"><${Empty} title=${`${what} is not connected yet`}>The service does not send this to the website yet.</${Empty}></div>`;
+}
+
 // ---- the app --------------------------------------------------------------------
 function App() {
   const s = useStore(); const route = useRoute();
@@ -307,13 +321,18 @@ function App() {
   }, []);
   useEffect(() => {
     if (!route.parts.length) go('/home');
+    if (route.parts[0] === 'subscriptions') go('/harnesses');
     // The old Home tabs keep working: Projects moved to its own page, and Questions and
     // Approvals became the Type filter on Needs attention.
     if (route.path === '/home/projects') go('/projects');
   }, [route.path]);
   useEffect(() => { document.title = 'LGTM Studio'; }, []);
+  // The live website opens Home once the engine says this browser is signed in.
+  useEffect(() => { if (live.on && s.session.status === 'in' && (route.parts[0] === 'login' || s.session.firstRun && route.parts[0] !== 'setup')) go(s.session.firstRun ? '/setup' : '/home'); }, [s.session.status, s.session.firstRun, route.path]);
   const top = route.parts[0] || 'home';
-  if (top === 'login' || (s.session.status !== 'in' && top !== 'setup')) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
+  // The live website asks the engine whether this browser is signed in before it shows anything.
+  if (s.session.status === 'checking') return html`<main class="auth" aria-busy="true"></main>`;
+  if (top === 'login' || (s.session.status !== 'in' && (top !== 'setup' || live.on))) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
   if (top === 'setup') return html`<${FirstRun} s=${s} route=${route} /><${DialogHost} s=${s} /><${Toasts} s=${s} />`;
   const project = top === 'p' ? projectOf(s, route.parts[1]) : null;
   let content;
@@ -322,8 +341,9 @@ function App() {
   else if (top === 'r') content = route.parts[2] === 'design' ? html`<${RepoDesign} s=${s} repoId=${route.parts[1]} route=${route} />` : html`<${RepoPage} s=${s} repoId=${route.parts[1]} />`;
   else if (top === 'projects') content = html`<${AllProjects} s=${s} />`;
   else if (top === 'machines') content = html`<${Machines} s=${s} route=${route} />`;
-  else if (top === 'subscriptions') content = html`<${Subscriptions} s=${s} route=${route} />`;
+  else if (top === 'subscriptions' || top === 'harnesses') content = html`<${Harnesses} s=${s} route=${route} />`;
   else if (top === 'notifications') content = html`<${Notifications} s=${s} route=${route} />`;
+  else if (top === 'workflows') content = html`<${Workflows} s=${s} />`;
   else if (top === 'settings') content = html`<${ServiceSettings} s=${s} route=${route} />`;
   else content = html`<${Home} s=${s} route=${route} />`;
   // Focus hides the sidebar, the top bar, the tab row and the lead panel, so the board fills the window.
@@ -345,9 +365,11 @@ function App() {
 //   connection   receives every engine call and pushed update; see engine.js
 //   slots        components for the named places above, by name
 export { App };
-export function mount(el, { connection, slots: fills } = {}) {
+export function mount(el, { connection, slots: fills, mode = 'mock' } = {}) {
   engine.setConnection(connection);
   slots = fills || {};
+  live.on = mode === 'live';
+  if (live.on) return mountLive(el);
   const state = seed();
   state.ui = {};
   for (const add of [seedGit, seedTerminal, seedMocks, seedBoard, seedWorkflow, seedService, seedAuth]) add?.(state);
@@ -361,9 +383,60 @@ export function mount(el, { connection, slots: fills } = {}) {
   render(html`<${App} />`, el);
   return { store, act };
 }
+
+// ---- live mode -------------------------------------------------------------------
+// The page that loads the website chooses live mode with mount(el, { connection, mode: 'live' }).
+// The store starts empty, nothing from seed() is read, and the simulation never starts. The
+// connection fills the store from the engine. It calls the function it is given with a patch
+// of whole store keys, such as { repos, projects, agents } or { session } or { conn }, already
+// in the store's shape. See engine.js for what the connection provides.
+function mountLive(el) {
+  const state = emptyState();
+  state.ui = {};
+  for (const key of Object.keys(state.settings)) state.settings[key] = typeof state.settings[key] === 'boolean' || typeof state.settings[key] === 'number' ? null : typeof state.settings[key] === 'string' ? '' : {};
+  state.settings.quiet = { on: null, from: '', to: '', failed: null };
+  seedTerminal(state);
+  Object.assign(state, { worktrees: [], gitUi: {}, boardRead: {}, boardUnread: {}, boardRevision: 0, boardDetails: {}, taskDetails: {}, setupData: null, boardAgents: {}, notifications: [], phoneOffer: null, workflow: {}, mocks: {}, design: {}, machineDetails: null });
+  store.state = guardStore(state);
+  act.applyPrefs();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
+  // A screen that changes an engine record outside update() is refused the same way.
+  addEventListener('error', onRefusedError);
+  addEventListener('unhandledrejection', onRefusedError);
+  engine.connection().open?.((patch) => {
+    if (patch.session && patch.session.status !== 'checking' && patch.session.status !== 'in') {
+      chat.reset(); engineWrite({ threads: {}, pending: {} });
+    }
+    if (patch.chatEvent) { chat.receive(patch.chatEvent); return; }
+    chat.enrich(patch);
+    // The Workflow and Mocks tabs keep one record per project. Each live project gets an
+    // empty one, frozen like the rest, so the tabs show their empty structure.
+    if (patch.projects) Object.assign(patch, {
+      workflow: Object.fromEntries(patch.projects.map((p) => [p.id, store.state.workflow[p.id] || emptyWorkflow()])),
+      mocks: Object.fromEntries(patch.projects.map((p) => [p.id, store.state.mocks[p.id] || emptyMocks()])),
+    });
+    // A harness the page has no words for is named by the engine's id for it.
+    for (const x of [...(patch.agents || []), ...(patch.subscriptions || [])]) {
+      if (x.harness && !HARNESSES[x.harness]) HARNESSES[x.harness] = { name: x.harness, models: [], efforts: [], noEffort: [], runMode: 'ACP' };
+    }
+    liveGit.observe(patch);
+    engineWrite(patch);
+    if (patch.conn?.status === 'live') chat.connected();
+    // The sidebar opens each repository the first time the engine names it, as the sample does.
+    if (patch.repos) for (const r of patch.repos) if (store.state.expanded['repo:' + r.id] === undefined) store.state.expanded['repo:' + r.id] = true;
+  });
+  render(html`<${App} />`, el);
+  return { store, act };
+}
+function onRefusedError(e) {
+  const error = e.error || e.reason;
+  if (live.on && refusal(error)) { e.preventDefault(); refuse(); }
+}
+
 // Takes the website out of the element and returns to the default connection.
 export function unmount(el) {
   render(null, el);
+  if (live.on) { chat.reset(); engine.connection().close?.(); removeEventListener('error', onRefusedError); removeEventListener('unhandledrejection', onRefusedError); live.on = false; }
   engine.setConnection(null);
   slots = {};
 }

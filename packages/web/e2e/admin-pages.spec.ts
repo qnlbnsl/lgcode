@@ -43,12 +43,12 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         success(yield* call(agentCredential(worker.token), "ask", { text: "Which branch should I use?" }))
         yield* Effect.promise(async () => {
-          const openService = async (name: "Phone notifications" | "Service settings") => {
+          const openService = async (name: "Notifications" | "Service settings") => {
             await openNavigation(page)
             await page.getByRole("navigation", { name: "Service pages", exact: true }).getByRole("link", { name, exact: true }).click()
             await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toHaveAttribute("aria-expanded", "false")
           }
-          const notifications = page.locator('.admin-page[aria-label="Phone notifications"]')
+          const notifications = page.locator('.admin-page[aria-label="Notifications"]')
           await page.setViewportSize({ width: 360, height: 800 })
           await page.goto(`http://127.0.0.1:${port}/?page=alerts`)
           await page.getByLabel("Password", { exact: true }).fill(password)
@@ -63,7 +63,7 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
           await expect(page).toHaveURL(`http://127.0.0.1:${port}/#/thread/phone-worker`)
           await expect(page.getByRole("heading", { name: "name-phone-worker", exact: true })).toBeVisible()
           await expect(page.getByRole("region", { name: "Question", exact: true })).toContainText("Which branch should I use?")
-          await openService("Phone notifications")
+          await openService("Notifications")
           await page.reload()
           await expect(notifications).toContainText("A question needs your answer")
           await assertPhoneWidth(page, "Alerts")

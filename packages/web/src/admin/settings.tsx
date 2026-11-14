@@ -12,12 +12,12 @@ import "./admin.css"
 type Web = WebSettings & { readonly serverState: typeof WebServerState.Type }
 const input = (form: HTMLFormElement, name: string) => form.elements.namedItem(name) as HTMLInputElement
 const pushLabels: Record<AlertKind, string> = {
-  approval: "Approvals", question: "Questions", failure: "Agent failures", account: "Subscription problems", other: "Other attention",
+  merge: "Merge reviews", sprint: "Sprint completions", approval: "Approvals", question: "Questions", failure: "Agent failures", account: "Subscription problems", other: "Other attention",
   "client.web-down": "Web server down", "board.post": "Posts needing your reply", "board.no-answer": "Unanswered posts",
   "roles.stall": "Stalled agents", "roles.replace": "Worker replacement", "roles.runaway": "Work exceeding its expected length",
   "roles.rule-first-use": "First use of a permission rule"
 }
-const sections = [["appearance", "Appearance"], ["notifications", "Phone notifications"], ["service", "Notification service"], ["web", "Web server"]] as const
+const sections = [["appearance", "Appearance"], ["notifications", "Notifications"], ["service", "Notification service"], ["web", "Web server"]] as const
 
 function PushSetting({ kind, push, busy, saving, onChange }: {
   readonly kind: AlertKind; readonly push: boolean; readonly busy: boolean; readonly saving: boolean; readonly onChange: (push: boolean) => void
@@ -230,11 +230,11 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
           <p className="admin-note">Saved in this browser. Match system follows the device’s light or dark setting.</p>
         </section>
         {alerts === undefined || web === undefined ? <p role="status">{busy ? "Loading settings…" : "Settings have not loaded."}</p> : <>
-          <section className="admin-settings-section" id="admin-settings-notifications" aria-label="Alert push settings"><h3>Phone notifications</h3>
+          <section className="admin-settings-section" id="admin-settings-notifications" aria-label="Alert push settings"><h3>Notifications</h3>
             <div className="admin-push-list">{alerts.kinds.map(({ kind, push }) => <div key={kind}><PushSetting kind={kind} push={push} busy={locked} saving={busy} onChange={(value) => { void setPush(kind, value) }} />{savedMark(`push-${kind}`)}</div>)}</div>
           </section>
           <section className="admin-settings-section" id="admin-settings-service"><h3>Notification service</h3>
-            <p className="admin-note">LGTM Studio sends phone notifications through an ntfy server.</p>
+            <p className="admin-note">LGTM Studio sends notifications through an ntfy server.</p>
             <form aria-label="Alert carrier" onSubmit={(event) => submit(event, saveCarrier)} onBlur={(event) => { if (event.target instanceof HTMLInputElement) void saveCarrier(event.currentTarget) }}
               key={`carrier-${alerts.carrier._tag === "ntfy" ? `${alerts.carrier.server}/${alerts.carrier.topic}` : "none"}`}>
               <fieldset disabled={locked}><label>Server<input name="server" type="url" defaultValue={alerts.carrier._tag === "ntfy" ? alerts.carrier.server : ""} required /></label>

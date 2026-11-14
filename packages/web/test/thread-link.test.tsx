@@ -31,11 +31,11 @@ it("7.9 opens the real alert's thread link with its subject without sending a st
     "client.agent.context": context,
     accounts,
   })
-  const alertsLink = Array.from(container.querySelectorAll("a")).find((link) => link.getAttribute("aria-label") === "Phone notifications")!
+  const alertsLink = Array.from(container.querySelectorAll("a")).find((link) => link.getAttribute("aria-label") === "Notifications")!
   await act(async () => { alertsLink.click() })
   expect(list).toHaveBeenCalled()
-  expect(container.querySelector('section[aria-label="Phone notifications"]')).toBeTruthy()
-  const link = container.querySelector<HTMLAnchorElement>('section[aria-label="Phone notifications"] a[href*="/thread/worker-1"]')
+  expect(container.querySelector('section[aria-label="Notifications"]')).toBeTruthy()
+  const link = container.querySelector<HTMLAnchorElement>('section[aria-label="Notifications"] a[href*="/thread/worker-1"]')
   expect(link).toBeTruthy() // catches an alert without a navigable thread link
   const target = new URL(link!.href)
   expect(target.pathname).toBe("/") // catches paths the static server cannot serve

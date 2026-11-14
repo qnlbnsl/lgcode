@@ -29,7 +29,7 @@ LGTM Studio's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `search` | Find project or agent. |
 | `command` | The Command key in the switcher shortcut on Apple systems. |
 | `bell` | Needs attention. |
-| `smartphone` | Phone notifications, which go to the owner's phone. |
+| `smartphone` | Notifications, which go to the owner's phone. |
 | `monitor` | Machines. |
 | `user` | Subscriptions. |
 | `settings` | Service settings. |

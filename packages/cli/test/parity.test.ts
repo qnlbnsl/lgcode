@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
 import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgtm/contracts";
 import { afterEach, expect, it } from "vitest";
@@ -7,6 +9,35 @@ import {
 } from "../../testing/test/support/unit7b.ts";
 
 afterEach(cleanupUnit7b);
+
+for (const words of [["project.mocks.editor.save"], ["project", "mocks", "editor", "save"]]) {
+  it(`review item 4: ${words.join(" ")} reads a real export from --file without a large argument`, async () => {
+    const root = prepareRoot(), file = join(root.work, "editor export.pen");
+    const exported = Buffer.from(JSON.stringify({ version: "2.8", children: [], name: "x".repeat(180_000) }));
+    expect(exported.byteLength).toBeGreaterThan(140_000);
+    writeFileSync(file, exported);
+    const engine = await fakeEngine(root, { onRequest: (frame, socket) => succeed(socket, frame, { requestId: frame.payload.requestId, revisionId: "saved" }) });
+    const payload = { requestId: "editor-file", projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true };
+    const args = [...words, "--input", JSON.stringify(payload), "--file", file];
+    expect(args.every((arg) => Buffer.byteLength(arg) < 4096)).toBe(true);
+    const child = startCli(root, args, serviceEnvironment(root));
+    expect(await finishCli(child)).toEqual({ code: 0, signal: null });
+    expect(engine.requests).toHaveLength(1);
+    expect(engine.requests[0]).toMatchObject({ tag: "project.mocks.editor.save", payload: { ...payload, content: exported.toString("base64") } });
+    expect(engine.requests[0]?.payload).not.toHaveProperty("file");
+    assertNoSecrets(child, [token]);
+  });
+}
+
+it("review item 4: rejects a local editor export above 512 KiB before sending an engine request", async () => {
+  const root = prepareRoot(), file = join(root.work, "too-large.pen");
+  writeFileSync(file, Buffer.alloc(512 * 1024 + 1, 65));
+  const engine = await fakeEngine(root);
+  const child = startCli(root, ["project.mocks.editor.save", "--input", JSON.stringify({ projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true }), "--file", file], serviceEnvironment(root));
+  expect((await finishCli(child)).code).not.toBe(0);
+  expect(child.stderr()).toContain("512 KiB");
+  expect(engine.requests).toEqual([]);
+});
 
 const commandWords = (command: string) => command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ");
 const invocations = [...CommandsRpcGroup.requests.keys()].flatMap((command) => [
@@ -33,6 +64,7 @@ for (const { command, words, form } of invocations) {
   it(`P03 ${command} ${form} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
+      "client.service.version": { check: true }, "client.service.restart": { confirmed: true },
       "client.alerts.retry": { alertId: "alert-1", generation: 7, attempt: 2 },
       "client.alerts.test": {}, "client.alerts.prompt.dismiss": {},
       "client.alerts.list": { after: 0, limit: 1, status: "open" },
@@ -41,8 +73,12 @@ for (const { command, words, form } of invocations) {
       "client.alerts.settings.set": { kind: "approval", push: false },
       "client.alerts.carrier.set": { carrier: { _tag: "ntfy", server: "https://push.example", topic: "owner_alerts" } },
       "client.alerts.carrier.clear-token": {},
+      "client.alerts.carrier.remove": { name: "email" },
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       configure: { agentId: "member", model: "small", effort: "low" },
+      "client.harness.status": {}, "client.harness.recipe": { harnessId: "fake" },
+      "client.harness.install": { harnessId: "fake" }, "client.harness.account.check": { accountId: "account" },
+      "client.harness.choices": { harnessId: "fake", accountId: "account", model: "small", refresh: true },
       "client.agent.configuration": { agentId: "member" },
       "client.agent.context": { agentId: "member" },
       prompt: { agentId: "member", text: "A prompt with spaces." },
@@ -53,6 +89,15 @@ for (const { command, words, form } of invocations) {
       "cancel-reply": { agentId: "member" }, release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
+      "client.alerts.quiet.set": { quiet: { enabled: true, start: "22:00", end: "07:00", timeZone: "America/Chicago", failureOverride: true } },
+      "client.alerts.carrier.enabled.set": { name: "email", enabled: false },
+
+      "client.workflows.list": {},
+      "client.workflows.read": { scope: "default", id: "build-loop" },
+      "client.workflows.clone": { scope: "default", id: "build-loop", target: "user", name: "CLI loop" },
+      "client.workflows.save": { scope: "user", id: "cli-loop", definition: {} },
+      "client.workflows.validate": { definition: {} },
+      "client.workflows.delete": { scope: "user", id: "cli-loop" },
       "client.web.settings": {},
       "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
@@ -85,6 +130,11 @@ for (const { command, words, form } of invocations) {
       "project.pull": {"worktreeId": "workspace", "projectId": "project"},
       "project.push": {"worktreeId": "workspace", "projectId": "project"},
       "project.integrate": {"worktreeId": "workspace", "projectId": "project", "destinationId": "project-workspace", "expectedHead": "abc123"},
+      "project.update": {worktreeId: "workspace", destinationId: "base", expectedHead: "abc123"},
+      "project.merge.abort": {worktreeId: "workspace", expectedHead: "abc123", expectedMergeHead: "def456", confirmed: true},
+      "project.conflict.resolved": {worktreeId: "workspace"},
+      "project.conflict.reopen": {worktreeId: "workspace", path: "src/app.ts", expectedHead: "abc123", expectedMergeHead: "def456", fingerprint: "fingerprint", confirmed: true},
+      "project.review.decline": {worktreeId: "workspace", projectId: "project", reviewId: "review", expectedHead: "abc123", expectedBaseHead: "def456", reason: "Add coverage."},
       "project.review.report": {worktreeId: "workspace", projectId: "project", head: "abc123", kind: "tests", status: "failed", summary: "Actual report", threadAgentId: "lead", threadSequence: 1},
       "project.review.prepare": {worktreeId: "workspace", projectId: "project", destinationId: "base"},
       "project.review.status": {worktreeId: "workspace", projectId: "project"},
@@ -100,6 +150,13 @@ for (const { command, words, form } of invocations) {
       "project.conflict": {"worktreeId": "workspace", "projectId": "project", "path": "src/app.ts"},
       "project.setup": {}, "project.setup.discover": {}, "project.setup.advance": { step: "found" }, "project.setup.complete": { projectId: "project" },
       "project.placement.preview": { name: "Console", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "New" } },
+      "project.mocks.comment": { projectId: "project", revisionId: "before", screenId: "home", text: "Use fewer columns." },
+      "project.mocks.screen.approve": { projectId: "project", revisionId: "before", screenId: "home", approved: false },
+      "project.mocks.seen": { projectId: "project", revisionId: "before", screenId: "home" },
+      "project.mocks.seen.batch": { projectId: "project", versions: [{ revisionId: "before", screenId: "home" }] },
+      "project.mocks.reviews.read": { projectId: "project" },
+      "project.mocks.editor.save": { projectId: "project", revisionId: "before", designRevision: "design", worktreeId: "workspace", confirmed: true, content: "ZXhwb3J0" },
+      "project.mocks.screen.read": { projectId: "project", revisionId: "before", screenId: "home" },
       "project.mocks.record": { projectId: "project", expectedRevision: "before", bundle: { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] } },
       "project.mocks.read": { projectId: "project", after: "before", limit: 1 },
       "project.mocks.artifact": { projectId: "project", revisionId: "before", sourceId: "source" },
@@ -146,16 +203,28 @@ for (const { command, words, form } of invocations) {
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
-        "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
+      "client.alerts.retry": { ...base, accepted: true }, "client.alerts.test": { ...base, accepted: false, reason: "token missing" },
         "client.alerts.list": { ...base, items: [], next: 10 },
         "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
+        "client.service.version": { ...base, version: "0.0.1", commit: "abc123", dataFolder: root.work, checkout: root.work, comparison: "unchecked", updateCommands: [] },
+        "client.service.restart": { ...base, restarting: true },
+        "client.harness.status": { ...base, harnesses: [{ harnessId: "fake", installed: false }] },
+        "client.harness.recipe": { ...base, recipe: { harnessId: "fake", name: "Fixture", automatic: true, packages: ["fixture@1.2.3"], registry: "https://example.test", source: "https://example.test/install", commands: ["fixed fixture command"], signInCommand: "fixture login", signInArguments: ["login"] } },
+        "client.harness.install": { ...base, state: "installed", installation: { harnessId: "fake", installed: true, path: "/tmp/fixture", version: "1.2.3" }, output: "Fixture installed." },
+        "client.harness.account.check": { ...base, accountId: "account", state: "signed-out", remoteAuthentication: "not-checked", signInCommand: "fixture login" },
+        "client.harness.choices": { ...base, harnessId: "fake", accountId: "account", models: { source: "negotiated", options: [{ id: "small", label: "Small" }] }, efforts: { source: "negotiated", options: [{ id: "low" }] } },
         "client.agent.configuration": { ...base, agentId: "member", configuration: { desired: { model: "small", effort: "low" }, applied: { model: "small", effort: "low" }, status: "applied" },
           models: { source: "negotiated", options: [{ id: "small", label: "Small" }] }, efforts: { source: "configured", options: [{ id: "low" }] } },
         "client.agent.context": { ...base, agentId: "member", context: { _tag: "available", used: 25, window: 100, percent: 25, reportedAt: 1_800_000_000_000, model: "small" } },
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
+        "client.workflows.list": { ...base, items: [] },
+        "client.workflows.read": { ...base, workflow: { scope: "default", id: "build-loop", name: "Build loop", readOnly: true, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.clone": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.save": { ...base, workflow: { scope: "user", id: "cli-loop", name: "Build loop", readOnly: false, definition: JSON.parse(readFileSync(new URL("../../engine/src/workflows/build-loop.json", import.meta.url), "utf8")) } },
+        "client.workflows.validate": { ...base, valid: false, error: "Use the workflow format." },
         "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
         "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
@@ -184,6 +253,9 @@ for (const { command, words, form } of invocations) {
         "project.discard.plan": { ...base, result: { fingerprint: "fingerprint", paths: ["src/app.ts"] } },
         "project.commit": { ...base, result: { head: "abc123" } },
         "project.integrate": { ...base, result: { head: "abc123" } },
+        "project.update": { ...base, result: { head: "abc123" } },
+        "project.conflict.resolved": { ...base, result: { items: [{ path: "src/app.ts", fingerprint: "fingerprint" }], truncated: false } },
+        "project.review.decline": { ...base, result: { ...gitReviewSample, outcome: "sent_back", reason: "Add coverage.", decidedAt: 2000 } },
         "project.review.prepare": { ...base, result: { review: gitReviewSample, comparison: { head: "abc123", baseHead: "def456", branch: "feature", base: "main", commits: { items: [], truncated: false }, files: { items: [], truncated: false }, diff: { patch: "", additions: 0, deletions: 0, binary: false, truncated: false } } } },
         "project.review.status": { ...base, result: { review: gitReviewSample, evidence: gitReviewSample.evidence } },
         "project.review.approve": { ...base, result: { ...gitReviewSample, outcome: "merged", decision: "approve_without_evidence", mergeHead: "abc123", decidedAt: 2000 } },
@@ -193,7 +265,11 @@ for (const { command, words, form } of invocations) {
         "project.setup": { ...base, setup: { step: "found" } },
         "project.setup.discover": { ...base, result: { state: "available", repositories: [], truncated: false, harnesses: [] } },
         "project.placement.preview": { ...base, result: { repositoryPath: root.work, path: root.work, branch: "main", checkout: "main", reserved: false } },
+        "project.mocks.screen.read": { ...base, review: { projectId: "project", revisionId: "before", screenId: "home", comments: [] } },
+        "project.mocks.reviews.read": { ...base, revisionId: "before", reviews: [] },
+        "project.mocks.comment": { ...base, notified: true },
         "project.mocks.record": { ...base, revisionId: "revision" },
+        "project.mocks.editor.save": { ...base, revisionId: "revision" },
         "project.design.record": { ...base, revisionId: "revision" },
         "project.design.read": { ...base, result: { _tag: "unavailable", reason: "repository design is not registered" } },
         "project.mocks.read": { ...base, items: [] },
@@ -260,7 +336,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.mocks.reviews.read", "project.mocks.screen.read", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

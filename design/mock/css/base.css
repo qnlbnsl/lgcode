@@ -383,13 +383,17 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 .tools { grid-column: 2; border: 1px solid var(--color-line); border-radius: var(--radius-md); overflow: hidden; max-width: var(--measure); }
 .tools > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: var(--row); padding: 0 10px; color: var(--color-muted); font-size: var(--text-sm); cursor: pointer; user-select: none; }
 .tools > summary::-webkit-details-marker { display: none; }
+.tools > summary > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tools > summary > .icon { flex: none; }
+.tool-box { display: grid; gap: 4px; padding: 8px 10px; border-top: 1px solid var(--color-line); }
+.tool-box h5 { margin: 0; font-size: var(--text-xs); font-weight: var(--weight-strong); letter-spacing: .04em; text-transform: uppercase; color: var(--color-muted); }
 .tools > summary:hover { background: var(--color-raised); color: var(--color-text); }
 .tools > summary .icon.chev { margin-left: auto; transition: transform var(--motion-fast) var(--ease); }
 .tools[open] > summary .icon.chev { transform: rotate(90deg); }
 .tool-line { display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 0 10px; border-top: 1px solid var(--color-line); font-size: var(--text-sm); min-width: 0; }
 .tool-line .verb { color: var(--color-muted); flex: none; width: 44px; }
 .tool-line .arg { font-family: var(--font-mono); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-.tool-line .res { color: var(--color-faint); font-size: var(--text-xs); flex: none; }
+.tool-line .res { color: var(--color-faint); font-size: var(--text-xs); flex: 0 1 auto; min-width: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-line .add { color: var(--color-success); } .tool-line .del { color: var(--color-error); }
 
 /* the one request block: questions, approvals, merges and failed starts.
@@ -493,19 +497,29 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 
 /* ---- a question or an approval in a thread: a brief, and a report under it ------------- */
 .req.qc { gap: 6px; padding: 10px 12px 10px 14px; border: 1px solid var(--color-line); border-left: 3px solid var(--color-warn); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-1); }
-.req.qc.done { border-left-color: var(--color-line-strong); background: var(--color-raised); box-shadow: none; gap: 2px; }
+.req.qc.done { border-left-color: var(--color-line-strong); background: var(--color-raised); box-shadow: none; }
+.qc-outcome { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.5; }
+.qc-outcome b { font-weight: var(--weight-medium); flex: none; color: var(--color-muted); }
+.qc-outcome span { min-width: 0; overflow-wrap: anywhere; }
+.qc-actions .btn.chosen { opacity: 1; font-weight: var(--weight-strong); }
+.qc-actions .btn.chosen.yes { color: var(--color-success); border-color: var(--color-success); }
+.qc-actions .btn.chosen.no { color: var(--color-error); border-color: var(--color-error); }
+.qc-code { position: relative; }
+.qc-code pre.code { max-height: 260px; padding-right: 40px; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--color-line); }
+.qc-copy { position: absolute; top: 5px; right: 5px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-muted); cursor: pointer; }
+.qc-copy:hover { color: var(--color-text); background: var(--color-raised); }
 .qc-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.qc-q { font-size: var(--text-md); font-weight: var(--weight-strong); line-height: 1.35; min-width: 0; }
+.qc-q { font-size: var(--text-md); font-weight: var(--weight-strong); line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
 .qc-age { margin-left: auto; flex: none; color: var(--color-muted); font-size: var(--text-sm); white-space: nowrap; }
 .qc-age.long { color: var(--color-warn); font-weight: var(--weight-medium); }
-.qc-ok { color: var(--color-success); flex: none; align-self: center; }
-.qc-answer { color: var(--color-muted); font-size: var(--text-sm); padding-left: 22px; }
 .qc-sum { color: var(--color-text); line-height: 1.5; max-width: var(--measure); }
 .qc-rec { display: flex; align-items: baseline; gap: 6px; font-weight: var(--weight-medium); line-height: 1.5; max-width: var(--measure); }
 .qc-rec.declined span:not(.qc-tag) { text-decoration: line-through; color: var(--color-muted); }
 .qc-star, .qc-part.reco h5 .icon { color: var(--color-success); flex: none; align-self: center; }
 .qc-tag { padding: 0 6px; border-radius: var(--radius-pill); background: var(--color-raised); color: var(--color-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); align-self: center; }
 .qc-actions { padding-top: 2px; }
+.req-actions .btn { max-width: 100%; }
+.req-actions > .btn:not(.ghost) { height: auto; min-height: var(--control); white-space: normal; text-align: left; overflow-wrap: anywhere; }
 .qc-actions .qc-thread { margin-left: auto; }
 
 /* the report under the brief: plain sections like a short paper, coloured headings only */

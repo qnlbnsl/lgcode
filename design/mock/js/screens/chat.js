@@ -1,3 +1,5 @@
+import { live } from '../lib.js';
+import { compact, busy } from '../live/chat.js';
 // The Chat tab: one agent's thread at full size, with what it is working on beside it.
 import { html, Icon, cx, href, useMedia, ago, useNow } from '../lib.js';
 import {
@@ -22,14 +24,14 @@ function Aside({ s, project, a }) {
       return html`<a key=${sp.id} class="list-row" style="padding:0 8px;margin:0 -8px" href=${href(`/p/${project.id}/sprint/${sp.id}`)}><span class="tag">${sp.label}</span><span class="truncate grow">${sp.name}</span><span class="faint num" style="font-size:var(--text-xs)">${pr.done}/${pr.total}</span></a>`; })}</section>`}
     <section><h3>Runs as</h3>
       <dl class="dl" style="font-size:var(--text-sm)">
-        <dt>Harness</dt><dd>${HARNESSES[a.harness].name} <span class="faint">· ${HARNESSES[a.harness].runMode} mode</span></dd>
+        <dt>Harness</dt><dd>${HARNESSES[a.harness].name} <span class="faint">· ${live.on ? a.runMode === 'acp' ? 'ACP' : a.runMode || '' : HARNESSES[a.harness].runMode} mode</span></dd>
         <dt>Subscription</dt><dd>${subLabel(s, a.subscription)}</dd>
         <dt>Model</dt><dd>${a.model} · ${a.effort}</dd>
         <dt>Permission</dt><dd><${Menu} class="pick" label="Permission mode" trigger=${html`<span>${a.permission}</span><${Icon} name="chevron-down" size=${12} />`}
           items=${[{ heading: 'From the narrowest to the widest' }, ...PERMISSION_MODES.map((m) => ({ label: m, checked: m === a.permission, onSelect: () => act.setAgentConfig(a.id, { permission: m }) }))]} /></dd>
         <dt>Machine</dt><dd>${machineOf(s, project.machine).name}</dd>
-        <dt>Context</dt><dd class="row"><span class="progress" style="width:72px"><i class=${a.context >= 80 ? 'warn' : ''} style=${{ width: a.context + '%' }}></i></span><span class="num">${a.context}%</span></dd>
-        <dt>This run</dt><dd class="num">${a.turns} turns · ${a.tokens.toFixed(1)}M tokens · started ${ago(a.startedAt, now)} ago</dd>
+        <dt>Context</dt><dd class="row"><span class="progress" style="width:72px"><i class=${a.context >= 80 ? 'warn' : ''} style=${{ width: a.context + '%' }}></i></span><span class="num">${a.context == null ? '—' : a.context + '%'}</span></dd>
+        <dt>This run</dt><dd class="num">${live.on ? '' : a.turns + ' turns · ' + a.tokens.toFixed(1) + 'M tokens · '}started ${ago(a.startedAt, now)} ago</dd>
       </dl></section>
     ${peers.length > 0 && html`<section><h3>${lead ? 'Team leads' : 'Same team'}</h3>${peers.map((p) => { const st = agentStatus(s, p); const t = p.team && teamOf(s, p.team);
       return html`<a key=${p.id} class="list-row" style="padding:0 8px;margin:0 -8px" href=${href(routeForAgent(s, p))}><${Avatar} agent=${p} s=${s} size="sm" /><span class="truncate grow">${p.name}${lead && t ? html` <span class="faint">· ${t.area || t.stage}</span>` : ''}</span>
@@ -48,10 +50,11 @@ export function ChatTab({ s, project, agentId, route }) {
         <${Avatar} agent=${a} s=${s} size="lg" />
         <div class="col grow"><div class="row" style="gap:8px"><h1>${a.name}</h1><span class="muted truncate">${t ? teamName(t) : project.name}</span></div>
           <div class="row" style="gap:8px;font-size:var(--text-sm)"><${StateWord} status=${st} />${a.activity && a.activity !== st.word && html`<span class="muted truncate">· ${a.activity}</span>`}</div></div>
-        ${a.stalled && html`<span class="badge warn" title="The stall watch saw no output for 14 minutes and nudged this agent once.">No output for 14 min · nudged</span>`}
+        ${a.stalled && html`<span class="badge warn" title=${live.on ? 'The stall watch reported that this agent may be stuck.' : 'The stall watch saw no output for 14 minutes and nudged this agent once.'}>${live.on ? 'May be stuck' : 'No output for 14 min · nudged'}</span>`}
         <${Menu} class="icon-btn" align="end" label="Agent actions" trigger=${html`<${Icon} name="ellipsis" size=${16} />`} items=${[
-          a.state !== 'stopped' && a.state !== 'failed' && { label: 'Stop agent', icon: 'circle-stop', onSelect: () => act.stopAgent(a.id) },
-          (a.state === 'stopped') && { label: 'Resume', icon: 'play', onSelect: () => act.resumeAgent(a.id) },
+          a.state !== 'stopped' && a.state !== 'failed' && { label: 'Stop agent', disabled: busy('agent:' + a.id), icon: 'circle-stop', onSelect: () => act.stopAgent(a.id) },
+          (a.state === 'stopped') && { label: 'Resume', disabled: busy('agent:' + a.id), icon: 'play', onSelect: () => act.resumeAgent(a.id) },
+          live.on && { label: 'Compact context', disabled: busy('agent:' + a.id), onSelect: () => compact(a.id) },
           { label: 'Open its terminal', icon: 'square-terminal', hint: 'Read-only view of what the agent runs.', onSelect: () => { location.hash = `#/p/${project.id}/terminal`; } },
           { label: 'Open its worktree in Git', icon: 'git-branch', onSelect: () => { location.hash = `#/p/${project.id}/git`; } },
         ].filter(Boolean)} />

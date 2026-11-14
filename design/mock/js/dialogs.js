@@ -1,3 +1,5 @@
+import * as liveGit from './live/git.js';
+import { live, refuse } from './lib.js';
 // Dialogs that belong to no single screen: the quick switcher, New project,
 // the merge review, and provider sign-in.
 import { html, useState, useEffect, useRef, Icon, cx, go, update, useKey } from './lib.js';
@@ -5,6 +7,8 @@ import {
   projectOf, repoOf, agentOf, teamOf, teamName, machineOf, subOf, byId, HARNESSES, openRequests, agentStatus, projectStatus, routeForAgent,
 } from './data.js';
 import * as act from './actions.js';
+import * as board from './live/board.js';
+import * as mocks from './live/mocks.js';
 import { Dialog, registerDialog, Avatar, MergeFacts } from './ui.js';
 
 // ---- quick switcher ---------------------------------------------------------------
@@ -36,16 +40,17 @@ export function searchScore(query, item) {
 function Switcher({ s }) {
   const [q, setQ] = useState(''); const [i, setI] = useState(0); const list = useRef(null);
   const all = [];
-  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || 'No remote', text: `${r.description || ''} ${r.remote || ''}`, to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
+  const text = live.on ? mocks.searchText(s) : null;
+  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || (live.on ? '' : 'No remote'), text: live.on ? text.repositories[r.id] : `${r.description || ''} ${r.remote || ''}`, to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
   for (const p of s.projects.filter((x) => !x.archived)) {
     const st = projectStatus(s, p); const sp = s.sprints.filter((x) => x.project === p.id);
-    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, text: `${repoOf(s, p).name} ${p.goal || ''} ${p.branch || ''} ${sp.map((x) => x.name + ' ' + x.goal).join(' ')}`, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
+    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, text: live.on ? text.projects[p.id] : `${repoOf(s, p).name} ${p.goal || ''} ${p.branch || ''} ${sp.map((x) => x.name + ' ' + x.goal).join(' ')}`, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
   }
   for (const a of s.agents) {
-    const p = projectOf(s, a.project); if (p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
-    all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
+    const p = projectOf(s, a.project); if (!p || p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
+    all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: live.on ? text.agents[a.id] : `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
   }
-  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/subscriptions', 'Subscriptions', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
+  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/harnesses', 'Harnesses', 'key-round'], ['/notifications', 'Notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
   const ql = q.trim();
   const found = ql
     ? all.map((x) => [searchScore(ql, x), x]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0] || KIND_ORDER[a[1].kind] - KIND_ORDER[b[1].kind]).map(([, x]) => x)
@@ -101,73 +106,76 @@ export function SubscriptionTable({ s, machine, value, onPick, name = 'lead-sub'
         <td class="muted wrap">${h.models.join(', ')}</td></tr>`; })}</tbody></table></div>`;
 }
 function NewProject({ s, d }) {
-  const [machine, setMachine] = useState(d.machine || 'studio');
-  const [repo, setRepo] = useState(d.repo || s.repos[0].id);
+  const [machine, setMachine] = useState(live.on ? 'local' : d.machine || 'studio');
+  const [repo, setRepo] = useState(d.repo || s.repos[0]?.id || '__new');
   const [newRepo, setNewRepo] = useState('');
   const [goal, setGoal] = useState(d.goal || '');
   const ready = s.subscriptions.filter((x) => x.signedIn && x.enabled && x.machine === machine);
   const [sub, setSub] = useState(ready[0]?.id);
   useEffect(() => { if (!ready.some((x) => x.id === sub)) setSub(ready[0]?.id); }, [machine]);
+  useEffect(() => { if (live.on) void board.loadSetup(); }, []);
+  const creating = live.on && board.busy('create-project');
+  const defaults = s.setupData?.lead;
   const m = machineOf(s, machine); const r = byId(s.repos, repo);
   const isNew = repo === '__new';
   const hasRepo = isNew || !!r?.folders[machine];
-  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !goal.trim() ? 'Write the goal.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !sub ? `No subscription is signed in on ${m.name}.` : null;
-  const create = () => { if (why || !hasRepo) return; act.closeDialog(); act.createProject({ repo, goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
+  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !goal.trim() ? 'Write the goal.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !live.on && !sub ? `No subscription is signed in on ${m.name}.` : null;
+  const create = () => { if (why || !hasRepo || creating) return; if (!live.on) act.closeDialog(); act.createProject({ repo, goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
   return html`<${Dialog} title="New project" size="wide" onClose=${act.closeDialog} onSubmit=${create}
-    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo}>Create project</button>`}>
+    foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo || creating} aria-busy=${creating}>${creating ? 'Creating…' : 'Create project'}</button>`}>
     <div class="field"><label for="np-goal">Goal</label>
       <textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="Make a mock for the LGTM Studio phone app" autofocus
         onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); create(); } }}></textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
       <div class="field"><label for="np-machine">Run on</label>
         <select id="np-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
-          ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
+          ${s.machines.filter((x) => !live.on || x.id === 'local').map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
       <div class="field"><label for="np-repo">Repository</label>
         <select id="np-repo" class="select" value=${repo} onChange=${(e) => setRepo(e.target.value)}>
           ${s.repos.map((x) => html`<option value=${x.id}>${x.name}${x.folders[machine] ? '' : ` (not on ${m.name})`}</option>`)}
           <option value="__new">New repository…</option></select></div>
     </div>
     ${isNew && html`<div class="field"><label for="np-newrepo">New repository name</label><input id="np-newrepo" class="input" value=${newRepo} onInput=${(e) => setNewRepo(e.target.value)} placeholder="notes-site" /></div>`}
-    ${!hasRepo && html`<div class="callout warn"><${Icon} name="triangle-alert" size=${15} /><span class="grow">${r.name} is not on ${m.name}.</span>
+    ${!hasRepo && r && html`<div class="callout warn"><${Icon} name="triangle-alert" size=${15} /><span class="grow">${r.name} is not on ${m.name}.</span>
       <button type="button" class="btn sm" onClick=${() => { act.openDialog({ type: 'add-repository', machine, repo, back: { type: 'new-project', machine, repo, goal } }); }}>Add to ${m.name}</button></div>`}
     <div class="field"><span class="label">Project lead</span>
-      <${SubscriptionTable} s=${s} machine=${machine} value=${sub} onPick=${setSub} /></div>
+      ${live.on ? html`<p class="muted" aria-live="polite">${board.busy('read-setup') ? 'Loading lead settings…' : defaults ? `${defaults.harness} · ${defaults.account._tag === 'named' ? defaults.account.accountId : 'Any ready account'}${defaults.model ? ' · ' + defaults.model : ''}${defaults.effort ? ' · ' + defaults.effort : ''}` : 'The service chooses the lead from its configured defaults.'}</p>` : html`<${SubscriptionTable} s=${s} machine=${machine} value=${sub} onPick=${setSub} />`}</div>
   <//>`;
 }
 registerDialog('new-project', NewProject);
 
 // ---- merge review -----------------------------------------------------------------
 function MergeReview({ s, d }) {
-  const r = byId(s.requests, d.requestId); if (!r) return null;
+  const r = live.on && d.worktreeId ? s.worktrees.find((w) => w.id === d.worktreeId)?.review : byId(s.requests, d.requestId); if (!r) return null;
   const ev = r.evidence; const ok = ev.tests.ok && ev.review.ok;
   const docs = [['docs/reference/index.md', 212, 0], ['docs/reference/invoices.md', 148, 0], ['docs/reference/customers.md', 131, 0], ['scripts/build-reference.ts', 96, 12], ['docs/api/invoices.md', 0, 304], ['docs/api/customers.md', 0, 271], ['redirects.json', 37, 0]];
   const wt = (s.worktrees || []).find((w) => w.project === r.project && w.branch === r.source);
   const seen = new Map();
   for (const c of wt?.commits || []) for (const f of c.files || []) { const k = f.path || f[0]; const o = seen.get(k) || [k, 0, 0]; o[1] += f.add ?? f[2]?.add ?? 0; o[2] += f.del ?? f[2]?.del ?? 0; seen.set(k, o); }
-  const files = r.project === 'apiref' || !seen.size ? (r.project === 'apiref' ? docs : []) : [...seen.values()].slice(0, 8);
+  const files = live.on ? (r.files || []).map((f) => [f.path, '', '']) : r.project === 'apiref' || !seen.size ? (r.project === 'apiref' ? docs : []) : [...seen.values()].slice(0, 8);
   const subjects = (wt?.commits || []).slice(0, Math.max(1, ev.commits)).map((k) => k.subject);
-  const first = act.pullRequestText(subjects.length ? subjects : [r.title], ev);
+  const first = live.on ? { title: '', body: '' } : act.pullRequestText(subjects.length ? subjects : [r.title], ev);
   const [title, setTitle] = useState(first.title); const [body, setBody] = useState(first.body); const [writing, setWriting] = useState(false);
-  const regen = () => { setWriting(true); setTimeout(() => { const t = act.pullRequestText(subjects.length ? subjects : [r.title], ev); setTitle(t.title); setBody(t.body); setWriting(false); }, 900); };
+  const regen = () => { if (live.on) return refuse(); setWriting(true); setTimeout(() => { const t = act.pullRequestText(subjects.length ? subjects : [r.title], ev); setTitle(t.title); setBody(t.body); setWriting(false); }, 900); };
   const over = title.length > act.PR_TITLE_LIMIT;
-  const merge = () => { if (over || !title.trim()) return; act.closeDialog(); act.answerRequest(r.id, 'merge'); };
+  const merge = () => { if (live.on) return liveGit.answerReview(r.id, 'merge'); if (over || !title.trim()) return; act.closeDialog(); act.answerRequest(r.id, 'merge'); };
   return html`<${Dialog} title=${r.title} size="wide" onClose=${act.closeDialog}
     foot=${html`<span class="why">Only you can merge into ${r.target}.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
-      <button type="button" class=${cx('btn', ok && 'primary')} disabled=${over || !title.trim()} onClick=${merge}>${ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
+      <button type="button" class=${cx('btn', ok && 'primary')} disabled=${live.on ? liveGit.busy('git') || r.status !== 'open' : over || !title.trim()} onClick=${merge}>${live.on && liveGit.busy('git') ? 'Merging…' : ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
     <p class="mg-brief">${r.brief || r.body}</p>
     ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
     <div class="pr-text">
       <div class="field"><div class="row"><label for="pr-title" class="grow">Pull request title</label>
           <span class=${cx('num pr-count', over && 'error-text')} aria-live="polite">${title.length} / ${act.PR_TITLE_LIMIT}</span>
-          <button type="button" class="btn sm ghost" disabled=${writing} data-tip=${`Writes the title and description with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${regen}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button></div>
-        <input id="pr-title" class=${cx('input', over && 'invalid')} value=${title} disabled=${writing} onInput=${(e) => setTitle(e.target.value)} />
+          <button type="button" class="btn sm ghost" disabled=${writing} data-tip=${live.on ? null : `Writes the title and description with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${regen}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button></div>
+        <input id="pr-title" class=${cx('input', over && 'invalid')} value=${title} disabled=${writing} onInput=${(e) => live.on ? refuse() : setTitle(e.target.value)} />
         ${over && html`<span class="error" role="alert">Keep the title to ${act.PR_TITLE_LIMIT} characters.</span>`}</div>
       <div class="field"><label for="pr-body">Description</label>
-        <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => setBody(e.target.value)}></textarea></div>
+        <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => live.on ? refuse() : setBody(e.target.value)}></textarea></div>
     </div>
-    <${MergeFacts} s=${s} r=${r} />
+    <${MergeFacts} s=${s} r=${r} />${live.on && r.truncated && html`<p role="alert">The comparison is truncated.</p>`}
     <div><div class="section-head"><h3>${ev.files} files changed</h3><span class="grow"></span><a class="link" href="#/p/${r.project}/git" onClick=${act.closeDialog}>Open every diff in Git</a></div>
-      <table class="table"><tbody>${files.map(([f, add, del]) => html`<tr><td class="mono truncate">${f}</td><td class="num success-text">+${add}</td><td class="num error-text">−${del}</td></tr>`)}
+      <table class="table"><tbody>${files.map(([f, add, del]) => html`<tr><td class="mono truncate">${f}</td><td class="num success-text">${add === '' ? '' : '+' + add}</td><td class="num error-text">${del === '' ? '' : '−' + del}</td></tr>`)}
         ${ev.files > files.length && html`<tr><td class="muted">${files.length ? 'and ' : ''}${ev.files - files.length}${files.length ? ' more' : ' files'}</td><td></td><td></td></tr>`}</tbody></table></div>
   <//>`;
 }

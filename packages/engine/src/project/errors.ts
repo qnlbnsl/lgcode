@@ -1,5 +1,16 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "mock revision changed; refresh and retry", "mock revision identity is already recorded",
+  "mock artifact changed; record a new revision", "invalid mock artifact reference", "artifact unavailable",
+  "registered project design is unavailable", "registered design format cannot open in the editor",
+  "registered design needs an unchanged file in a dedicated design folder", "registered design artifacts changed or are unavailable",
+  "registered design workspace is unavailable", "repository design is unavailable to this caller", "a path cannot contain a registered secret",
+  "mock editor design changed; refresh and retry", "mock editor export must be base64 data of at most 512 KiB",
+  "mock editor save requires confirmation", "mock editor export does not match the recorded design format",
+  "Mock editor save outcome is uncertain; refresh the mocks before retrying.",
+  "mock editor export contains private data", "mock editor file changed or its path is unsafe", "mock editor revision exceeds the data budget",
+  "mock screen feedback exceeds the read budget",
+  "mock screen is unavailable", "mock comment must contain between 1 and 4096 characters", "mock screen comment limit reached",
   "project state changed; refresh and retry",
   "Git outcome is uncertain; refresh Git state",
   "Git attempt metadata is unavailable",
@@ -18,6 +29,9 @@ export const projectRefusalReasons = new Set([
   "review report requires an existing project thread item",
   "review identity contains a registered secret",
   "main review is unavailable; prepare a new review",
+  "give a reason for sending the review back",
+  "project lead is unavailable; the review was not sent back",
+  "update requires the registered parent workspace",
   "set the workspace folder before using Git",
   "workspace settings changed; refresh and retry",
   "registered workspace not found",
@@ -79,4 +93,4 @@ export const projectRefusalReasons = new Set([
 ])
 
 // These fixed service reasons never include a path, URL or Git stderr.
-for (const reason of ["invalid_path", "not_repository", "invalid_ref", "output_limit", "timeout", "cancelled", "git_unavailable", "git_failed", "busy", "collision", "dirty_destination", "dirty_source", "conflicts", "confirmation_required", "stale_state", "nothing_staged", "invalid_message", "missing_remote", "missing_upstream", "authentication_required", "network_failed", "push_rejected", "pull_diverged", "base_requires_review", "unsupported_provider", "push_required", "unsupported_conflict", "incomplete_choices", "owner_required", "unsupported_review"]) projectRefusalReasons.add(`Git: ${reason}`)
+for (const reason of ["invalid_path", "not_repository", "invalid_ref", "output_limit", "timeout", "cancelled", "git_unavailable", "git_failed", "busy", "collision", "dirty_destination", "dirty_source", "conflicts", "confirmation_required", "stale_state", "nothing_staged", "invalid_message", "missing_remote", "missing_upstream", "authentication_required", "network_failed", "push_rejected", "pull_diverged", "base_requires_review", "unsupported_provider", "push_required", "unsupported_conflict", "incomplete_choices", "owner_required", "unsupported_review", "no_merge", "abort_blocked"]) projectRefusalReasons.add(`Git: ${reason}`)

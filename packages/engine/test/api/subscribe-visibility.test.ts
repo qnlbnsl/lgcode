@@ -51,8 +51,14 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 // `n` makes its identifiers unique. Terminal events for the subscriber itself
 // are left out (`terminal`), because they would end its own access.
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
+  HarnessInstallStarted: (_a, n) => ({ harnessId: "first", operationRequestId: n }),
+  HarnessInstallFinished: (_a, n) => ({ harnessId: "first", operationRequestId: n, state: "failed", reason: "Fixture install failed." }),
   ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
+  "project.MockScreenCommented": (_a, n) => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", commentId: `comment-${n}`, author: owner, text: "Private screen feedback" }),
+  "project.MockScreenApprovalSet": () => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", approved: false, author: owner }),
+  "project.MockScreenSeen": () => ({ projectId: "project-one", revisionId: "mock-revision", screenId: "home", author: owner }),
+  "project.MockScreensSeen": () => ({ projectId: "project-one", versions: [{ revisionId: "mock-revision", screenId: "home" }], author: owner }),
   "project.SetupAdvanced": () => ({ step: "found" }),
   "project.DesignRecorded": () => ({ projectId: "project-one", revisionId: "design-revision", author: { _tag: "owner" }, fileFingerprint: "a".repeat(64),
     design: { repoId: "project-repo", worktreeId: "workspace", file: "design/actual.fig", components: [] } }),
@@ -145,6 +151,11 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   HarnessChanged: () => ({ harness }),
   CommandRefused: () => ({ command: "start", reason: "refused" }),
   "client.AlertPromptDismissed": () => ({}),
+  "client.AlertDestinationChanged": () => ({ name: "email", carrier: { _tag: "email", host: "127.0.0.1", port: 465, security: "tls", username: "owner", from: "owner@local.test", to: "owner@local.test" } }),
+  "client.AlertDestinationTokenSet": () => ({ name: "email", origin: "smtp-test", carrierGeneration: "email_test_generation" }),
+  "client.AlertDestinationTokenCleared": () => ({ name: "email" }),
+  "client.AlertCarrierEnabled": () => ({ name: "email", enabled: false }),
+  "client.AlertQuietChanged": () => ({ quiet: { enabled: true, start: "22:00", end: "07:00", timeZone: "UTC", failureOverride: true } }),
   "client.AlertBaseline": () => ({ position: 0 }),
   "client.AlertRaised": (a, n) => ({ alertId: `alert-${n}`, alertKey: `permission:${n}`, kind: "approval", agentId: a, subject: { _tag: "permission", id: `p-${n}` }, title: "Permission needs your approval", sourceSequence: 0 }),
   "client.AlertDelivered": (_a, n) => ({ alertId: `alert-${n}`, carrier: "ntfy", generation: 0, attempt: 1 }),
@@ -157,6 +168,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   "client.WebSettingsChanged": () => ({ settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } }),
   "client.WebServerDown": () => ({ reason: "port taken" }),
   "client.WebServerUp": () => ({}),
+  "client.ServiceRestartRequested": () => ({}),
 };
 const terminal = new Set(["AgentStartFailed", "AgentCrashed", "AgentStopped"]);
 

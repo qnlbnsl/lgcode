@@ -126,8 +126,20 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 2. The message board
 
-- **Channels and direct messages** (built). Each team has a channel. Leads can
-  message the orchestrator directly. Workers can message each other.
+- **Channels and direct messages** (built). Each project starts with General and
+  Leads channels for the owner and the project lead.
+  General admits each active agent in the project once.
+  Leads admits active agents with a lead role and a team group from that project.
+  The engine preserves the owner's member removals.
+  Each channel holds at most 64 members.
+  A service post records each admission skipped because the channel is full.
+  The owner can add a skipped agent manually after making room.
+  The engine appends missing defaults for active projects on startup.
+  It skips archived and archiving projects.
+  Project creation requires the board to be enabled.
+  Each team also has a channel.
+  Leads can message the orchestrator directly.
+  Workers can message each other.
 - **Wake rules** (built). Each post says whether it needs an answer. Only a
   post that needs an answer wakes its recipient, because every wake costs a
   full agent turn.
@@ -513,8 +525,11 @@ The full design is in
   what users get, and any gap between the mock and the design gets fixed.
   Since 2026-11-08 the web mock shows OpenPencil's web editor in a frame, built
   from source in `design/openpencil/`. It opens a
-  repository's design file but cannot save into the repository yet. Saving back
-  needs an endpoint that writes the file, or OpenPencil's automation bridge.
+  repository's design file. The live Mocks tab now accepts the editor's exported file
+  through Save changes from editor. The owner selects the export, and the engine
+  replaces only the registered design file. Exports are limited to 512 kibibytes.
+  Saving records a new design revision and mock revision. It returns the project
+  to Design and clears approval and seen marks for the new version.
 - **Teams named for their stage** (requested by the owner, 2026-11-07; not
   designed). A project moves through a Design team, a Planning team, a Build
   team and a Review team, in place of hand-picked names. The project page shows
@@ -923,3 +938,108 @@ Renumbering depends on the migration tool:
 - Tools that name migrations by timestamp, such as Rails, Prisma and Drizzle, rarely
   collide on names. They can still apply migrations in an order that nobody tested, so
   the rerun of the tests on the new base still applies.
+
+## A one-sentence reason on every approval request
+
+The owner asked on 2026-11-13 for an approval card to say what is being attempted.
+The live website can name only the program, because a harness reports the command and not the reason.
+The engine could ask the requesting agent for one sentence of intent, or take it from the agent's last message before the tool call.
+The card would then show that sentence as its summary.
+
+## One Harnesses page in place of harness settings and Subscriptions
+
+The owner asked for this on 2026-11-13.
+One page lists every harness.
+Each harness shows its accounts and subscriptions.
+A button on a harness adds another account or subscription.
+Adding an account checks whether the harness is installed.
+A harness that is not installed shows its install script and is installed from the page.
+"Subscriptions" then leaves the left navigation.
+The mock and the live website now provide this page.
+The old address opens Harnesses.
+Harness defaults now live beside the accounts.
+
+## A harness installer
+
+The owner asked for this on 2026-11-13.
+LGTM Studio installs a missing harness by itself.
+The page shows the install script before it runs.
+The engine now provides owner-only status, recipe, install, and local sign-in reads.
+Gemini CLI has a pinned npm recipe with a dependency lockfile.
+Automatic installs disable package scripts.
+Claude Code and Cursor show their official commands for the owner to run manually.
+The bundled Claude and Codex runtimes count as installed without separate command-line installations.
+Codex has nothing to install separately.
+The installer checks the staged manifests and installed package metadata before running a new executable.
+The engine checks managed file hashes before running an installed harness.
+Provider sign-in stays in the owner's terminal.
+
+## Notifications with more than one kind of delivery
+
+The owner asked for this on 2026-11-13.
+The page and its navigation entry are named "Notifications".
+Delivery kinds are added, starting with email and ntfy, and others may follow.
+Email is sent through the user's own mail account, with the user's own credentials or key.
+LGTM Studio's maker never sends the email.
+
+The engine and website support independent email and ntfy delivery as of 2026-11-13.
+Email uses the owner's Simple Mail Transfer Protocol (SMTP) server through Nodemailer.
+The owner can remove its settings and store its password from the terminal.
+Quiet hours expose a held state and allow an override for agent failures, account problems, and a web server outage.
+Each configured carrier has an enable switch and a test action.
+Tests report whether that carrier accepted the message.
+Quiet hours use a start, an end, and a named time zone.
+The owner can let failure alerts through during quiet hours.
+Sprint completion events raise sprint alerts, which are off by default.
+Opening an owner merge review raises a merge alert.
+Passwords and access tokens stay in the owner's secret store.
+Clients receive only whether a secret is set.
+
+
+## A Workflows tab with a visual editor
+
+The owner asked for this on 2026-11-13.
+The build loop is shown in a "Workflows" tab.
+A user sees the default workflow as a picture.
+A user clones it and changes the copy in a visual editor.
+A user can also make a workflow from nothing.
+The definition store, typed API, terminal commands, and visual clone editor are implemented.
+The format and storage rules are in [the workflow document](workflows.md).
+The visual editor can add and remove every phase and block in a copy.
+A separate creation action and project workflow selection remain planned.
+
+## Model choices before an agent starts
+
+The client application programming interface can discover a harness account's model choices.
+The engine opens a temporary Agent Client Protocol session without sending a prompt.
+The engine closes the harness before the request finishes.
+The result keeps the exact model identifiers and the reported labels.
+A separate reason explains an unavailable model list or effort list.
+The engine remembers successful results for five minutes in memory.
+A client can explicitly refresh a result.
+A client can request a model's effort choices.
+Reports remain separate for each account and selected model.
+The live website uses these reports for its model choices.
+
+Failures and empty reports are remembered for thirty seconds.
+Concurrent requests for one report share a discovery session.
+At most two discovery sessions run in the engine process at once.
+Service settings shows each harness's report as it arrives.
+
+## Discovery without persistent harness history
+
+A future harness-specific discovery mode could disable session persistence through supported harness interfaces.
+It must preserve the account's login and the owner's existing history.
+The investigation and its limits are recorded in issue 719.
+
+
+## Git actions after the website connection
+
+The owner requested the remaining Git actions on 2026-11-13.
+The local engine, client application programming interface, command-line program, and live website now support aborting a merge, reopening a resolved file, sending a main review back with a reason, updating from a registered parent, and integrating a registered builder worktree into its team.
+The owner approves every merge into the base branch.
+Sending a review back records a distinct outcome and addresses its reason to the project lead on the board.
+Git text generation needs an owner-configured account and model with a bounded short-task execution boundary.
+Hosted pull request editing needs a durable provider record and an authenticated provider update action.
+Those generation and editing controls remain refused until their prerequisites exist.
+Remote-machine Git remains unavailable.

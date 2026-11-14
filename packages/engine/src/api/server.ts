@@ -42,6 +42,9 @@ type Handlers = { readonly [R in RpcGroup.Rpcs<typeof CommandsRpcGroup> as R["_t
 
 const refused = (status: number, text: string) => HttpServerResponse.text(text, { status });
 const reasons = new Set([
+  "Confirm that every signed-in page is signed out and running agents are stopped.",
+  "This service cannot restart itself on this platform.", "The service launch files are unavailable. Restart was refused before stopping agents.", "service restarting",
+  "The workflow folder must be absolute, existing, owned by you, outside the service state folder, and have no symbolic links.",
   "command refused", "cannot reload", "no usable account", "invalid credential",
   "notification changed; refresh before retrying",
   "request id reused", "recovering", "board disabled", "database read failed", "database write failed",

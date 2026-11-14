@@ -200,7 +200,7 @@ that draws it.
 | Conversations | `Chat` (`/p/console/chat`), `Messages` (`/p/console/messages`), `Messages / Waiting for a reply` (`/p/console/messages/waiting`), `Agents` (`/p/console/agents`) |
 | Code | `Terminal` (`/p/console/terminal`), `Git / Changes` (`/p/console/git`), `Git / History`, `Git / Conflicts`, `Merge review` |
 | Repository | `Repository` (`/r/lgtm`), `Repository design` (`/r/lgtm/design`) |
-| Service | `Machines` (`/machines`), `Pair machine`, `Add repository`, `Subscriptions` (`/subscriptions`), `Add subscription`, `Phone notifications` (`/notifications`), `Service settings` (`/settings`) |
+| Service | `Machines` (`/machines`), `Pair machine`, `Add repository`, `Subscriptions` (`/subscriptions`), `Add subscription`, `Notifications` (`/notifications`), `Service settings` (`/settings`) |
 
 A frame without an address is a state or a dialog that the mock opens from the screen above
 it. Phone layouts are added as `/ Phone` states as they are drawn.

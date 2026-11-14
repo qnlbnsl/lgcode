@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";
-import { carrierTokenReference } from "@lgtm/contracts";
+import { carrierNames, carrierTokenReference } from "@lgtm/contracts";
 import { SecretStore } from "../../src/commands/SecretStore.ts";
 import { collectSecrets } from "../../src/accounts/collectSecrets.ts";
 import { engineLists } from "../../src/pieces/lists.ts";
@@ -34,10 +34,11 @@ it("6.13 only the selected carrier slot resolves, even when its literal token lo
   } finally { await server.close(); }
 });
 
-it("6.13 the client folder resolves secrets only inside the ntfy carrier", () => {
+it("6.13 the client folder resolves secrets only inside registered carrier implementations", () => {
   registerRebuildCheck({ noLog: true });
   const root = "packages/engine/src/client";
-  expect(existsSync(`${root}/alerts/carriers/ntfy.ts`), "6b must supply the only permitted secret-resolution path").toBe(true);
+  const implementations = new Set(carrierNames.map((name) => `${root}/alerts/carriers/${name}.ts`));
+  for (const file of implementations) expect(existsSync(file), "Each registered carrier needs its own implementation").toBe(true);
   const bad: string[] = [];
   const walk = (path: string) => { for (const entry of readdirSync(path, { withFileTypes: true })) {
     const file = join(path, entry.name);
@@ -45,7 +46,7 @@ it("6.13 the client folder resolves secrets only inside the ntfy carrier", () =>
     if (!entry.name.endsWith(".ts")) continue;
     const source = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g,
       (token) => token.startsWith("//") || token.startsWith("/*") ? " " : token);
-    if (file !== `${root}/alerts/carriers/ntfy.ts` && (
+    if (!implementations.has(file) && (
       /\.\s*resolve\b|\[\s*["']resolve["']\s*\]/.test(source)
       || /\{[^}]*\bresolve\b[^}]*\}\s*=/.test(source)
     )) bad.push(file);

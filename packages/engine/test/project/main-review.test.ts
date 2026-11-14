@@ -15,6 +15,8 @@ import * as Server from "../../src/api/server.ts"
 import { CommandHandler } from "../../src/commands/CommandHandler.ts"
 import * as GitApi from "../../src/project/gitApi.ts"
 import * as GitProcesses from "../../src/project/git/process.ts"
+import { engineLists } from "../../src/pieces/lists.ts"
+import { type PiecePlanner, type PiecePlan } from "../../src/commands/internal.ts"
 import { reviewPlanners } from "../../src/project/gitReview.ts"
 import { makeGitService } from "../../src/project/git/index.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
@@ -704,3 +706,190 @@ it.live("issue 595: partial main checkout permission failure leaves the review o
   expect(mergeCalls()).toBe(1)
   expect(projectView(yield* snapshot).gitReviews[f.worktreeId]?.outcome).toBe("open")
 })).pipe(Effect.orDie))
+
+
+it.live("s4-git2: sends a main review back atomically with its reason on the lead board and refuses old or agent decisions", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  expect(typeof (f.api as any)["project.review.decline"]).toBe("function");
+  const payload = { requestId: freshRequest(), projectId: f.projectId, worktreeId: f.worktreeId, reviewId: review.reviewId, expectedHead: review.head, expectedBaseHead: review.baseHead, reason: "Please add coverage <script>literal</script>." };
+  const member = yield* client(f.socket, f.member.token);
+  expect(yield* refusal(run(member, "project.review.decline", payload))).toBe("command refused");
+  expect(yield* refusal(run(f.api, "project.review.decline", { ...payload, requestId: freshRequest(), reason: "   " }))).toBe("give a reason for sending the review back");
+  const reply = yield* run(f.api, "project.review.decline", payload);
+  expect(reply.result).toMatchObject({ outcome: "sent_back", reason: payload.reason, decision: null, mergeHead: null });
+  expect(yield* run(f.api, "project.review.decline", payload)).toEqual(reply);
+  expect((yield* run(f.api, "project.review.status", f)).result.review.outcome).toBe("sent_back");
+  const posts = (yield* readLog).filter((row) => row.event._tag === "board.PostWritten" && row.event.text.includes(payload.reason));
+  expect(posts).toHaveLength(1);
+  expect(posts[0]!.event).toMatchObject({ to: [{ _tag: "agent", agentId: projectView(yield* snapshot).projects[f.projectId]!.leadAgentId }] });
+  expect(yield* refusal(approve(f, review))).toBe("main review is unavailable; prepare a new review");
+  expect(yield* refusal(run(f.api, "project.review.decline", { ...payload, requestId: freshRequest() }))).toBe("main review is unavailable; prepare a new review");
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(f.baseHead);
+})).pipe(Effect.orDie));
+
+it.live("s4-git2: updates only from the registered parent and integrates a registered builder into its team", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup();
+  expect(typeof (f.api as any)["project.update"]).toBe("function");
+  save(rig.work, "parent.txt", "parent change\n"); const parentHead = commit(rig.work, "Parent update");
+  const update = { requestId: freshRequest(), projectId: f.projectId, worktreeId: f.worktreeId, destinationId: f.destinationId, expectedHead: parentHead };
+  yield* run(f.api, "project.update", update);
+  expect(git(f.source, "merge-base", "--is-ancestor", parentHead, "HEAD")).toBe("");
+  const teamPath = join(rig.root, "team"), builderPath = join(rig.root, "builder");
+  git(f.source, "worktree", "add", "-b", "team-build", teamPath);
+  const teamId = (yield* run(f.api, "project.workspace.register", { repoId: f.repoId, machineId: "local", path: teamPath, branch: "team-build", checkout: "worktree", parentId: f.worktreeId })).worktreeId;
+  const team = yield* run(f.api, "project.team.create", { projectId: f.projectId, name: "Build", worktreeId: teamId });
+  git(teamPath, "worktree", "add", "-b", "builder-work", builderPath);
+  const builderId = (yield* run(f.api, "project.workspace.register", { repoId: f.repoId, machineId: "local", path: builderPath, branch: "builder-work", checkout: "worktree", parentId: teamId })).worktreeId;
+  save(builderPath, "builder.txt", "builder contribution\n"); const head = commit(builderPath, "Builder contribution");
+  yield* run(f.api, "project.integrate", { worktreeId: builderId, destinationId: teamId, expectedHead: head });
+  expect(readFileSync(join(teamPath, "builder.txt"), "utf8")).toBe("builder contribution\n");
+  expect(existsSync(join(f.source, "builder.txt"))).toBe(false);
+  expect(yield* refusal(run(f.api, "project.integrate", { worktreeId: builderId, destinationId: f.worktreeId, expectedHead: head }))).toBe("integration requires a registered team source and its project workspace");
+  expect(yield* refusal(run(f.api, "project.update", { ...update, requestId: freshRequest(), destinationId: teamId }))).toBe("update requires the registered parent workspace");
+  save(rig.work, "file.txt", "parent conflict\n"); const nextParent = commit(rig.work, "Parent conflict");
+  save(f.source, "file.txt", "project conflict\n"); commit(f.source, "Project conflict");
+  expect(yield* refusal(run(f.api, "project.update", { ...update, requestId: freshRequest(), expectedHead: nextParent }))).toBe("Git: conflicts");
+  const state = (yield* run(f.api, "project.git.state", { worktreeId: f.worktreeId })).result;
+  expect(state.mergeHead).toBe(nextParent);
+  const conflict = (yield* run(f.api, "project.conflict", { worktreeId: f.worktreeId, path: "file.txt" })).result;
+  const chosen = (yield* run(f.api, "project.conflict.choose", { worktreeId: f.worktreeId, selection: conflict, hunk: 0, choice: "ours" })).result;
+  yield* run(f.api, "project.conflict.resolve", { worktreeId: f.worktreeId, selection: chosen });
+  const seen = (yield* run(f.api, "project.conflict.resolved", { worktreeId: f.worktreeId })).result.items[0];
+  expect(seen.path).toBe("file.txt");
+  yield* run(f.api, "project.conflict.reopen", { worktreeId: f.worktreeId, path: "file.txt", expectedHead: state.head, expectedMergeHead: state.mergeHead, fingerprint: seen.fingerprint, confirmed: true });
+  expect((yield* run(f.api, "project.conflict", { worktreeId: f.worktreeId, path: "file.txt" })).result.choices).toEqual([null]);
+  yield* run(f.api, "project.merge.abort", { worktreeId: f.worktreeId, expectedHead: state.head, expectedMergeHead: state.mergeHead, confirmed: true });
+  expect((yield* run(f.api, "project.git.state", { worktreeId: f.worktreeId })).result.mergeHead).toBeNull();
+})).pipe(Effect.orDie));
+
+
+it.live("s4-git2: a send-back decision waits for the same workspace's in-flight owner approval", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  const original = GitProcesses.gitProcess;
+  let release!: () => void, entered!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const spy = vi.spyOn(GitProcesses, "gitProcess").mockImplementation(async (...args) => {
+    if (args[0] === rig.work && args[1].includes("merge") && !args[1].includes("--is-ancestor")) { entered(); await held; }
+    return original(...args);
+  });
+  yield* Effect.gen(function* () {
+    const merging = yield* approve(f, review).pipe(Effect.forkChild);
+    yield* Effect.promise(() => started);
+    const declining = yield* run(f.api, "project.review.decline", { worktreeId: f.worktreeId, projectId: f.projectId,
+      reviewId: review.reviewId, expectedHead: review.head, expectedBaseHead: review.baseHead, reason: "Please check the tests." }).pipe(Effect.result, Effect.forkChild);
+    yield* Effect.sleep(100);
+    expect(projectView(yield* snapshot).gitReviews[f.worktreeId]!.outcome).toBe("open");
+    release();
+    expect((yield* Fiber.join(merging)).result.outcome).toBe("merged");
+    expect((yield* Fiber.join(declining))._tag).toBe("Failure");
+  }).pipe(Effect.ensuring(Effect.sync(() => { release(); spy.mockRestore(); })));
+})).pipe(Effect.orDie));
+
+const decline = (f: Effect.Success<ReturnType<typeof setup>>, review: any, extra: Record<string, unknown> = {}) => run(f.api, "project.review.decline", {
+  projectId: f.projectId, worktreeId: f.worktreeId, reviewId: review.reviewId, expectedHead: review.head, expectedBaseHead: review.baseHead, reason: "Please check the tests.", ...extra,
+});
+it.live("review 2: a send-back wakes the recorded lead and replaces its queued board wake without dropping withdrawal", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  const lead = projectView(yield* snapshot).projects[f.projectId]!.leadAgentId;
+  yield* run(f.api, "board.post", { direct: { _tag: "agent", agentId: lead }, to: [{ _tag: "agent", agentId: lead }], reply: "all", text: "Earlier queued lead work." });
+  const earlier = Object.values((yield* snapshot).deliveries).find((d) => d.target === lead && d.source?._tag === "piece" && d.source.namespace === "board" && d.status === "queued")!;
+  expect(earlier).toBeDefined();
+  yield* decline(f, review);
+  const rows = yield* readLog, decided = rows.find((r) => r.event._tag === "project.MainReviewDecided")!;
+  const ownRows = rows.filter((r) => r.requestId === decided.requestId);
+  expect(ownRows.some((r) => r.event._tag === "DeliveryWithdrawn" && r.event.deliveryId === earlier.id)).toBe(true);
+  expect((yield* snapshot).deliveries[earlier.id]!.status).toBe("withdrawn");
+  const queued = Object.values((yield* snapshot).deliveries).filter((d) => d.target === lead && d.source?._tag === "piece" && d.source.namespace === "board" && d.status === "queued");
+  expect(queued).toHaveLength(1);
+  expect(queued[0]!.content).toMatchObject({ _tag: "prompt", text: expect.stringContaining("Please check the tests.") });
+})).pipe(Effect.orDie));
+for (const absent of ["stopped", "removed"] as const) it.live(`review 2: refuses a send-back when its lead is ${absent}`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review, lead = projectView(yield* snapshot).projects[f.projectId]!.leadAgentId;
+  if (absent === "stopped") yield* run(f.api, "stop", { agentId: lead });
+  else { const views = yield* Views; const original = views.snapshot; Object.defineProperty(views, "snapshot", { configurable: true, get: () => original.pipe(Effect.map((s) => ({ ...s, agents: Object.fromEntries(Object.entries(s.agents).filter(([id]) => id !== lead)) }))) }); yield* Effect.addFinalizer(() => Effect.sync(() => Object.defineProperty(views, "snapshot", { configurable: true, value: original }))); }
+  expect(yield* refusal(decline(f, review))).toBe("project lead is unavailable; the review was not sent back");
+  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]!.outcome).toBe("open");
+})).pipe(Effect.orDie));
+for (const flaw of ["afterCommit", "sideRows"] as const) it.live(`review 1: decline rejects a planner's ${flaw} boundary violation`, () => {
+  const original = engineLists.planners["project.review.decline"]!;
+  const planner: PiecePlanner = (input, raw) => original(input, raw).pipe(Effect.map((plan) => ({ ...plan, ...(flaw === "afterCommit" ? { afterCommit: Effect.void } : { sideRows: { foreign_rows: [] } }) } as unknown as PiecePlan)));
+  return provideBoard(rig, Effect.gen(function* () {
+    const f = yield* setup(), review = (yield* prepare(f)).result.review;
+    expect(yield* refusal(decline(f, review))).toBe("command refused");
+    expect(projectView(yield* snapshot).gitReviews[f.worktreeId]!.outcome).toBe("open");
+  }), [], { lists: { ...engineLists, planners: { ...engineLists.planners, "project.review.decline": planner } } }).pipe(Effect.orDie);
+});
+it.live("review 3: update reads a dirty parent's commit but refuses a dirty child, stale head and foreign repository", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(); save(rig.work, "parent.txt", "committed parent\n"); const parent = commit(rig.work, "Parent update");
+  const payload = { worktreeId: f.worktreeId, destinationId: f.destinationId, expectedHead: parent };
+  save(rig.work, "untracked.txt", "Leave this parent file alone.\n"); save(rig.work, "file.txt", "uncommitted parent edit\n");
+  yield* run(f.api, "project.update", payload);
+  expect(readFileSync(join(f.source, "parent.txt"), "utf8")).toBe("committed parent\n");
+  expect(readFileSync(join(rig.work, "file.txt"), "utf8")).toBe("uncommitted parent edit\n");
+  save(f.source, "dirty.txt", "child edit\n");
+  expect(yield* refusal(run(f.api, "project.update", payload))).toBe("Git: dirty_destination"); rmSync(join(f.source, "dirty.txt"));
+  expect(yield* refusal(run(f.api, "project.update", { ...payload, expectedHead: f.baseHead }))).toBe("Git: stale_state");
+  const other = join(rig.root, "other-repository"); mkdirSync(other); git(other, "init", "-b", "main"); git(other, "config", "user.name", "Builder"); git(other, "config", "user.email", "builder@example.invalid"); git(other, "config", "commit.gpgsign", "false"); save(other, "foreign.txt", "foreign\n"); const foreignHead = commit(other, "Foreign");
+  const repository = yield* run(f.api, "project.repository.add", { name: "Other", path: other, machineId: "local" });
+  const workspace = yield* run(f.api, "project.workspace.register", { repoId: repository.repoId, path: other, branch: "main", machineId: "local", checkout: "main" });
+  expect(yield* refusal(run(f.api, "project.update", { ...payload, destinationId: workspace.worktreeId, expectedHead: foreignHead }))).toBe("update requires the registered parent workspace");
+})).pipe(Effect.orDie));
+it.live("review 9: every new owner-only Git action refuses an authenticated agent with the exact reason", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), member = yield* client(f.socket, f.member.token);
+  for (const [name, extra] of [["project.merge.abort", { expectedHead: f.head, expectedMergeHead: f.baseHead, confirmed: true }], ["project.conflict.reopen", { path: "file.txt", expectedHead: f.head, expectedMergeHead: f.baseHead, fingerprint: "abc", confirmed: true }], ["project.conflict.resolved", {}], ["project.update", { destinationId: f.destinationId, expectedHead: f.baseHead }]] as const) {
+    expect(yield* refusal(run(member, name, { projectId: f.projectId, worktreeId: f.worktreeId, ...extra }))).toBe("command refused");
+  }
+})).pipe(Effect.orDie));
+
+it.live("review 2: sending back an idle lead's review queues its reason without any earlier board duty", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), review = (yield* prepare(f)).result.review;
+  const lead = projectView(yield* snapshot).projects[f.projectId]!.leadAgentId;
+  expect(Object.values((yield* snapshot).deliveries).filter((d) => d.target === lead && d.source?._tag === "piece" && d.source.namespace === "board")).toEqual([]);
+  yield* decline(f, review);
+  const deliveries = Object.values((yield* snapshot).deliveries).filter((d) => d.target === lead && d.source?._tag === "piece" && d.source.namespace === "board" && d.status === "queued");
+  expect(deliveries).toHaveLength(1);
+  expect(deliveries[0]!.content).toMatchObject({ _tag: "prompt", text: expect.stringContaining("Please check the tests.") });
+})).pipe(Effect.orDie));
+it.live("review 7: abort's overlapping-edit refusal is fixed on the wire and replayable", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup();
+  expect(yield* refusal(run(f.api, "project.merge.abort", { worktreeId: f.worktreeId, expectedHead: f.head, expectedMergeHead: f.baseHead, confirmed: true }))).toBe("Git: no_merge");
+  save(rig.work, "file.txt", "parent conflict\n"); const parent = commit(rig.work, "Parent conflict");
+  save(f.source, "file.txt", "project conflict\n"); commit(f.source, "Project conflict");
+  expect(yield* refusal(run(f.api, "project.update", { worktreeId: f.worktreeId, destinationId: f.destinationId, expectedHead: parent }))).toBe("Git: conflicts");
+  const c = (yield* run(f.api, "project.conflict", { worktreeId: f.worktreeId, path: "file.txt" })).result;
+  const chosen = (yield* run(f.api, "project.conflict.choose", { worktreeId: f.worktreeId, selection: c, hunk: 0, choice: "both" })).result;
+  yield* run(f.api, "project.conflict.resolve", { worktreeId: f.worktreeId, selection: chosen });
+  git(f.source, "add", "--", "file.txt"); save(f.source, "file.txt", "owner edit\n");
+  const p = { requestId: freshRequest(), worktreeId: f.worktreeId, expectedHead: git(f.source, "rev-parse", "HEAD"), expectedMergeHead: parent, confirmed: true };
+  expect(yield* refusal(run(f.api, "project.merge.abort", p))).toBe("Git: abort_blocked");
+  expect(yield* refusal(run(f.api, "project.merge.abort", p))).toBe("Git: abort_blocked");
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toEqual([]);
+  expect(readFileSync(join(f.source, "file.txt"), "utf8")).toBe("owner edit\n");
+})).pipe(Effect.orDie));
+it.live("review 12: project-wide Git readers include other team builders, but exclude outsiders and the base checkout", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), parent = projectView(yield* snapshot).projects[f.projectId]!.leadAgentId;
+  const teamPath = join(rig.root, "access-team"), builderPath = join(rig.root, "access-builder");
+  git(f.source, "worktree", "add", "-b", "access-team", teamPath);
+  const team = yield* run(f.api, "project.workspace.register", { repoId: f.repoId, path: teamPath, branch: "access-team", machineId: "local", checkout: "worktree", parentId: f.worktreeId });
+  yield* run(f.api, "project.team.create", { projectId: f.projectId, name: "Access", worktreeId: team.worktreeId });
+  git(teamPath, "worktree", "add", "-b", "access-builder", builderPath);
+  const builder = yield* run(f.api, "project.workspace.register", { repoId: f.repoId, path: builderPath, branch: "access-builder", machineId: "local", checkout: "worktree", parentId: team.worktreeId });
+  save(builderPath, "file.txt", "builder\n"); const head = commit(builderPath, "Builder");
+  save(teamPath, "file.txt", "team\n"); commit(teamPath, "Team"); expect(() => git(builderPath, "merge", "access-team")).toThrow();
+  const otherPath = join(rig.root, "other-team"); git(f.source, "worktree", "add", "-b", "other-team", otherPath);
+  const otherWorkspace = yield* run(f.api, "project.workspace.register", { repoId: f.repoId, path: otherPath, branch: "other-team", machineId: "local", checkout: "worktree", parentId: f.worktreeId });
+  const otherTeamRecord = yield* run(f.api, "project.team.create", { projectId: f.projectId, name: "Other", worktreeId: otherWorkspace.worktreeId });
+  const sibling = yield* seedAgent({ id: "other-team-reader", parent, folder: otherPath, groups: [otherTeamRecord.group] });
+  const outsider = yield* seedAgent({ id: "outside-project" });
+  const member = yield* client(f.socket, f.member.token), otherTeam = yield* client(f.socket, sibling.token), foreign = yield* client(f.socket, outsider.token);
+  for (const [name, extra] of [["project.changes", {}], ["project.diff", { path: "file.txt" }], ["project.history", {}], ["project.commit.files", { commit: head }], ["project.git.state", {}], ["project.review", { base: "access-team" }], ["project.conflict", { path: "file.txt" }]] as const) {
+    const p = { projectId: f.projectId, worktreeId: builder.worktreeId, ...extra };
+    expect((yield* run(f.api, name, { worktreeId: builder.worktreeId, ...extra })).result).toBeDefined();
+    expect((yield* run(member, name, p)).data).toBeTypeOf("string");
+    expect((yield* run(otherTeam, name, p)).data).toBeTypeOf("string");
+    expect(yield* refusal(run(foreign, name, p))).toBe("project is unavailable to this caller");
+    expect(yield* refusal(run(member, name, { ...p, projectId: "another-project" }))).toBe("project is unavailable to this caller");
+    expect(yield* refusal(run(member, name, { ...p, worktreeId: f.destinationId }))).toBe("project is unavailable to this caller");
+  }
+})).pipe(Effect.orDie));

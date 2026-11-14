@@ -103,7 +103,7 @@ live("W05c context: turn token totals and wrong-session reports do not become co
     yield* finishFirstPrompt(echo, started.agentId);
     expect(yield* read(started.agentId)).toEqual({ _tag: "unavailable", reason: "not-reported" });
     const choices = yield* config(started.agentId);
-    expect(choices.models).toEqual({ source: "unavailable", options: [] });
-    expect(choices.efforts).toEqual({ source: "unavailable", options: [] });
+    expect(choices.models).toEqual({ source: "unavailable", options: [], reason: "This harness did not report model choices." });
+    expect(choices.efforts).toEqual({ source: "unavailable", options: [], reason: "This harness did not report effort choices." });
   }));
 });

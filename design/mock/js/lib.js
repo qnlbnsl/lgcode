@@ -43,10 +43,60 @@ export function notify() {
   scheduled = true;
   queueMicrotask(() => { scheduled = false; for (const l of [...listeners]) l(); });
 }
-export function update(fn) { fn(store.state); notify(); }
+export function update(fn) {
+  if (!live.on) { fn(store.state); notify(); return; }
+  // In live mode, a change that the engine does not take yet is refused as a whole. Nothing
+  // else changes in the same turn either, so no "Saved" or success notice follows it.
+  if (live.refusedTurn) return;
+  try { fn(store.state); } catch (e) { if (!refusal(e)) throw e; refuse(); }
+  notify();
+}
+
+// ---- live mode -------------------------------------------------------------
+// In live mode the engine owns the records in the store. The connection writes them through
+// engineWrite(), and they are frozen, so a screen that tries to change one is refused, with
+// a short notice, instead of changing the browser's copy. The page's own state, such as the
+// preferences, the open dialog and the drafts, stays writable.
+export const ENGINE_OWNED = new Set([
+  'session', 'conn', 'owner', 'machines', 'subscriptions', 'repos', 'projects', 'teams', 'agents', 'epics', 'sprints', 'tasks',
+  'machineDetails', 'phoneOffer', 'accountLimits', 'threads', 'pending',
+  'boardUnread', 'boardRevision', 'boardDetails', 'taskDetails', 'setupData', 'boardAgents', 'requests', 'channels', 'posts', 'worktrees', 'workflow', 'mocks', 'design', 'notifications', 'settings',
+]);
+export const live = { on: false, refusedTurn: false, onRefuse: null };
+let engineWriting = false;
+class Refused extends Error {}
+export function freeze(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const k of Object.keys(value)) freeze(value[k]); }
+  return value;
+}
+// Wraps the live store, so that only engineWrite() can replace a record the engine owns.
+export function guardStore(state) {
+  for (const k of ENGINE_OWNED) if (k in state) freeze(state[k]);
+  return new Proxy(state, {
+    // Writing back the value a key already holds changes nothing, so it is allowed.
+    set(target, key, value) { if (ENGINE_OWNED.has(key) && !engineWriting && target[key] !== value) throw new Refused(String(key)); target[key] = value; return true; },
+    deleteProperty(target, key) { if (ENGINE_OWNED.has(key) && !engineWriting) throw new Refused(String(key)); delete target[key]; return true; },
+  });
+}
+// The connection's only way to change the records it owns. Each value it writes is frozen.
+export function engineWrite(patch) {
+  engineWriting = true;
+  try { for (const [k, v] of Object.entries(patch)) store.state[k] = freeze(v); } finally { engineWriting = false; }
+  notify();
+}
+// True for the error a refused change throws: a write to a frozen record, or a replaced one.
+export function refusal(e) {
+  return e instanceof Refused || (e instanceof TypeError && /read[- ]only|not extensible|Cannot (add|delete|define|assign)|can't (define|delete|assign)/i.test(e.message));
+}
+export function refuse() {
+  if (live.refusedTurn) return;
+  live.refusedTurn = true;
+  setTimeout(() => { live.refusedTurn = false; }, 0);
+  live.onRefuse?.();
+}
 export function useStore() {
   const [, bump] = useReducer((n) => n + 1, 0);
-  useEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
+  useLayoutEffect(() => { listeners.add(bump); return () => listeners.delete(bump); }, []);
   return store.state;
 }
 
