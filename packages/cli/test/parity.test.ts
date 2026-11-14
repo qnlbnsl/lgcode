@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
 import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgtm/contracts";
 import { afterEach, expect, it } from "vitest";
@@ -8,6 +9,35 @@ import {
 } from "../../testing/test/support/unit7b.ts";
 
 afterEach(cleanupUnit7b);
+
+for (const words of [["project.mocks.editor.save"], ["project", "mocks", "editor", "save"]]) {
+  it(`review item 4: ${words.join(" ")} reads a real export from --file without a large argument`, async () => {
+    const root = prepareRoot(), file = join(root.work, "editor export.pen");
+    const exported = Buffer.from(JSON.stringify({ version: "2.8", children: [], name: "x".repeat(180_000) }));
+    expect(exported.byteLength).toBeGreaterThan(140_000);
+    writeFileSync(file, exported);
+    const engine = await fakeEngine(root, { onRequest: (frame, socket) => succeed(socket, frame, { requestId: frame.payload.requestId, revisionId: "saved" }) });
+    const payload = { requestId: "editor-file", projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true };
+    const args = [...words, "--input", JSON.stringify(payload), "--file", file];
+    expect(args.every((arg) => Buffer.byteLength(arg) < 4096)).toBe(true);
+    const child = startCli(root, args, serviceEnvironment(root));
+    expect(await finishCli(child)).toEqual({ code: 0, signal: null });
+    expect(engine.requests).toHaveLength(1);
+    expect(engine.requests[0]).toMatchObject({ tag: "project.mocks.editor.save", payload: { ...payload, content: exported.toString("base64") } });
+    expect(engine.requests[0]?.payload).not.toHaveProperty("file");
+    assertNoSecrets(child, [token]);
+  });
+}
+
+it("review item 4: rejects a local editor export above 512 KiB before sending an engine request", async () => {
+  const root = prepareRoot(), file = join(root.work, "too-large.pen");
+  writeFileSync(file, Buffer.alloc(512 * 1024 + 1, 65));
+  const engine = await fakeEngine(root);
+  const child = startCli(root, ["project.mocks.editor.save", "--input", JSON.stringify({ projectId: "project", revisionId: "revision", designRevision: "design", worktreeId: "workspace", confirmed: true }), "--file", file], serviceEnvironment(root));
+  expect((await finishCli(child)).code).not.toBe(0);
+  expect(child.stderr()).toContain("512 KiB");
+  expect(engine.requests).toEqual([]);
+});
 
 const commandWords = (command: string) => command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ");
 const invocations = [...CommandsRpcGroup.requests.keys()].flatMap((command) => [

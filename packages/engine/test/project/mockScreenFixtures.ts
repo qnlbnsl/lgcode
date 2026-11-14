@@ -9,7 +9,7 @@ export const screenBundle = () => ({ sources: [{ sourceId: "page", worktreeId: "
 export const seedScreens = (rig: Rig) => Effect.gen(function* () {
   yield* seedAccount(); yield* seedHarness()
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
-  const lead = yield* seedAgent({ id: "project-lead", name: "Project lead" }), designer = yield* seedAgent({ id: "designer", name: "Designer", parent: "project-lead" }), stranger = yield* seedAgent({ id: "stranger", name: "Other project agent" })
+  const lead = yield* seedAgent({ id: "project-lead", name: "Project lead" }), designer = yield* seedAgent({ id: "designer", name: "Designer", role: "designer", parent: "project-lead" }), stranger = yield* seedAgent({ id: "stranger", name: "Other project agent" })
   success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "sh" } }))
   const repoId = success(yield* call(ownerCredential, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   yield* appendSetup([eventOf({ _tag: "project.WorktreeCreated", worktreeId: "workspace", repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" }),

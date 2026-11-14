@@ -205,6 +205,7 @@ export type SeedState = "starting" | "working" | "idle" | "paused" | "interrupte
 
 export interface SeedAgent {
   readonly id: string;
+  readonly role?: string;
   readonly name?: string;
   readonly parent?: string | undefined; // an agent id; absent means the owner
   readonly state?: SeedState | undefined;
@@ -223,7 +224,7 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   const token = mintAgentToken();
   const parent: Actor = spec.parent === undefined ? { _tag: "owner" } : { _tag: "agent", agentId: agentIdOf(spec.parent) };
   const events: Array<Event> = [decodeEvent({
-    _tag: "AgentStarted", agentId, name: spec.name ?? `name-${spec.id}`, role: "worker", groups: spec.groups ?? [], parent,
+    _tag: "AgentStarted", agentId, name: spec.name ?? `name-${spec.id}`, role: spec.role ?? "worker", groups: spec.groups ?? [], parent,
     harness: "first", account: "primary", permission: spec.permission ?? "ask", folder: spec.folder ?? defaultFolder,
     runMode: "acp", model: "test-model", effort: "high",
   })];
