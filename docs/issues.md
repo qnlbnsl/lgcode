@@ -13133,3 +13133,15 @@ The exhaustive registration guard found the new restart-launch and version-proce
 These two tests create no engine log.
 They now register the explicit noLog form required for those tests.
 The browser and credit stages did not run because the unit stage failed.
+
+## s6-settings-26. The final review-fix check still hit the known Git browser timeout.
+
+The final full check passed all package and root type checks.
+All 567 unit files passed, with 8,552 passed tests and two skipped tests.
+The browser stage passed 55 of 56 journeys.
+The Git journey timed out for ten seconds while clicking Use both after reopening a conflict.
+The merged file reports this at packages/web/e2e/support/studioGit.ts:165, rather than the earlier line 157.
+The live settings, Harnesses, Notifications, and standalone sample journeys passed.
+The credit check passed separately after the failed browser stage skipped its chained invocation.
+The settings worker changed no Git implementation or timeout beyond the required integration merge.
+The lead assigned that Git problem to another builder.
