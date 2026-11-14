@@ -12604,3 +12604,13 @@ The sample workflow module then imports an unavailable TypeScript source path, s
 The fixture now copies the workflow contracts bundle from its existing Studio build over the sample's source re-export.
 The engine's content policy and the standalone sample sources are unchanged.
 The next isolated email run will verify this fixture correction.
+
+## s6-mocks-7. The third full check failed in the merged Git conflict journey.
+
+The run passed 8459 unit tests and 54 browser tests.
+The Git journey timed out at `packages/web/e2e/support/studioGit.ts:157` while waiting for Use both after recreating a conflict and refreshing.
+The assignment's known intermittent Git failure was named at line 100.
+This output does not establish that the new failure is the same one.
+Both Mocks journeys and the corrected email journey passed.
+The Mocks builder has not changed the Git journey, Git implementation, or its timeout.
+An isolated Git run is requested to establish whether this failure repeats.
