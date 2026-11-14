@@ -12888,3 +12888,62 @@ The live copy now includes the shared harness defaults editor for that explicit 
 The ordinary Service settings address and the standalone sample keep their current layouts.
 The editor uses the same asynchronous model reports on both addresses.
 The browser journey is unchanged.
+
+
+## s4-git2-1. An explicit Git refresh could be dropped behind an automatic read.
+
+The Refresh Git button and automatic refreshes used the same git-read pending key.
+A click during an older read returned false without starting a fresh read.
+The page's owner-action busy state also remained false during that explicit refresh.
+An external merge can therefore be absent from the page when the owner expects the refresh to have completed.
+A full browser run with the old refresh and corrected owner dialogs reproduced Use both after an external merge and refresh.
+That run had 54 passes and one failure in 9.2 minutes.
+The snapshot had Conflicts selected and eventually contained the choice buttons without an owner Working state.
+The read could outlast the click budget while the journey already saw the owner-action state as idle.
+The gated regression separately proves the dropped-refresh case.
+Explicit refresh now uses the owner-action key and advances the read generation.
+An older automatic reply cannot overwrite its newer conflict state.
+Automatic reads retain their separate key and do not disable approval.
+A gated regression verifies that a held older read cannot discard the explicit refresh or replace its result.
+
+## s4-git2-2. The conflict view hid an unfinished selection read.
+
+The baseline full browser run failed at Use both after reopening a resolved file.
+Its captured page had the Conflicts view open and the owner action still marked Working.
+The conflicted file said Ready while its body contained no choices.
+The page had published the conflict file list before reading the selected file's conflict parts.
+The view now says Loading conflicts while that selection is unread.
+The file list also says Loading instead of Ready.
+Choices remain disabled until their selection is loaded.
+A rendered regression holds this state and verifies the visible status and disabled resolution control.
+
+## s4-git2-3. Git dialogs closed before their owner action finished.
+
+Issues 755 and 756 were worked around by journey waits after discard and send-back.
+Discard now uses the existing confirmation dialog's pending mode through its complete readback.
+Abort and reopen use that same pending mode.
+Their dialogs show Discarding, Aborting, or Reopening until completion.
+Send-back keeps its dialog open and shows Sending back until its readback and pending state finish.
+The owner cannot close that dialog while its action is pending.
+The two workaround waits were removed.
+The discard journey observes the visible confirmation closing instead.
+Unit regressions hold readback and verify that the dialogs remain open.
+No timeout was raised.
+
+## s4-git2-4. The baseline admin journey lost its changed heartbeat value once.
+
+The unmodified d34b903 full browser run failed in admin-pages.spec.ts at its heartbeat assertion.
+The input showed 25 after the test filled 30, blurred the input, and clicked Refresh settings.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+This page is outside the current Git assignment and was not changed.
+
+## s4-git2-5. The baseline thread journey observed no permission answer once.
+
+The unmodified d34b903 full browser run failed in thread-browser.spec.ts after its permission clicks.
+The fake runner had zero answerPermission calls instead of one within five seconds.
+The snapshot still showed the open permission request.
+The next diagnostic full browser run passed that case.
+The saved failure snapshot and output are retained in the Git worker's handoff.
+The Git page changes do not change this thread implementation.
+This finding remains outside the current Git assignment.
