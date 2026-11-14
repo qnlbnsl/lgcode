@@ -1,3 +1,4 @@
+import { registerRebuildCheck } from '../support/rebuildCheck.ts'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import * as Effect from 'effect/Effect'
@@ -11,6 +12,7 @@ vi.mock('node:child_process', async (original) => {
   } }
 })
 import { gitVersion, serviceControlReads } from '../../src/client/serviceControl.ts'
+registerRebuildCheck({ noLog: true })
 afterEach(() => { fixture.calls = []; fixture.script = '' })
 test('the version process refuses output above 16 kibibytes and accepts the bound exactly', async () => {
   fixture.script = 'process.stdout.write("x".repeat(16384))'

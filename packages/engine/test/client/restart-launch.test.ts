@@ -1,7 +1,9 @@
+import { registerRebuildCheck } from '../support/rebuildCheck.ts'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { checkRestartLaunch, restartAfterShutdown } from '../../src/client/restartLaunch.ts'
+registerRebuildCheck({ noLog: true })
 test('restart preflight requires readable launch files and an executable Node program', async () => {
   const root = mkdtempSync('/tmp/lgtm-restart-launch-'), execPath = join(root, 'node'), scriptPath = join(root, 'service.ts')
   try {

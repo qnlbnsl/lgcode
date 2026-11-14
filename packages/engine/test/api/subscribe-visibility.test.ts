@@ -164,6 +164,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   "client.WebSettingsChanged": () => ({ settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } }),
   "client.WebServerDown": () => ({ reason: "port taken" }),
   "client.WebServerUp": () => ({}),
+  "client.ServiceRestartRequested": () => ({}),
 };
 const terminal = new Set(["AgentStartFailed", "AgentCrashed", "AgentStopped"]);
 

@@ -13117,3 +13117,19 @@ The continuation uses the concrete command and log error types instead of an unc
 The following type check passed for every package and the root.
 The affected suite passed 312 tests.
 The live settings browser journey passed with the folder reset and no-tracking explanation.
+
+## s6-settings-24. The first full review-fix check found a visibility fixture gap and a forbidden type import.
+
+The new restart event was missing from the exhaustive subscription visibility samples.
+Its empty payload now has a sample, so the existing tests check owner-only visibility in catch-up and live streams.
+A type-only import of LogWriteFailed from the client piece also crossed the repository's piece boundary.
+The restart continuation now preserves its caller's error type through a generic parameter.
+The client piece does not import the log writer.
+
+## s6-settings-25. Two process-only tests omitted the required rebuild registration.
+
+The first full check finished with 8,547 passed tests, five failed tests, and two skipped tests.
+The exhaustive registration guard found the new restart-launch and version-process files.
+These two tests create no engine log.
+They now register the explicit noLog form required for those tests.
+The browser and credit stages did not run because the unit stage failed.
