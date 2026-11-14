@@ -14,9 +14,9 @@ describe('service mapping', () => {
   it('maps harness choices without sample models', () => {
     expect(mapHarnesses([harness])).toEqual({ codex: { name: 'codex', models: ['model'], efforts: ['high'], noEffort: [], runMode: 'ACP' } })
   })
-  it('maps named accounts and harness defaults without assigning a machine or usage', () => {
+  it('maps named accounts and harness defaults onto the local machine, without usage', () => {
     const [row] = mapAccounts([account], [{ id: account.id, status: 'out-of-usage', enabled: true, environment: [] }], [harness], project)
-    expect(row).toMatchObject({ name: 'Build account', status: 'out-of-usage', useForNew: true, model: 'model', machine: '', usage: null, window: null, account: null })
+    expect(row).toMatchObject({ name: 'Build account', status: 'out-of-usage', useForNew: true, model: 'model', machine: 'local', usage: null, window: null, account: null })
     expect(mapAccounts([{ ...account, enabled: false }], [{ id: account.id, status: 'needs-sign-in', enabled: false, environment: [] }], [], undefined)[0]).toMatchObject({ signedIn: false, enabled: false, useForNew: false, model: '' })
   })
   it('maps exact settings and keeps unavailable and unset values empty', () => {
