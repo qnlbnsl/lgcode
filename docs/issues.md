@@ -13368,3 +13368,23 @@ The live mapping in `packages/studio/src/mapping.ts` sets the project's creation
 `phaseTimes` in `design/mock/js/screens/workflow.js` then spreads the time since zero across the phases with fixed sample weights.
 The phase lengths are therefore invented, not only wrong in size.
 The fix needs the engine to record when a project enters each phase, and the page to show no length until it has one.
+
+## 847. The "Harnesses" page was hard to read as one run of text
+
+Found: 2026-11-14, by the owner on the live website.
+State: changed on the branch `area/harness-layout`, awaiting the owner's approval of the look.
+
+The owner's words: "the overall UI on this needs some segmentation so I can separate things out. It feels like a wall of text."
+Each harness is now one bordered card with a header, and three named parts inside it: "Program", "Defaults for this harness" and "Accounts".
+The long program path is folded under "Where it is installed".
+The three defaults sit side by side.
+A strip under the title names each harness with its state and jumps to its card.
+
+## 848. A reload of a live page briefly says "The service is not connected."
+
+Found: 2026-11-14, while checking the new "Harnesses" layout.
+State: open.
+
+Right after a reload of the "Harnesses" page, a notice says "The service is not connected." and the model rows say "Reading the models."
+Both clear within a few seconds, and the connection mark says "Live" throughout.
+A request is probably sent before the connection is ready.

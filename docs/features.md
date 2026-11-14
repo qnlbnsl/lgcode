@@ -1043,3 +1043,17 @@ Git text generation needs an owner-configured account and model with a bounded s
 Hosted pull request editing needs a durable provider record and an authenticated provider update action.
 Those generation and editing controls remain refused until their prerequisites exist.
 Remote-machine Git remains unavailable.
+
+## Sign in to a harness from the page, with a login folder for each account
+
+The owner asked for this on 2026-11-14.
+"Add account" on the "Harnesses" page should run the harness's sign-in for the owner, in a terminal shown beside the dialog.
+Each added account should get its own login folder under `~/.lgtm`, made by the service, so one harness can hold two sign-ins.
+The builder `s7-signin` is building both.
+
+## A choice between the bundled harness program and the one installed on the machine
+
+The owner asked on 2026-11-14 whether agents should run the vendor's installed program and not the copy that arrives with the adapter package.
+Today the engine runs the copy that the Agent Client Protocol adapter depends on, at the version the lockfile pins.
+A setting for each harness could offer "Bundled with LGTM Studio" and "Installed on this machine".
+The owner has not ruled on it.

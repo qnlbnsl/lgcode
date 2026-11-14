@@ -334,26 +334,33 @@ export function Harnesses({ s }) {
     <div class="page-head"><h1 class="page-title">Harnesses</h1><${Saved} s=${s} /><span class="grow"></span>
       <button type="button" class="btn" disabled=${live.on && liveGit.busy('read-service')} onClick=${() => live.on ? liveGit.checkHarnesses() : act.toast('Sample harnesses checked.')}><${Icon} name="refresh-cw" size=${14} />Check again</button></div>
     <p class="muted">${signed} of ${s.subscriptions.length} signed in, ${limited} at its limit</p>
+    ${(!live.on || s.ui.serviceReady) && html`<nav class="svc-jump" aria-label="Harnesses on this page">${Object.entries(HARNESSES).map(([hid, h]) => { const n = s.subscriptions.filter((x) => x.harness === hid).length;
+      return html`<a key=${hid} class="svc-jump-item" href=${'#harness-' + hid} onClick=${(e) => { e.preventDefault(); document.getElementById('harness-' + hid)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+        <i class=${cx('dot', !h.installed ? 'waiting' : n ? 'working' : 'idle')}></i><b>${h.name}</b><span class="muted">${!h.installed ? 'Not installed' : n ? plural(n, 'account') : 'No account'}</span></a>`; })}</nav>`}
     ${live.on && (liveGit.busy('subscriptions') || liveGit.busy('settings')) && html`<span role="status">Saving…</span>`}
     <fieldset disabled=${live.on && (liveGit.busy('subscriptions') || liveGit.busy('settings') || liveGit.busy('read-service'))} style="border:0;padding:0;margin:0;min-width:0" aria-busy=${live.on && liveGit.busy('read-service')}><div data-main>
-    ${(!live.on || s.ui.serviceReady) && html`<${Section} title="Defaults for new project leads"><${HarnessDefaults} s=${s} /><//>`}
+    ${(!live.on || s.ui.serviceReady) && html`<div class="svc-card svc-card-defaults"><${Section} title="Defaults for new project leads"><${HarnessDefaults} s=${s} /><//></div>`}
     ${(live.on && !s.ui.serviceReady ? [] : Object.entries(HARNESSES)).map(([hid, h]) => { const list = s.subscriptions.filter((x) => x.harness === hid);
       const save = (patch) => { if (live.on) return liveGit.harnessSetting(hid, patch); update(() => Object.assign(h, patch)); markSaved(); };
-      return html`<section key=${hid} class="svc-harness" aria-label=${h.name}>
-        <div class="section-head"><h2>${h.name}</h2><span class=${cx('badge outline', !h.installed && 'warn')}>${h.installed ? 'Installed' + (h.version ? ' · ' + h.version : '') : 'Not installed'}</span><span class="grow"></span>
+      return html`<section key=${hid} id=${'harness-' + hid} class="svc-harness svc-card" aria-label=${h.name}>
+        <div class="section-head svc-card-head"><h2>${h.name}</h2><span class=${cx('badge outline', !h.installed && 'warn')}>${h.installed ? 'Installed' + (h.version ? ' · ' + h.version : '') : 'Not installed'}</span><span class="grow"></span>
           <button type="button" class="btn sm" onClick=${() => act.openDialog({ type: 'add-subscription', harness: hid })}><${Icon} name="plus" size=${13} />Add account</button></div>
-        ${h.path && html`<p class="mono muted">${h.path}</p>`}
-        ${h.installationReason && html`<p class="muted">${h.installationReason}</p>`}
-        <div class="svc-rows">
+        <div class="svc-seg"><h3 class="svc-seg-title">Program</h3>
+          ${h.installationReason ? html`<p>${h.installationReason}</p>` : html`<p class="muted">${h.installed ? 'Installed on this machine.' : 'Not installed on this machine.'}</p>`}
+          ${h.path && html`<details class="svc-path"><summary>Where it is installed</summary><p class="mono muted">${h.path}</p></details>`}
+        </div>
+        <div class="svc-seg"><h3 class="svc-seg-title">Defaults for this harness</h3>
+        <div class="svc-rows svc-trio">
           <${Row} label="Run mode" id=${'hm-' + hid}><select id=${'hm-' + hid} class="select" value=${h.runMode?.toLowerCase()} onChange=${(e) => save({ runMode: e.target.value })}><option value="acp">Agent Client Protocol (ACP)</option><option value="interactive">Interactive</option></select><//>
           <${Row} label="Default model" id=${'hmodel-' + hid}>${h.models.length ? html`<select id=${'hmodel-' + hid} class="select" value=${h.defaultModel || ''} onChange=${(e) => save({ defaultModel: e.target.value })}><option value="">Harness default</option>${h.models.map((m) => html`<option value=${m}>${h.modelLabels?.[m] || m}</option>`)}</select>` : html`<span class="muted">${h.reason || 'This harness did not report model choices.'}</span>`}<//>
           <${Row} label="Default effort" id=${'heffort-' + hid}>${h.efforts.length ? html`<select id=${'heffort-' + hid} class="select" value=${h.defaultEffort || ''} onChange=${(e) => save({ defaultEffort: e.target.value })}><option value="">Harness default</option>${h.efforts.map((e) => html`<option value=${e}>${h.effortLabels?.[e] || e}</option>`)}</select>` : html`<span class="muted">${h.effortReason || 'This harness did not report effort choices.'}</span>`}<//>
-        </div>
+        </div></div>
+        <div class="svc-seg"><h3 class="svc-seg-title">Accounts</h3>
         <div class="svc-subs">
           <div class="svc-sub-row svc-sub-head" aria-hidden="true"><div class="c-name">Account</div><div>Status</div><div>5 hours</div><div>This week</div><div>Agents</div><div>Model for new agents</div><div></div></div>
           ${list.map((x) => html`<${SubRow} key=${x.id} s=${s} x=${x} now=${now} />`)}
           ${list.length === 0 && html`<${Empty} title=${`No ${h.name} account`}>Add an account to run agents.<//>`}
-        </div>
+        </div></div>
       </section>`; })}
     </div></fieldset>
     <p class="svc-foot-note">Sign in through the harness's own program. Check again reads local sign-in evidence. Provider authentication is checked when an agent starts.</p>
