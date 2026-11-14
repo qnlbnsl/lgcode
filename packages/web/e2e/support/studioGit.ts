@@ -159,6 +159,8 @@ export async function exerciseStudioGit(page: Page) {
           await page.getByRole('tablist', { name: 'Git views' }).getByRole('button', { name: /^Conflicts/ }).click()
           await page.getByRole('button', { name: 'Reopen', exact: true }).click()
           await page.getByRole('dialog').getByRole('button', { name: 'Reopen file', exact: true }).click()
+          // The owner sees Reopening until the conflict selection is ready.
+          await expect(page.getByRole('dialog')).toHaveCount(0)
           await page.getByRole('button', { name: 'Use both', exact: true }).click()
           await page.getByRole('button', { name: 'Mark resolved', exact: true }).click()
           await expect(page.getByRole('button', { name: 'Stage all', exact: true })).toBeEnabled()

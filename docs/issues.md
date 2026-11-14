@@ -12924,7 +12924,7 @@ Discard now uses the existing confirmation dialog's pending mode through its com
 Abort and reopen use that same pending mode.
 Their dialogs show Discarding, Aborting, or Reopening until completion.
 Send-back keeps its dialog open and shows Sending back until its readback and pending state finish.
-The owner cannot close that dialog while its action is pending.
+Its Cancel controls are disabled and its close callback is guarded while the action is pending.
 The two workaround waits were removed.
 The discard journey observes the visible confirmation closing instead.
 Unit regressions hold readback and verify that the dialogs remain open.
@@ -12947,3 +12947,17 @@ The next diagnostic full browser run passed that case.
 The saved failure snapshot and output are retained in the Git worker's handoff.
 The Git page changes do not change this thread implementation.
 This finding remains outside the current Git assignment.
+
+
+## s4-git2-6. The Git journey clicked past the visible reopening confirmation.
+
+The first full browser validation with the page fixes passed the external-merge refresh boundary.
+It later attempted Use both immediately after confirming Reopen.
+That step still had only its ten-second click budget while the owner was being shown a retained confirmation and a loading conflict view.
+The end snapshot contains the Reopen confirmation and Loading conflicts.
+It also contains a socket-unavailable toast after the failed test began shutting down its service.
+The complete output had 54 passes and one failure in 10.1 minutes.
+The journey now observes the reopening confirmation closing before choosing lines.
+An owner sees that same progress and waits for the dialog to finish.
+This wait uses the existing expectation budget and raises no timeout.
+The page fix itself is unchanged.
