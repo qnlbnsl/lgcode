@@ -37,9 +37,10 @@ export async function saveMockEditorFile(root: string, recordedPath: string, exp
       if (fingerprint(await smallFile(destination, 1024 * 1024)) !== expected) throw new Error()
     }
     await stillRecorded()
+    const mode = (await lstat(destination)).mode & 0o777
     temporary = `${parent}/.lgtm-editor-${randomUUID()}`
     const output = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
-    try { await output.writeFile(bytes); await output.sync() } finally { await output.close() }
+    try { await output.writeFile(bytes); await output.chmod(mode); await output.sync() } finally { await output.close() }
     await stillRecorded()
     changed = true
     await rename(temporary, destination)

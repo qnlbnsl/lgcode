@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs"
-import { fileURLToPath, URL } from "node:url"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { expect, it, vi } from "vitest"
 import { mockControlsSource } from "../scripts/mockControlsSource.ts"
 
-const source = readFileSync(fileURLToPath(new URL("../../../design/mock/js/live/mocks.js", import.meta.url)), "utf8")
+const source = readFileSync(resolve(existsSync("design/mock") ? "design/mock" : "../../design/mock", "js/live/mocks.js"), "utf8")
 const wired = mockControlsSource("js/live/mocks.js", source)
 // Execute the real copied loader with a fake authenticated transport. The
 // imports and page components outside this function are irrelevant here.

@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { expect, it } from "vitest"
 import { mockControlsSource } from "../scripts/mockControlsSource.ts"
 import { mapMocks } from "../src/mocks.ts"
 import type { MockRevision, MockScreenReview } from "@lgtm/contracts"
+
+const mockRoot = resolve(existsSync("design/mock") ? "design/mock" : "../../design/mock")
+const mockSource = (path: string) => readFileSync(resolve(mockRoot, path), "utf8")
 
 it("review item 2: keeps plain text comments and their revision when a new version is recorded", () => {
   const revision = { projectId: "project", revisionId: "v1", at: 1, author: { _tag: "owner" }, artifacts: [], comparisons: [],
@@ -13,7 +17,7 @@ it("review item 2: keeps plain text comments and their revision when a new versi
 })
 
 it("connects the copied screen and fails closed when its reference markup changes", () => {
-  const source = readFileSync("design/mock/js/screens/mocks.js", "utf8")
+  const source = mockSource("js/screens/mocks.js")
   const wired = mockControlsSource("js/screens/mocks.js", source)
   expect(wired).toContain("controls.comment(p, sc, text)")
   expect(wired).toContain("'Sending…'")
@@ -22,7 +26,7 @@ it("connects the copied screen and fails closed when its reference markup change
 })
 
 it("loads authenticated feedback before accepting a consistent mock snapshot", () => {
-  const source = readFileSync("design/mock/js/live/mocks.js", "utf8")
+  const source = mockSource("js/live/mocks.js")
   const wired = mockControlsSource("js/live/mocks.js", source)
   expect(wired.indexOf("project.mocks.screen.read")).toBeLessThan(wired.indexOf("const final ="))
   expect(wired).toContain("mapMocks(items, approval, reviews)")
@@ -60,18 +64,18 @@ it("review item 2: shows a screen's historical comments oldest first and exclude
 
 it("review item 9: refuses duplicate replacement anchors in the merged mock", () => {
   for (const path of ["js/screens/mocks.js", "js/live/mocks.js"]) {
-    const source = readFileSync("design/mock/" + path, "utf8")
+    const source = mockSource(path)
     expect(() => mockControlsSource(path, source + "\n" + source)).toThrow(/unique|ambiguous|multiple/)
   }
 })
 
 it("review item 9: refuses a missing seen-badge replacement instead of silently leaving the old control", () => {
-  const source = readFileSync("design/mock/js/screens/mocks.js", "utf8")
+  const source = mockSource("js/screens/mocks.js")
   expect(() => mockControlsSource("js/screens/mocks.js", source.replaceAll("!live.on && !c.seen", "!c.seen"))).toThrow("no longer matches")
 })
 
 it("review item 2: labels earlier comments with their recorded revision in the copied screen", () => {
-  const source = readFileSync("design/mock/js/screens/mocks.js", "utf8")
+  const source = mockSource("js/screens/mocks.js")
   const wired = mockControlsSource("js/screens/mocks.js", source)
   expect(wired).toContain("c.revisionId")
 })
