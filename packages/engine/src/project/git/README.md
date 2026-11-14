@@ -24,13 +24,14 @@ replies. Agent text must remain plain text in the page.
 | `discover`, `register`, `createRepository` | Discover inside the configured folder, validate a checkout, or create a repository on `main`. Registration validates the folder and returns its identity; W04 persists the project record. |
 | `branches`, `worktrees`, `createWorktree` | List local branches and controlled worktrees, or allocate a safe branch and folder with a numeric collision suffix. An empty repository uses a real unborn branch, with a null head. The folder lives under the main repository's `.worktrees/`, even when called from a linked checkout. A local `info/exclude` rule keeps generated checkouts out of the parent's changes. |
 | `changes`, `diff`, `history`, `commitFiles` | Read real porcelain status, patches, line counts, history and files. A diff defaults to all tracked changes against the head, plus untracked files. `staged: true` selects the index, and `staged: false` selects working files against the index. |
-| `state` | Return the head, branch, upstream, ahead and behind counts, and any merge head. With a target ref, return the pending count and earliest unmerged commit's committer date. Without an upstream, sync counts are zero and `upstream` is null. Without a target, pending is zero and `pendingSince` is null. |
+| `state` | Return the head, branch, upstream, ahead and behind counts, and any merge head. With a target ref, return the separate `behindParent` count, the pending count and earliest unmerged commit's committer date. Without an upstream, sync counts are zero and `upstream` is null. Without a target, pending is zero and `pendingSince` is null. |
 | `stage`, `unstage`, `stageAll`, `unstageAll`, `commit` | Mutate the actual index and commit selected changes. Bulk operations exclude conflicts. A resolved merge can be committed with no staged file diff when its merge head still exists. |
 | `planDiscard`, `discard` | Obtain a file list and fingerprint, then supply that plan with `confirmed: true`. Only unstaged changes are discarded. Conflicts are excluded, and the staged index is preserved. Edits invalidate confirmation. |
 | `fetch`, `pull`, `push` | Synchronize through `origin`. Pull requires an upstream and a clean destination, and only fast-forwards. Push sets the branch's upstream. Fixed failures report missing prerequisites, divergence and recoverable remote errors. |
-| `mergeTeam` | Merge a clean source checkout into a clean destination in the same repository. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
+| `mergeTeam`, `updateFromParent` | Merge a committed source head into a clean destination in the same repository. Team integration requires a clean source, while parent update leaves uncommitted parent files alone. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
 | `review` | Read evidence against a local base branch, keyed to both heads. It creates no approval, provider report, or merge. |
 | `reviewMain`, `approveMain` | Read a complete bounded comparison between registered project and base checkouts. The separate approval method requires the engine-supplied authenticated owner and explicit confirmation, revalidates both reviewed heads and branch identities, and merges the reviewed object into main or master. It refuses incomplete or binary review data, dirty worktrees, and an active merge. It never changes `mergeTeam`'s base refusal. |
+| `abortMerge`, `resolvedConflicts`, `reopen` | Abort an explicitly confirmed merge after checking its head pair, list resolved regular text files from the current merge's resolve-undo index, or restore one file's original conflict stages. Reopening never accepts replacement content. No active merge returns `no_merge` for a mutation. |
 | `conflict`, `choose`, `resolve` | Read real index stages and canonical three-way text hunks, choose each hunk, and resolve after rechecking the file and index fingerprint. Both keeps ours, then theirs. Each line retains its newline. Resolution clears the unmerged index entries and leaves the result unstaged for review. Client-supplied segments are never used as write content. |
 
 A conflict's `ours`, `base` and `theirs` fields are complete bounded file
@@ -117,3 +118,13 @@ Aggregate agent reads omit excluded files; owner Git operations retain the ordin
 Literal Git path syntax remains separate, so ordinary tab-bearing filenames retain their supported behavior.
 Owner-controlled Git configuration can run content filters or merge drivers as the same Unix user.
 The current local-owner security boundary accepts that scope; this service does not claim to sandbox repository configuration.
+
+Parent updates require a clean child and the expected parent commit.
+Uncommitted parent files do not block that read-only source operation.
+Team integration still requires a clean source.
+
+The resolved file list carries each safe file's content fingerprint.
+Reopening requires that fingerprint and explicit confirmation.
+Unsafe or oversized resolved paths are omitted without hiding other resolved paths.
+A stale file observation refuses before checkout replaces its contents.
+A proven overlapping-edit abort refusal returns `abort_blocked` without mutation uncertainty.

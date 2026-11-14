@@ -1019,3 +1019,15 @@ Service settings shows each harness's report as it arrives.
 A future harness-specific discovery mode could disable session persistence through supported harness interfaces.
 It must preserve the account's login and the owner's existing history.
 The investigation and its limits are recorded in issue 719.
+
+
+## Git actions after the website connection
+
+The owner requested the remaining Git actions on 2026-11-13.
+The local engine, client application programming interface, command-line program, and live website now support aborting a merge, reopening a resolved file, sending a main review back with a reason, updating from a registered parent, and integrating a registered builder worktree into its team.
+The owner approves every merge into the base branch.
+Sending a review back records a distinct outcome and addresses its reason to the project lead on the board.
+Git text generation needs an owner-configured account and model with a bounded short-task execution boundary.
+Hosted pull request editing needs a durable provider record and an authenticated provider update action.
+Those generation and editing controls remain refused until their prerequisites exist.
+Remote-machine Git remains unavailable.

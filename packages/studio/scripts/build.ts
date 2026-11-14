@@ -1,3 +1,4 @@
+import { gitActionsSource } from "./gitActions.ts"
 import { harnessChoicesSource } from "./harnessChoices.ts"
 import { mockControlsSource } from "./mockControlsSource.ts"
 // Builds the live website into packages/studio/dist, which the engine serves at /studio/.
@@ -77,9 +78,9 @@ export async function buildStudio(dist = defaultDist): Promise<string> {
     const target = join(dist, path)
     writeFileSync(target, mockControlsSource(path, readFileSync(target, "utf8")))
   }
-  for (const path of ["js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
+  for (const path of ["js/screens/git.js", "js/actions.js", "js/live/git.js", "js/live/board.js", "js/screens/service.js", "js/screens/auth.js", "js/dialogs.js", "js/ui.js", "js/screens/messages.js"]) {
     const target = join(dist, path)
-    writeFileSync(target, harnessChoicesSource(path, readFileSync(target, "utf8")))
+    writeFileSync(target, gitActionsSource(path, harnessChoicesSource(path, readFileSync(target, "utf8"))))
   }
 
   writeFileSync(join(dist, "js/workflow-contracts.js"), contracts)

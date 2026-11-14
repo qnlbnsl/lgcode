@@ -21,7 +21,3 @@ design/data/local/
 
 # Reverse Fig photographs, reports and intermediate files.
 .reverse-fig/
-
-# Studio generates the sample's shared contracts and default workflow.
-design/mock/vendor/workflow-contracts.js
-design/mock/workflows/build-loop.json

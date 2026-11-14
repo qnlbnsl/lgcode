@@ -8,7 +8,7 @@ export type GitFailureReason =
   | "conflicts" | "confirmation_required" | "stale_state" | "nothing_staged" | "invalid_message"
   | "missing_remote" | "missing_upstream" | "authentication_required" | "network_failed" | "push_rejected"
   | "pull_diverged" | "base_requires_review" | "unsupported_provider" | "push_required"
-  | "unsupported_conflict" | "incomplete_choices" | "owner_required" | "unsupported_review";
+  | "unsupported_conflict" | "incomplete_choices" | "owner_required" | "unsupported_review" | "no_merge" | "abort_blocked";
 
 // Neither subprocess output nor rejected paths are attached to a failure.
 export class GitFailure extends Data.TaggedError("GitFailure")<{ readonly reason: GitFailureReason; readonly uncertain?: boolean; readonly determinate?: boolean }> {}
@@ -30,6 +30,7 @@ export interface CommitFile { readonly path: string; readonly originalPath: stri
 export interface GitState {
   readonly head: string | null; readonly branch: string | null; readonly upstream: string | null;
   readonly mergeHead: string | null;
+  readonly behindParent?: number;
   readonly ahead: number; readonly behind: number; readonly pending: number; readonly pendingSince: string | null;
 }
 export type ConflictChoice = "ours" | "theirs" | "both";
@@ -44,6 +45,7 @@ export interface Review {
   readonly head: string; readonly baseHead: string; readonly branch: string; readonly base: string;
   readonly commits: Bounded<Commit>; readonly files: Bounded<CommitFile>; readonly diff: Diff;
 }
+export interface ResolvedConflict { readonly path: string; readonly fingerprint: string }
 export interface DiscardPlan { readonly fingerprint: string; readonly paths: ReadonlyArray<string> }
 export interface GitService {
   mutationIdentity(folder: string): GitOperation<GitMutationIdentity>;
@@ -71,12 +73,16 @@ export interface GitService {
   pull(folder: string): GitOperation<void>;
   push(folder: string): GitOperation<void>;
   mergeTeam(source: string, destination: string, expectedHead: string): GitOperation<string>;
+  updateFromParent(source: string, destination: string, expectedHead: string): GitOperation<string>;
   review(folder: string, base: string, agentRead?: boolean): GitOperation<Review>;
   reviewMain(source: string, destination: string): GitOperation<Review>;
   // A distinct execution boundary, never a bypass on mergeTeam. The engine
   // supplies the authenticated caller, not a field from the command payload.
   approveMain(source: string, destination: string, reviewed: Pick<Review, "head" | "baseHead" | "branch" | "base">,
     caller: Caller | undefined, confirmed: boolean): GitOperation<string>;
+  abortMerge(folder: string, expectedHead: string, expectedMergeHead: string, confirmed: boolean): GitOperation<void>;
+  resolvedConflicts(folder: string): GitOperation<Bounded<ResolvedConflict>>;
+  reopen(folder: string, path: string, expectedHead: string, expectedMergeHead: string, fingerprint: string, confirmed: boolean): GitOperation<void>;
   conflict(folder: string, path: string, agentRead?: boolean): GitOperation<Conflict>;
   choose(folder: string, selection: Conflict, hunk: number, choice: ConflictChoice): GitOperation<Conflict>;
   resolve(folder: string, selection: Conflict): GitOperation<void>;
