@@ -30,7 +30,6 @@ export function rewriteIndex(html: string): { readonly page: string; readonly th
   const main = '<script type="module" src="js/main.js"></script>'
   if (!html.includes(main)) throw new Error("design/mock/index.html no longer loads js/main.js")
   const page = html
-    .replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, "")
     .replace(inline[0], '<script src="theme.js"></script>')
     .replace(main, '<script type="module" src="live.js"></script>')
     // The policy allows no data: address, and an empty icon is not needed.

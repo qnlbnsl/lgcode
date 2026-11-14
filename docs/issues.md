@@ -12547,3 +12547,18 @@ Both files are now committed.
 They can fall behind `packages/contracts/src/workflows.ts` and the engine's default workflow until the build is run again.
 No test yet fails when they fall behind.
 
+## 759. The sample mock was blank when the engine served it.
+
+`design/mock/index.html` used an inline import map to find the workflow contracts.
+The engine's static server sends a content security policy that allows no inline script.
+The browser ignored the import map, the "Workflows" screen failed to import, and the whole page stayed blank.
+The Notifications journey opens the sample through the engine first, so it failed on `85cf37e`.
+The mock now imports the committed bundle `design/mock/vendor/workflow-contracts.js` directly, with no import map.
+
+## 760. The Git journey failed once at "Use both" under load.
+
+The full check on `85cf37e` failed at `packages/web/e2e/support/studioGit.ts:157`.
+The "Use both" button did not appear within ten seconds after an external merge conflict and a refresh.
+The same journey passed when it ran alone on the same commit.
+The cause is not known.
+
