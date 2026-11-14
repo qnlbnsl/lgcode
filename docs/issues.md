@@ -13382,4 +13382,5 @@ The lead must resolve whether the terminal should redact all login tokens or whe
 
 The required remote check exited with status 255 before running a test.
 Secure Shell rejected `/etc/ssh/ssh_config.d/20-systemd-ssh-proxy.conf` with `Bad owner or permissions`.
+Running the same helper with sandbox escalation reached the remote computer and started the required check.
 The worker did not change the system configuration or substitute local tests.
