@@ -6,6 +6,7 @@ import { rolesVisibility } from "./roles/visibility.ts"
 
 export type VisibilityClass = "agent-scoped" | "owner-only" | "piece-decided"
 export const eventVisibility = {
+  HarnessInstallStarted: "owner-only", HarnessInstallFinished: "owner-only",
   ...boardVisibility,
   ...projectVisibility,
   ...clientEventVisibility,

@@ -314,7 +314,8 @@ export function engineConnection(options: ConnectionOptions = {}): LiveConnectio
       // Credential ingress is decoded by the existing client, which requires Redacted.
       const secret = tag === "client.alerts.carrier.set-token" && "value" in payload
         ? Redacted.make(String(payload.value), { label: "secret value" }) : undefined
-      const retryKey = tag === "client.alerts.retry" ? JSON.stringify(payload) : undefined
+      const retryKey = tag === "client.alerts.retry" ? JSON.stringify(payload)
+        : tag === "client.harness.install" ? JSON.stringify([tag, payload]) : undefined
       const id = retryKey === undefined ? requestId() : retryIds.get(retryKey) ?? requestId()
       if (retryKey !== undefined) retryIds.set(retryKey, id)
       try {

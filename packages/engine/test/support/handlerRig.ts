@@ -94,6 +94,7 @@ export const makeFakeSecrets = (): FakeSecrets => {
 };
 
 export interface Fakes {
+  readonly harnessPrograms?: import("../../src/harnesses/programs.ts").HarnessPrograms;
   readonly runner: FakeRunner;
   readonly secrets: FakeSecrets;
   // WS-7b: the production default declines until the roles condition exists.
@@ -123,6 +124,7 @@ export const provideRig = <A, E, R>(
     Effect.map(EventLog.EventLog, fakes.wrapLog),
   ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
+    ...(fakes.harnessPrograms === undefined ? {} : { harnessPrograms: fakes.harnessPrograms }),
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
     ...(fakes.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: fakes.capacityHoldCondition }),
     ...(fakes.harnessDefaults === undefined ? {} : { harnessDefaults: fakes.harnessDefaults }),

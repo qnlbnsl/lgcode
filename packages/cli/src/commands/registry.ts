@@ -10,6 +10,10 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.harness.status": "Read each harness's installed program, path and version.",
+  "client.harness.recipe": "Show the exact repository-owned install commands for a harness.",
+  "client.harness.install": "Install a harness using its fixed user-only recipe. Provider sign-in stays in your terminal.",
+  "client.harness.account.check": "Check local sign-in evidence without authenticating with a provider.",
   "project.context.search": "Search readable project tasks and files in a registered local project workspace; returns typed references and truncation state.",
   "project.repository.discover": "Discover bounded local repositories inside the workspace folder.",
   "project.branches": "List actual branches of a registered local repository.",
