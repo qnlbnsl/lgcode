@@ -13368,3 +13368,18 @@ The live mapping in `packages/studio/src/mapping.ts` sets the project's creation
 `phaseTimes` in `design/mock/js/screens/workflow.js` then spreads the time since zero across the phases with fixed sample weights.
 The phase lengths are therefore invented, not only wrong in size.
 The fix needs the engine to record when a project enters each phase, and the page to show no length until it has one.
+
+## s7-signin-1. The sign-in terminal brief conflicts with the rule against sending login tokens to a client.
+
+The sign-in terminal brief permits command output containing a token to reach the owner's initiating connection.
+Rule 6 in the security policy forbids sending harness login tokens to any client.
+The brief also forbids weakening that rule and requires the builder to stop if the work needs an exception.
+The existing harness request handlers redact output for the owner too.
+The builder stopped before changing the application.
+The lead must resolve whether the terminal should redact all login tokens or whether the owner approves a narrowly scoped exception for this connection.
+
+## s7-signin-2. The remote test helper fails before running checks in this worker environment.
+
+The required remote check exited with status 255 before running a test.
+Secure Shell rejected `/etc/ssh/ssh_config.d/20-systemd-ssh-proxy.conf` with `Bad owner or permissions`.
+The worker did not change the system configuration or substitute local tests.
